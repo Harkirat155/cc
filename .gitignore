@@ -22,7 +22,6 @@
 /.stylelintcache
 /.git
 
-/package-lock.json
 /yarn.lock
 /pnpm-lock.yaml
 
