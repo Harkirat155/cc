@@ -17,9 +17,8 @@ export default defineConfig({
       treeshake: true, // Remove unused code
       output: {
         manualChunks: undefined, // Reduce chunk splitting for smaller files
+        format: 'es', // Use ES module format
       },
-      external: ['react', 'react-dom'], // Exclude React from the bundle
-      format: 'es', // Use ES module format
       sourcemap: true, // Generate source maps for easier debugging
     },
   },
