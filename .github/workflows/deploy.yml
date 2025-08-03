@@ -26,8 +26,10 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: ./app/package-lock.json
 
       - name: Check for lock file
+        continue-on-error: false
         run: |
           if [ ! -f ./app/package-lock.json ]; then
             echo "Error: package-lock.json not found in ./app"
