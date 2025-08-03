@@ -1,159 +1,95 @@
-import React, { useState, useEffect } from 'react';
-import io from 'socket.io-client';
-import Board from './components/Board'; // Adjust path as needed
-import HistoryPanel from './components/HistoryPanel'; // Adjust path as needed
-import Menu from './components/Menu'; // Adjust path as needed
-import ResultModal from './components/ResultModal'; // Adjust path as needed
-import './App.css'; // Adjust path as needed
+import React, { useState } from 'react';
+import GameBoard from './components/GameBoard';
+import HistoryPanel from './components/HistoryPanel';
+import MenuPanel from './components/MenuPanel';
+import ResultModal from './components/ResultModal';
+import ValueMark from './components/ValueMark';
 
-const socket = io('https://crisscross-backend.onrender.com', { // Replace with your backend URL
-  reconnection: true,
-  reconnectionAttempts: 5,
-});
-
-function App() {
-  const [gameState, setGameState] = useState({
-    board: Array(9).fill(''),
-    turn: 'X',
-    winner: null,
-    xScore: 0,
-    oScore: 0,
-  });
-  const [roomId, setRoomId] = useState('');
-  const [player, setPlayer] = useState(null);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [message, setMessage] = useState('Create or join a game room');
+const Game = () => {
+  const [squares, setSquares] = useState(Array(9).fill(null));
+  const [isXNext, setIsXNext] = useState(true);
   const [history, setHistory] = useState([]);
+  const [xWins, setXWins] = useState(0);
+  const [oWins, setOWins] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [result, setResult] = useState('');
 
-  useEffect(() => {
-    socket.on('gameUpdate', (state) => {
-      setGameState(state);
-      setHistory((prev) => [...prev, state.board]);
-      if (state.winner) {
-        setShowModal(true);
+  const calculateWinner = (squares) => {
+    const lines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+    for (let line of lines) {
+      const [a, b, c] = line;
+      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+        return { winner: squares[a], line };
       }
-    });
-
-    socket.on('startGame', () => {
-      setGameStarted(true);
-      setMessage(`You are ${player}. Game started!`);
-    });
-
-    socket.on('playerDisconnected', ({ message }) => {
-      setMessage(message);
-      setGameStarted(false);
-      setShowModal(true);
-    });
-
-    return () => {
-      socket.off('gameUpdate');
-      socket.off('startGame');
-      socket.off('playerDisconnected');
-    };
-  }, [player]);
-
-  const createRoom = () => {
-    socket.emit('createRoom', ({ roomId, player }) => {
-      setRoomId(roomId);
-      setPlayer(player);
-      setMessage(`Room created: ${roomId}. Share this link: https://harkirat155.github.io/crissCross/?room=${roomId}`);
-    });
-  };
-
-  const joinRoom = (inputRoomId) => {
-    socket.emit('joinRoom', { roomId: inputRoomId }, ({ error, player }) => {
-      if (error) {
-        setMessage(error);
-      } else {
-        setRoomId(inputRoomId);
-        setPlayer(player);
-        setMessage(`Joined room ${inputRoomId} as ${player}`);
-      }
-    });
+    }
+    return squares.every(s => s) ? { winner: 'Draw', line: [] } : null;
   };
 
   const handleSquareClick = (index) => {
-    if (!gameStarted || gameState.winner || gameState.board[index] !== '' || gameState.turn !== player) {
-      return;
+    if (squares[index] || calculateWinner(squares)) return;
+    const newSquares = squares.slice();
+    newSquares[index] = isXNext ? 'X' : 'O';
+    setSquares(newSquares);
+    setIsXNext(!isXNext);
+
+    const winnerInfo = calculateWinner(newSquares);
+    if (winnerInfo) {
+      const resultText = winnerInfo.winner === 'Draw' ? 'Draw!' : `${winnerInfo.winner} Wins!`;
+      setResult(resultText);
+      setShowModal(true);
+      setHistory([...history, {
+        squares: newSquares,
+        result: resultText
+      }]);
+      if (winnerInfo.winner === 'X') setXWins(xWins + 1);
+      if (winnerInfo.winner === 'O') setOWins(oWins + 1);
     }
-    socket.emit('makeMove', { roomId, index });
   };
 
-  const resetGame = () => {
-    socket.emit('resetGame', { roomId });
+  const handleNewGame = () => {
+    setSquares(Array(9).fill(null));
+    // setIsXNext(true);
     setShowModal(false);
   };
 
-  const resetScores = () => {
-    socket.emit('resetScores', { roomId });
+  const handleReset = () => {
+    setSquares(Array(9).fill(null));
+    setIsXNext(true);
+    setHistory([]);
+    setXWins(0);
+    setOWins(0);
+    setShowModal(false);
   };
 
-  const handleJoinInput = (e) => {
-    e.preventDefault();
-    const inputRoomId = e.target.elements.roomId.value;
-    joinRoom(inputRoomId);
+  const handleHistoryClick = (index) => {
+    const selectedGame = history[index];
+    setSquares(selectedGame.squares);
+    setIsXNext(true);
+    setShowModal(false);
   };
 
-  // Extract roomId from URL on load
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roomFromUrl = params.get('room');
-    if (roomFromUrl) {
-      joinRoom(roomFromUrl);
-    }
-  }, []);
+  const winnerInfo = calculateWinner(squares);
+  const winningSquares = winnerInfo ? winnerInfo.line : [];
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-100">
-      {!gameStarted ? (
-        <div className="p-4">
-          <h1 className="text-2xl font-bold mb-4">Tic Tac Toe</h1>
-          <button
-            onClick={createRoom}
-            className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
-          >
-            Create New Game
-          </button>
-          <form onSubmit={handleJoinInput} className="flex flex-col">
-            <input
-              type="text"
-              name="roomId"
-              placeholder="Enter Room ID"
-              className="border p-2 mb-2 rounded"
-            />
-            <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
-              Join Game
-            </button>
-          </form>
-          <p className="mt-4">{message}</p>
-        </div>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold mb-4">Tic Tac Toe</h1>
-          <p className="mb-2">Room: {roomId} | You are: {player}</p>
-          <p className="mb-2">Turn: {gameState.turn}</p>
-          <div className="flex">
-            <HistoryPanel history={history} />
-            <Board
-              squares={gameState.board}
-              onSquareClick={handleSquareClick}
-            />
-          </div>
-          <Menu onNewGame={resetGame} onResetScore={resetScores} />
-          <ResultModal
-            show={showModal}
-            winner={gameState.winner}
-            onClose={() => setShowModal(false)}
-            onNewGame={resetGame}
-          />
-          <div className="mt-4">
-            <p>Score: X: {gameState.xScore} | O: {gameState.oScore}</p>
-          </div>
-        </>
-      )}
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <h1 className="text-4xl font-bold mb-8 text-gray-800 animate-pulse">Tic Tac Toe</h1>
+      <div className="mb-4 text-lg font-medium text-gray-700">
+        Score: <ValueMark value="X" /> - {xWins} | <ValueMark value="O" /> - {oWins}
+      </div>
+      <div className="mb-4 text-lg font-medium text-gray-700">
+        Turn: {isXNext ? <ValueMark value="X" /> : <ValueMark value="O" />}
+      </div>
+      <GameBoard squares={squares} onSquareClick={handleSquareClick} winningSquares={winningSquares} />
+      <HistoryPanel history={history} onHistoryClick={handleHistoryClick} />
+      <MenuPanel onReset={handleReset} onNewGame={handleNewGame} />
+      {showModal && <ResultModal result={result} onClose={handleNewGame} />}
     </div>
   );
-}
+};
 
-export default App;
+export default Game;
