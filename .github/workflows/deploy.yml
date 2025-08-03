@@ -27,11 +27,20 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Check for lock file
+        run: |
+          if [ ! -f ./app/package-lock.json ]; then
+            echo "Error: package-lock.json not found in ./app"
+            exit 1
+          fi
+
       - name: Install Dependencies
-        run: cd app && npm ci
+        working-directory: ./app
+        run: npm ci
 
       - name: Build
-        run: cd app && npm run build
+        working-directory: ./app
+        run: npm run build
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
