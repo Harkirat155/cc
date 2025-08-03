@@ -1,8 +1,6 @@
-/node_modules
-/dist
-/build
 /.env
 /.DS_Store
+
 
 /.vscode
 /.idea
@@ -25,4 +23,5 @@
 /yarn.lock
 /pnpm-lock.yaml
 
-first.md
+node_modules
+dist
