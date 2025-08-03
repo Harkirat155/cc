@@ -18,6 +18,9 @@ export default defineConfig({
       output: {
         manualChunks: undefined, // Reduce chunk splitting for smaller files
       },
+      external: ['react', 'react-dom'], // Exclude React from the bundle
+      format: 'es', // Use ES module format
+      sourcemap: true, // Generate source maps for easier debugging
     },
   },
   css: {
