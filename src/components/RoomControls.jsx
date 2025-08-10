@@ -45,9 +45,6 @@ export default function RoomControls({ roomId, player, createRoom, joinRoom, lea
           </button>
         )}
       </form>
-      {roomId && (
-        <div className="text-xs text-gray-600 font-mono ml-1">Room: {roomId} | You: {player}</div>
-      )}
     </div>
   );
 }
