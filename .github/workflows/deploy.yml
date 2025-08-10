@@ -37,7 +37,10 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-      
+
+      - name: Set backend URL
+        run: echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
+
       - name: Install Dependencies
         run: npm ci
 
