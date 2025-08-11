@@ -40,6 +40,10 @@ export default function useSocketGame() {
   // Sequence of moves for current game (compact form)
   const moveSequenceRef = useRef([]); // array of { mark, index }
   const lastBoardRef = useRef(emptyBoard());
+  // Time-travel index (which snapshot user is viewing)
+  const [viewIndex, setViewIndex] = useState(0); // 0..moveHistory.length-1
+  const viewIndexRef = useRef(0);
+  useEffect(() => { viewIndexRef.current = viewIndex; }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
   const [message, setMessage] = useState("Local game ready");
@@ -96,7 +100,12 @@ export default function useSocketGame() {
           moveSequenceRef.current.push({ mark: payload.board[changedIndex], index: changedIndex });
         }
         lastBoardRef.current = payload.board.slice();
-        return [...h, { squares: payload.board.slice(), result: resultText }];
+        const next = [...h, { squares: payload.board.slice(), result: resultText }];
+        // Auto-follow if user was at latest
+        if (viewIndexRef.current === h.length - 1) {
+          setViewIndex(next.length - 1);
+        }
+        return next;
       });
       if (payload.winner) setShowModal(true);
     });
@@ -141,10 +150,44 @@ export default function useSocketGame() {
 
   const handleSquareClick = useCallback(
     (index) => {
+      // If user is viewing a past move, auto-resume latest before applying a move
+      setViewIndex((currentIdx) => {
+        const latest = moveHistory.length - 1;
+        return currentIdx === latest ? currentIdx : latest;
+      });
       // Multiplayer path
       if (isMultiplayer) {
         if (!socketRef.current) return;
         if (player === "spectator") return; // read-only
+        // Prevent move if it's not this player's turn
+        if (gameState.turn !== player) return;
+        // Optimistic update for snappy UX; server will reconcile via gameUpdate
+        setGameState((curr) => {
+          if (curr.winner || curr.board[index] !== "") return curr;
+          const board = curr.board.slice();
+          board[index] = curr.turn;
+          const result = calcWinner(board);
+          const nextTurn = result ? curr.turn : (curr.turn === 'X' ? 'O' : 'X');
+          const resultText = result ? (result.winner === 'draw' ? 'Draw' : `${result.winner} wins`) : `${nextTurn}'s turn`;
+          // History optimistic append
+          setMoveHistory((h) => {
+            const last = h[h.length -1];
+            if (last && last.squares.every((v,i)=> v===board[i])) return h;
+            const placedIndex = board.findIndex((cell, idx) => cell !== last.squares[idx]);
+            if (placedIndex >= 0) moveSequenceRef.current.push({ mark: board[placedIndex], index: placedIndex });
+            lastBoardRef.current = board.slice();
+            const nextArr = [...h, { squares: board.slice(), result: resultText }];
+            if (viewIndexRef.current === h.length -1) setViewIndex(nextArr.length -1);
+            return nextArr;
+          });
+          return {
+            ...curr,
+            board,
+            turn: result ? curr.turn : nextTurn,
+            winner: result ? result.winner : curr.winner,
+            winningLine: result ? result.line : curr.winningLine
+          };
+        });
         socketRef.current.emit("makeMove", { roomId, index });
         return;
       }
@@ -174,12 +217,14 @@ export default function useSocketGame() {
           const placedIndex = board.findIndex((cell, idx) => cell !== last.squares[idx]);
           if (placedIndex >= 0) moveSequenceRef.current.push({ mark: board[placedIndex], index: placedIndex });
           lastBoardRef.current = board.slice();
-          return [...h, { squares: board.slice(), result: resultText }];
+      const nextArr = [...h, { squares: board.slice(), result: resultText }];
+      if (viewIndexRef.current === h.length - 1) setViewIndex(nextArr.length - 1);
+      return nextArr;
         });
         return next;
       });
     },
-    [isMultiplayer, player, roomId]
+    [isMultiplayer, player, roomId, moveHistory.length]
   );
 
   const finalizeCurrentGameIfFinished = useCallback(() => {
@@ -214,6 +259,7 @@ export default function useSocketGame() {
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
     setMoveHistory([{ squares: emptyBoard(), result: 'New game: X to move' }]);
+  setViewIndex(0);
     setShowModal(false);
   }, [finalizeCurrentGameIfFinished, isMultiplayer, roomId]);
 
@@ -226,6 +272,7 @@ export default function useSocketGame() {
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
     setMoveHistory([{ squares: emptyBoard(), result: 'Scores reset: X to move' }]);
+  setViewIndex(0);
     setShowModal(false);
   }, [isMultiplayer, roomId]);
 
@@ -241,6 +288,7 @@ export default function useSocketGame() {
       moveSequenceRef.current = [];
       lastBoardRef.current = emptyBoard();
       setMoveHistory([{ squares: emptyBoard(), result: 'Left room' }]);
+  setViewIndex(0);
       setShowModal(false);
     });
   }, [isMultiplayer, roomId, finalizeCurrentGameIfFinished]);
@@ -257,6 +305,8 @@ export default function useSocketGame() {
     gameState,
   history: moveHistory,
   completedGames,
+    viewIndex,
+    displayedBoard: moveHistory[Math.min(viewIndex, moveHistory.length -1)].squares,
     message,
     roomId,
     player,
@@ -269,5 +319,10 @@ export default function useSocketGame() {
     resetGame,
     resetScores,
   leaveRoom,
+    jumpTo: (idx) => {
+      if (idx < 0 || idx >= moveHistory.length) return;
+      setViewIndex(idx);
+    },
+    resumeLatest: () => setViewIndex(moveHistory.length -1),
   };
 }

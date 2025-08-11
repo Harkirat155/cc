@@ -9,9 +9,13 @@ import RoomControls from "./components/RoomControls";
 
 const Game = () => {
   const {
-    gameState,
-    history,
+  gameState,
+  history,
     completedGames,
+  viewIndex,
+  displayedBoard,
+  jumpTo,
+  resumeLatest,
     message,
     roomId,
     player,
@@ -47,11 +51,18 @@ const Game = () => {
         Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
       </div>
       <GameBoard
-        squares={gameState.board}
+        squares={displayedBoard}
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-  <HistoryPanel history={history} completedGames={completedGames} onHistoryClick={() => {}} />
+      <HistoryPanel
+        history={history}
+        completedGames={completedGames}
+        viewIndex={viewIndex}
+        jumpTo={jumpTo}
+        resumeLatest={resumeLatest}
+        onHistoryClick={() => {}}
+      />
       <RoomControls
         roomId={roomId}
         player={player}

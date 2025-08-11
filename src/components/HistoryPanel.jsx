@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import HistoryItem from "./HistoryItem";
 
-const HistoryPanel = ({ history, completedGames = [], onHistoryClick }) => {
+const HistoryPanel = ({ history, completedGames = [], onHistoryClick, viewIndex, jumpTo, resumeLatest }) => {
   const [expanded, setExpanded] = useState(false);
   const panelRef = useRef(null);
 
@@ -55,7 +55,7 @@ const HistoryPanel = ({ history, completedGames = [], onHistoryClick }) => {
             Current Game
           </div>
           <ul
-            className="mb-3 pr-1 space-y-1 overflow-y-auto flex-1 min-h-16"
+            className="mb-2 pr-1 space-y-1 overflow-y-auto flex-1 min-h-16"
             style={{ scrollbarWidth: "thin" }}
           >
             {history.map((game, index) => (
@@ -63,13 +63,23 @@ const HistoryPanel = ({ history, completedGames = [], onHistoryClick }) => {
                 key={index}
                 game={game}
                 index={index}
-                onClick={onHistoryClick}
+                active={index === viewIndex}
+                onClick={() => jumpTo(index)}
               />
             ))}
             {history.length === 0 && (
               <li className="text-xs text-gray-400">No moves yet</li>
             )}
           </ul>
+          {history.length > 1 && viewIndex < history.length - 1 && (
+            <button
+              type="button"
+              onClick={resumeLatest}
+              className="mb-3 text-[10px] uppercase tracking-wide px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+            >
+              Resume Live
+            </button>
+          )}
           <div className="text-[11px] uppercase text-gray-500 mb-1 mt-1 flex items-center justify-between">
             <span>Completed</span>
             {completedGames.length > 0 && (
