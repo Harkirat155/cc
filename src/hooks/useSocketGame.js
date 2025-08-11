@@ -33,7 +33,13 @@ const initialLocalState = {
 
 export default function useSocketGame() {
   const [gameState, setGameState] = useState(initialLocalState);
-  const [history, setHistory] = useState([{ squares: emptyBoard(), result: 'Game start: X to move' }]);
+  // Move-by-move history for the CURRENT (ongoing) game
+  const [moveHistory, setMoveHistory] = useState([{ squares: emptyBoard(), result: 'Game start: X to move' }]);
+  // Concise summaries of COMPLETED games
+  const [completedGames, setCompletedGames] = useState([]); // {id, winner, draw, sequence:["X0","O4",...], totalMoves, finishedAt}
+  // Sequence of moves for current game (compact form)
+  const moveSequenceRef = useRef([]); // array of { mark, index }
+  const lastBoardRef = useRef(emptyBoard());
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
   const [message, setMessage] = useState("Local game ready");
@@ -77,12 +83,19 @@ export default function useSocketGame() {
       const resultText = payload.winner
         ? (payload.winner === 'draw' ? 'Draw' : `${payload.winner} wins`)
         : `${payload.turn}'s turn`;
-      setHistory((h) => {
+      setMoveHistory((h) => {
         const last = h[h.length - 1];
         if (last && last.squares && last.squares.every((v, i) => v === payload.board[i])) {
-          // No board change; skip duplicate entry
-          return h;
+          return h; // duplicate board state
         }
+        // Detect changed cell to append to sequence
+        const prevBoard = lastBoardRef.current;
+        let changedIndex = null;
+        for (let i=0;i<payload.board.length;i++) if (prevBoard[i] !== payload.board[i]) { changedIndex = i; break; }
+        if (changedIndex !== null) {
+          moveSequenceRef.current.push({ mark: payload.board[changedIndex], index: changedIndex });
+        }
+        lastBoardRef.current = payload.board.slice();
         return [...h, { squares: payload.board.slice(), result: resultText }];
       });
       if (payload.winner) setShowModal(true);
@@ -154,10 +167,14 @@ export default function useSocketGame() {
         const resultText = result
           ? (result.winner === 'draw' ? 'Draw' : `${result.winner} wins`)
           : `${next.turn}'s turn`;
-        setHistory((h) => {
+        setMoveHistory((h) => {
           const last = h[h.length - 1];
           if (last && last.squares && last.squares.every((v,i) => v === board[i])) return h;
-            return [...h, { squares: board.slice(), result: resultText }];
+          // Record move in sequence
+          const placedIndex = board.findIndex((cell, idx) => cell !== last.squares[idx]);
+          if (placedIndex >= 0) moveSequenceRef.current.push({ mark: board[placedIndex], index: placedIndex });
+          lastBoardRef.current = board.slice();
+          return [...h, { squares: board.slice(), result: resultText }];
         });
         return next;
       });
@@ -165,21 +182,40 @@ export default function useSocketGame() {
     [isMultiplayer, player, roomId]
   );
 
+  const finalizeCurrentGameIfFinished = useCallback(() => {
+    if (!gameState.winner) return; // only store completed
+    // Avoid duplicating if already stored (check last completed sequence string)
+    const seqStr = moveSequenceRef.current.map(m => m.mark+""+m.index).join('-');
+    if (completedGames.length && completedGames[completedGames.length-1].sequence.join('-') === seqStr) return;
+    setCompletedGames(g => [...g, {
+      id: Date.now(),
+      winner: gameState.winner === 'draw' ? null : gameState.winner,
+      draw: gameState.winner === 'draw',
+      sequence: moveSequenceRef.current.map(m => m.mark+""+m.index),
+      totalMoves: moveSequenceRef.current.length,
+      finishedAt: new Date().toISOString()
+    }]);
+  }, [gameState.winner, completedGames]);
+
   const resetGame = useCallback(() => {
+    // If current game finished, persist summary
+    finalizeCurrentGameIfFinished();
     if (isMultiplayer && socketRef.current) {
-  socketRef.current.emit("resetGame", { roomId });
-      setShowModal(false);
-      return;
+      socketRef.current.emit("resetGame", { roomId });
+      // After server reset, local state will update via event; prime local trackers
+    } else {
+      setGameState((s) => ({
+        ...initialLocalState,
+        xScore: s.xScore,
+        oScore: s.oScore,
+      }));
     }
-    // Local
-    setGameState((s) => ({
-      ...initialLocalState,
-      xScore: s.xScore,
-      oScore: s.oScore,
-    }));
-  setHistory([{ squares: emptyBoard(), result: 'New game: X to move' }]);
+    // Reset per-game tracking
+    moveSequenceRef.current = [];
+    lastBoardRef.current = emptyBoard();
+    setMoveHistory([{ squares: emptyBoard(), result: 'New game: X to move' }]);
     setShowModal(false);
-  }, [isMultiplayer, roomId]);
+  }, [finalizeCurrentGameIfFinished, isMultiplayer, roomId]);
 
   const resetScores = useCallback(() => {
     if (isMultiplayer && socketRef.current) {
@@ -187,7 +223,9 @@ export default function useSocketGame() {
       return;
     }
     setGameState((s) => ({ ...initialLocalState }));
-  setHistory([{ squares: emptyBoard(), result: 'Scores reset: X to move' }]);
+    moveSequenceRef.current = [];
+    lastBoardRef.current = emptyBoard();
+    setMoveHistory([{ squares: emptyBoard(), result: 'Scores reset: X to move' }]);
     setShowModal(false);
   }, [isMultiplayer, roomId]);
 
@@ -195,14 +233,17 @@ export default function useSocketGame() {
     if (!isMultiplayer || !socketRef.current) return;
     socketRef.current.emit('leaveRoom', { roomId }, (resp) => {
       if (resp?.error){ setMessage(resp.error); return; }
+      finalizeCurrentGameIfFinished();
       setRoomId(null);
       setPlayer(null);
       setMessage('Left room');
       setGameState(initialLocalState);
-  setHistory([{ squares: emptyBoard(), result: 'Left room' }]);
+      moveSequenceRef.current = [];
+      lastBoardRef.current = emptyBoard();
+      setMoveHistory([{ squares: emptyBoard(), result: 'Left room' }]);
       setShowModal(false);
     });
-  }, [isMultiplayer, roomId]);
+  }, [isMultiplayer, roomId, finalizeCurrentGameIfFinished]);
 
   // Cleanup socket on unmount
   useEffect(
@@ -214,7 +255,8 @@ export default function useSocketGame() {
 
   return {
     gameState,
-    history,
+  history: moveHistory,
+  completedGames,
     message,
     roomId,
     player,

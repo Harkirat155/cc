@@ -11,6 +11,7 @@ const Game = () => {
   const {
     gameState,
     history,
+    completedGames,
     message,
     roomId,
     player,
@@ -20,9 +21,9 @@ const Game = () => {
     createRoom,
     joinRoom,
     handleSquareClick,
-  resetGame,
-  resetScores,
-  leaveRoom,
+    resetGame,
+    resetScores,
+    leaveRoom,
   } = useSocketGame();
   const winningSquares = gameState.winningLine || [];
 
@@ -50,10 +51,7 @@ const Game = () => {
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-      <HistoryPanel
-        history={history}
-        onHistoryClick={() => {}}
-      />
+  <HistoryPanel history={history} completedGames={completedGames} onHistoryClick={() => {}} />
       <RoomControls
         roomId={roomId}
         player={player}
