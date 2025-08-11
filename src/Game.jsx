@@ -51,7 +51,7 @@ const Game = () => {
         winningSquares={winningSquares}
       />
       <HistoryPanel
-        history={history.map((b) => ({ squares: b, result: "" }))}
+        history={history}
         onHistoryClick={() => {}}
       />
       <RoomControls

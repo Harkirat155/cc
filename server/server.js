@@ -5,7 +5,7 @@ import compression from "compression";
 
 // Config
 const PORT = process.env.PORT || 5123;
-const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 100);
+const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
 // Helpers
@@ -44,6 +44,9 @@ function genCode() {
 
 // LRU rooms map: roomId -> { players: {X, O}, spectators: Set, state }
 const rooms = new Map();
+// Track which rooms a socket participates in for O(1) disconnect cleanup.
+// socketId -> Set(roomId)
+const socketRooms = new Map();
 const touch = (id) => {
   const r = rooms.get(id);
   if (!r) return;
@@ -83,6 +86,9 @@ io.on("connection", (socket) => {
       state: initialState(),
     });
     socket.join(roomId);
+  // map socket -> room
+  let set = socketRooms.get(socket.id); if (!set){ set = new Set(); socketRooms.set(socket.id, set); }
+  set.add(roomId);
     enforceLRU();
     ack?.({ roomId, player: "X" });
     publish(roomId);
@@ -106,6 +112,8 @@ io.on("connection", (socket) => {
       role = "spectator";
     }
     socket.join(roomId);
+  let set = socketRooms.get(socket.id); if (!set){ set = new Set(); socketRooms.set(socket.id, set); }
+  set.add(roomId);
     ack?.({ player: role });
     if (room.players.X && room.players.O) io.to(roomId).emit("startGame");
     publish(roomId);
@@ -173,29 +181,28 @@ io.on("connection", (socket) => {
       if (!room.players.X && !room.players.O && room.spectators.size === 0) {
         rooms.delete(roomId);
       } else publish(roomId);
+      // remove mapping
+      const set = socketRooms.get(socket.id); if (set){ set.delete(roomId); if (set.size === 0) socketRooms.delete(socket.id); }
       return ack?.({ ok: true });
     }
     ack?.({ error: "Not in room" });
   });
 
   socket.on("disconnect", () => {
-    for (const [roomId, room] of rooms.entries()) {
+    const set = socketRooms.get(socket.id);
+    if (!set){ return; }
+    for (const roomId of set.values()){
+      const room = rooms.get(roomId);
+      if (!room) continue;
       let changed = false;
-      if (room.players.X === socket.id) {
-        room.players.X = null;
-        changed = true;
-      }
-      if (room.players.O === socket.id) {
-        room.players.O = null;
-        changed = true;
-      }
+      if (room.players.X === socket.id) { room.players.X = null; changed = true; }
+      if (room.players.O === socket.id) { room.players.O = null; changed = true; }
       if (room.spectators.delete(socket.id)) changed = true;
-      if (changed) {
-        if (!room.players.X && !room.players.O && room.spectators.size === 0) {
-          rooms.delete(roomId);
-        } else publish(roomId);
+      if (changed){
+        if (!room.players.X && !room.players.O && room.spectators.size === 0) rooms.delete(roomId); else publish(roomId);
       }
     }
+    socketRooms.delete(socket.id);
   });
 });
 

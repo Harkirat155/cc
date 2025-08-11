@@ -33,7 +33,7 @@ const initialLocalState = {
 
 export default function useSocketGame() {
   const [gameState, setGameState] = useState(initialLocalState);
-  const [history, setHistory] = useState([emptyBoard()]);
+  const [history, setHistory] = useState([{ squares: emptyBoard(), result: 'Game start: X to move' }]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
   const [message, setMessage] = useState("Local game ready");
@@ -74,10 +74,18 @@ export default function useSocketGame() {
     s.on("gameUpdate", (payload) => {
       setRoomId(payload.roomId || roomId);
       setGameState((prev) => ({ ...prev, ...payload }));
-      setHistory((h) => [...h, payload.board.slice()]);
-      if (payload.winner) {
-        setShowModal(true);
-      }
+      const resultText = payload.winner
+        ? (payload.winner === 'draw' ? 'Draw' : `${payload.winner} wins`)
+        : `${payload.turn}'s turn`;
+      setHistory((h) => {
+        const last = h[h.length - 1];
+        if (last && last.squares && last.squares.every((v, i) => v === payload.board[i])) {
+          // No board change; skip duplicate entry
+          return h;
+        }
+        return [...h, { squares: payload.board.slice(), result: resultText }];
+      });
+      if (payload.winner) setShowModal(true);
     });
     s.on("startGame", () => setMessage("Game started"));
 
@@ -143,7 +151,14 @@ export default function useSocketGame() {
         } else {
           next.turn = current.turn === "X" ? "O" : "X";
         }
-        setHistory((h) => [...h, board]);
+        const resultText = result
+          ? (result.winner === 'draw' ? 'Draw' : `${result.winner} wins`)
+          : `${next.turn}'s turn`;
+        setHistory((h) => {
+          const last = h[h.length - 1];
+          if (last && last.squares && last.squares.every((v,i) => v === board[i])) return h;
+            return [...h, { squares: board.slice(), result: resultText }];
+        });
         return next;
       });
     },
@@ -162,7 +177,7 @@ export default function useSocketGame() {
       xScore: s.xScore,
       oScore: s.oScore,
     }));
-    setHistory([emptyBoard()]);
+  setHistory([{ squares: emptyBoard(), result: 'New game: X to move' }]);
     setShowModal(false);
   }, [isMultiplayer, roomId]);
 
@@ -172,7 +187,7 @@ export default function useSocketGame() {
       return;
     }
     setGameState((s) => ({ ...initialLocalState }));
-    setHistory([emptyBoard()]);
+  setHistory([{ squares: emptyBoard(), result: 'Scores reset: X to move' }]);
     setShowModal(false);
   }, [isMultiplayer, roomId]);
 
@@ -184,7 +199,7 @@ export default function useSocketGame() {
       setPlayer(null);
       setMessage('Left room');
       setGameState(initialLocalState);
-      setHistory([emptyBoard()]);
+  setHistory([{ squares: emptyBoard(), result: 'Left room' }]);
       setShowModal(false);
     });
   }, [isMultiplayer, roomId]);
