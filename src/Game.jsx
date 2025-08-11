@@ -9,25 +9,28 @@ import RoomControls from "./components/RoomControls";
 
 const Game = () => {
   const {
-  gameState,
-  history,
+    gameState,
+    history,
     completedGames,
-  viewIndex,
-  displayedBoard,
-  jumpTo,
-  resumeLatest,
+    viewIndex,
+    displayedBoard,
+    jumpTo,
+    resumeLatest,
     message,
     roomId,
     player,
     isMultiplayer,
     showModal,
     setShowModal,
+    newGameRequester,
+    requestNewGame,
     createRoom,
     joinRoom,
     handleSquareClick,
     resetGame,
     resetScores,
     leaveRoom,
+    socketId,
   } = useSocketGame();
   const winningSquares = gameState.winningLine || [];
 
@@ -75,9 +78,20 @@ const Game = () => {
       {showModal && (
         <ResultModal
           result={
-            gameState.winner === "draw" ? "Draw!" : `${gameState.winner} Wins!`
+            gameState.winner === "draw"
+              ? "Draw!"
+              : gameState.winner
+              ? `${gameState.winner} Wins!`
+              : "Game Over"
           }
-          onClose={resetGame}
+          onStartNewLocal={resetGame}
+          onJoinNewGame={resetGame}
+          onLeaveRoom={leaveRoom}
+          isMultiplayer={isMultiplayer}
+          player={player}
+          newGameRequester={newGameRequester}
+          requestNewGame={requestNewGame}
+          socketId={socketId}
         />
       )}
     </div>

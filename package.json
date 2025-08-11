@@ -10,7 +10,7 @@
         "build": "vite build",
         "serve": "vite preview",
         "test": "jest",
-        "server": "node server/server.js",
+        "server": "node server/app.js",
         "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
         "lint": "eslint ."
     },

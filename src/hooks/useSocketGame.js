@@ -34,7 +34,9 @@ const initialLocalState = {
 export default function useSocketGame() {
   const [gameState, setGameState] = useState(initialLocalState);
   // Move-by-move history for the CURRENT (ongoing) game
-  const [moveHistory, setMoveHistory] = useState([{ squares: emptyBoard(), result: 'Game start: X to move' }]);
+  const [moveHistory, setMoveHistory] = useState([
+    { squares: emptyBoard(), result: "Game start: X to move" },
+  ]);
   // Concise summaries of COMPLETED games
   const [completedGames, setCompletedGames] = useState([]); // {id, winner, draw, sequence:["X0","O4",...], totalMoves, finishedAt}
   // Sequence of moves for current game (compact form)
@@ -43,11 +45,14 @@ export default function useSocketGame() {
   // Time-travel index (which snapshot user is viewing)
   const [viewIndex, setViewIndex] = useState(0); // 0..moveHistory.length-1
   const viewIndexRef = useRef(0);
-  useEffect(() => { viewIndexRef.current = viewIndex; }, [viewIndex]);
+  useEffect(() => {
+    viewIndexRef.current = viewIndex;
+  }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
+  const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
 
@@ -84,23 +89,45 @@ export default function useSocketGame() {
     s.on("gameUpdate", (payload) => {
       setRoomId(payload.roomId || roomId);
       setGameState((prev) => ({ ...prev, ...payload }));
+      if (payload.newGameRequester !== undefined) {
+        setNewGameRequester(payload.newGameRequester);
+      } else if (payload.winner) {
+        // winner state but no requester yet
+        setNewGameRequester(null);
+      }
       const resultText = payload.winner
-        ? (payload.winner === 'draw' ? 'Draw' : `${payload.winner} wins`)
+        ? payload.winner === "draw"
+          ? "Draw"
+          : `${payload.winner} wins`
         : `${payload.turn}'s turn`;
       setMoveHistory((h) => {
         const last = h[h.length - 1];
-        if (last && last.squares && last.squares.every((v, i) => v === payload.board[i])) {
+        if (
+          last &&
+          last.squares &&
+          last.squares.every((v, i) => v === payload.board[i])
+        ) {
           return h; // duplicate board state
         }
         // Detect changed cell to append to sequence
         const prevBoard = lastBoardRef.current;
         let changedIndex = null;
-        for (let i=0;i<payload.board.length;i++) if (prevBoard[i] !== payload.board[i]) { changedIndex = i; break; }
+        for (let i = 0; i < payload.board.length; i++)
+          if (prevBoard[i] !== payload.board[i]) {
+            changedIndex = i;
+            break;
+          }
         if (changedIndex !== null) {
-          moveSequenceRef.current.push({ mark: payload.board[changedIndex], index: changedIndex });
+          moveSequenceRef.current.push({
+            mark: payload.board[changedIndex],
+            index: changedIndex,
+          });
         }
         lastBoardRef.current = payload.board.slice();
-        const next = [...h, { squares: payload.board.slice(), result: resultText }];
+        const next = [
+          ...h,
+          { squares: payload.board.slice(), result: resultText },
+        ];
         // Auto-follow if user was at latest
         if (viewIndexRef.current === h.length - 1) {
           setViewIndex(next.length - 1);
@@ -108,6 +135,11 @@ export default function useSocketGame() {
         return next;
       });
       if (payload.winner) setShowModal(true);
+    });
+    s.on("gameReset", () => {
+      // Reset came from someone (maybe opponent). Clear requester flags & modal for everyone.
+      setNewGameRequester(null);
+      setShowModal(false);
     });
     s.on("startGame", () => setMessage("Game started"));
 
@@ -167,17 +199,31 @@ export default function useSocketGame() {
           const board = curr.board.slice();
           board[index] = curr.turn;
           const result = calcWinner(board);
-          const nextTurn = result ? curr.turn : (curr.turn === 'X' ? 'O' : 'X');
-          const resultText = result ? (result.winner === 'draw' ? 'Draw' : `${result.winner} wins`) : `${nextTurn}'s turn`;
+          const nextTurn = result ? curr.turn : curr.turn === "X" ? "O" : "X";
+          const resultText = result
+            ? result.winner === "draw"
+              ? "Draw"
+              : `${result.winner} wins`
+            : `${nextTurn}'s turn`;
           // History optimistic append
           setMoveHistory((h) => {
-            const last = h[h.length -1];
-            if (last && last.squares.every((v,i)=> v===board[i])) return h;
-            const placedIndex = board.findIndex((cell, idx) => cell !== last.squares[idx]);
-            if (placedIndex >= 0) moveSequenceRef.current.push({ mark: board[placedIndex], index: placedIndex });
+            const last = h[h.length - 1];
+            if (last && last.squares.every((v, i) => v === board[i])) return h;
+            const placedIndex = board.findIndex(
+              (cell, idx) => cell !== last.squares[idx]
+            );
+            if (placedIndex >= 0)
+              moveSequenceRef.current.push({
+                mark: board[placedIndex],
+                index: placedIndex,
+              });
             lastBoardRef.current = board.slice();
-            const nextArr = [...h, { squares: board.slice(), result: resultText }];
-            if (viewIndexRef.current === h.length -1) setViewIndex(nextArr.length -1);
+            const nextArr = [
+              ...h,
+              { squares: board.slice(), result: resultText },
+            ];
+            if (viewIndexRef.current === h.length - 1)
+              setViewIndex(nextArr.length - 1);
             return nextArr;
           });
           return {
@@ -185,7 +231,7 @@ export default function useSocketGame() {
             board,
             turn: result ? curr.turn : nextTurn,
             winner: result ? result.winner : curr.winner,
-            winningLine: result ? result.line : curr.winningLine
+            winningLine: result ? result.line : curr.winningLine,
           };
         });
         socketRef.current.emit("makeMove", { roomId, index });
@@ -208,18 +254,35 @@ export default function useSocketGame() {
           next.turn = current.turn === "X" ? "O" : "X";
         }
         const resultText = result
-          ? (result.winner === 'draw' ? 'Draw' : `${result.winner} wins`)
+          ? result.winner === "draw"
+            ? "Draw"
+            : `${result.winner} wins`
           : `${next.turn}'s turn`;
         setMoveHistory((h) => {
           const last = h[h.length - 1];
-          if (last && last.squares && last.squares.every((v,i) => v === board[i])) return h;
+          if (
+            last &&
+            last.squares &&
+            last.squares.every((v, i) => v === board[i])
+          )
+            return h;
           // Record move in sequence
-          const placedIndex = board.findIndex((cell, idx) => cell !== last.squares[idx]);
-          if (placedIndex >= 0) moveSequenceRef.current.push({ mark: board[placedIndex], index: placedIndex });
+          const placedIndex = board.findIndex(
+            (cell, idx) => cell !== last.squares[idx]
+          );
+          if (placedIndex >= 0)
+            moveSequenceRef.current.push({
+              mark: board[placedIndex],
+              index: placedIndex,
+            });
           lastBoardRef.current = board.slice();
-      const nextArr = [...h, { squares: board.slice(), result: resultText }];
-      if (viewIndexRef.current === h.length - 1) setViewIndex(nextArr.length - 1);
-      return nextArr;
+          const nextArr = [
+            ...h,
+            { squares: board.slice(), result: resultText },
+          ];
+          if (viewIndexRef.current === h.length - 1)
+            setViewIndex(nextArr.length - 1);
+          return nextArr;
         });
         return next;
       });
@@ -230,16 +293,25 @@ export default function useSocketGame() {
   const finalizeCurrentGameIfFinished = useCallback(() => {
     if (!gameState.winner) return; // only store completed
     // Avoid duplicating if already stored (check last completed sequence string)
-    const seqStr = moveSequenceRef.current.map(m => m.mark+""+m.index).join('-');
-    if (completedGames.length && completedGames[completedGames.length-1].sequence.join('-') === seqStr) return;
-    setCompletedGames(g => [...g, {
-      id: Date.now(),
-      winner: gameState.winner === 'draw' ? null : gameState.winner,
-      draw: gameState.winner === 'draw',
-      sequence: moveSequenceRef.current.map(m => m.mark+""+m.index),
-      totalMoves: moveSequenceRef.current.length,
-      finishedAt: new Date().toISOString()
-    }]);
+    const seqStr = moveSequenceRef.current
+      .map((m) => m.mark + "" + m.index)
+      .join("-");
+    if (
+      completedGames.length &&
+      completedGames[completedGames.length - 1].sequence.join("-") === seqStr
+    )
+      return;
+    setCompletedGames((g) => [
+      ...g,
+      {
+        id: Date.now(),
+        winner: gameState.winner === "draw" ? null : gameState.winner,
+        draw: gameState.winner === "draw",
+        sequence: moveSequenceRef.current.map((m) => m.mark + "" + m.index),
+        totalMoves: moveSequenceRef.current.length,
+        finishedAt: new Date().toISOString(),
+      },
+    ]);
   }, [gameState.winner, completedGames]);
 
   const resetGame = useCallback(() => {
@@ -258,9 +330,10 @@ export default function useSocketGame() {
     // Reset per-game tracking
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
-    setMoveHistory([{ squares: emptyBoard(), result: 'New game: X to move' }]);
-  setViewIndex(0);
+    setMoveHistory([{ squares: emptyBoard(), result: "New game: X to move" }]);
+    setViewIndex(0);
     setShowModal(false);
+    setNewGameRequester(null);
   }, [finalizeCurrentGameIfFinished, isMultiplayer, roomId]);
 
   const resetScores = useCallback(() => {
@@ -271,25 +344,32 @@ export default function useSocketGame() {
     setGameState((s) => ({ ...initialLocalState }));
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
-    setMoveHistory([{ squares: emptyBoard(), result: 'Scores reset: X to move' }]);
-  setViewIndex(0);
+    setMoveHistory([
+      { squares: emptyBoard(), result: "Scores reset: X to move" },
+    ]);
+    setViewIndex(0);
     setShowModal(false);
+    setNewGameRequester(null);
   }, [isMultiplayer, roomId]);
 
   const leaveRoom = useCallback(() => {
     if (!isMultiplayer || !socketRef.current) return;
-    socketRef.current.emit('leaveRoom', { roomId }, (resp) => {
-      if (resp?.error){ setMessage(resp.error); return; }
+    socketRef.current.emit("leaveRoom", { roomId }, (resp) => {
+      if (resp?.error) {
+        setMessage(resp.error);
+        return;
+      }
       finalizeCurrentGameIfFinished();
       setRoomId(null);
       setPlayer(null);
-      setMessage('Left room');
+      setMessage("Left room");
       setGameState(initialLocalState);
       moveSequenceRef.current = [];
       lastBoardRef.current = emptyBoard();
-      setMoveHistory([{ squares: emptyBoard(), result: 'Left room' }]);
-  setViewIndex(0);
+      setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
+      setViewIndex(0);
       setShowModal(false);
+      setNewGameRequester(null);
     });
   }, [isMultiplayer, roomId, finalizeCurrentGameIfFinished]);
 
@@ -303,26 +383,35 @@ export default function useSocketGame() {
 
   return {
     gameState,
-  history: moveHistory,
-  completedGames,
+    history: moveHistory,
+    completedGames,
     viewIndex,
-    displayedBoard: moveHistory[Math.min(viewIndex, moveHistory.length -1)].squares,
+    displayedBoard:
+      moveHistory[Math.min(viewIndex, moveHistory.length - 1)].squares,
     message,
     roomId,
     player,
     isMultiplayer,
     showModal,
     setShowModal,
+    newGameRequester,
+    requestNewGame: () => {
+      if (!isMultiplayer || !socketRef.current) return;
+  // Set requester locally for instant UI feedback
+  setNewGameRequester(socketRef.current.id);
+  socketRef.current.emit("requestNewGame", { roomId });
+    },
+    socketId: socketRef.current?.id || null,
     createRoom,
     joinRoom,
     handleSquareClick,
     resetGame,
     resetScores,
-  leaveRoom,
+    leaveRoom,
     jumpTo: (idx) => {
       if (idx < 0 || idx >= moveHistory.length) return;
       setViewIndex(idx);
     },
-    resumeLatest: () => setViewIndex(moveHistory.length -1),
+    resumeLatest: () => setViewIndex(moveHistory.length - 1),
   };
 }
