@@ -56,7 +56,7 @@ jobs:
         run: npm ci
 
       - name: Quick server syntax check
-        run: node --check server/server.js
+        run: node --check server/**
 
       # Add test step here if/when tests exist for server logic
       #- name: Run tests
