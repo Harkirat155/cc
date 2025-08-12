@@ -20,8 +20,7 @@ const Game = () => {
     roomId,
     player,
     isMultiplayer,
-    showModal,
-    setShowModal,
+  showModal,
     newGameRequester,
     requestNewGame,
     createRoom,
@@ -58,17 +57,14 @@ const Game = () => {
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-      <HistoryPanel
+  <HistoryPanel
         history={history}
         completedGames={completedGames}
         viewIndex={viewIndex}
         jumpTo={jumpTo}
         resumeLatest={resumeLatest}
-        onHistoryClick={() => {}}
       />
       <RoomControls
-        roomId={roomId}
-        player={player}
         createRoom={createRoom}
         joinRoom={joinRoom}
         leaveRoom={leaveRoom}

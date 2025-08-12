@@ -20,6 +20,5 @@ const io = new Server(server, {
 registerSocketHandlers(io);
 
 server.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`Realtime server listening on ${PORT}`);
 });

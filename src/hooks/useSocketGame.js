@@ -68,7 +68,7 @@ export default function useSocketGame() {
     socketRef.current = s;
 
     s.on("connect", () => {
-      setMessage((prev) =>
+  setMessage((_prev) =>
         roomId ? `Connected as ${player || ""}` : "Connected"
       );
       // If there was a pending join request before socket was ready
@@ -287,7 +287,8 @@ export default function useSocketGame() {
         return next;
       });
     },
-    [isMultiplayer, player, roomId, moveHistory.length]
+  // include gameState.turn to satisfy exhaustive-deps, but we only read it synchronously
+  [isMultiplayer, player, roomId, moveHistory.length, gameState.turn]
   );
 
   const finalizeCurrentGameIfFinished = useCallback(() => {
@@ -341,7 +342,7 @@ export default function useSocketGame() {
       socketRef.current.emit("resetScores", { roomId });
       return;
     }
-    setGameState((s) => ({ ...initialLocalState }));
+  setGameState((_s) => ({ ...initialLocalState }));
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
     setMoveHistory([

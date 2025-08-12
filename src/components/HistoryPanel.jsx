@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import HistoryItem from "./HistoryItem";
 
-const HistoryPanel = ({ history, completedGames = [], onHistoryClick, viewIndex, jumpTo, resumeLatest }) => {
+const HistoryPanel = ({ history, completedGames = [], viewIndex, jumpTo, resumeLatest }) => {
   const [expanded, setExpanded] = useState(false);
   const panelRef = useRef(null);
 

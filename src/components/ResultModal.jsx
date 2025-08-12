@@ -3,10 +3,10 @@ import React from "react";
 const ResultModal = ({
   result,
   onStartNewLocal, // original resetGame for initiator or local
-  onJoinNewGame, // opponent joins after initiator resets
+  // onJoinNewGame, // opponent joins after initiator resets (handled by onStartNewLocal)
   onLeaveRoom,
   isMultiplayer,
-  player,
+  // player,
   newGameRequester,
   requestNewGame,
   socketId,

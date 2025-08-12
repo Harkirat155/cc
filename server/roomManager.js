@@ -1,5 +1,4 @@
 // Room and socket management
-import { initialState } from './gameLogic.js';
 
 const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 10);
 export const rooms = new Map(); // roomId -> { players, spectators, state }

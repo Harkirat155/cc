@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 // Props expected:
 // { roomId, player, createRoom, joinRoom, leaveRoom, isMultiplayer }
-export default function RoomControls({ roomId, player, createRoom, joinRoom, leaveRoom, isMultiplayer }){
+export default function RoomControls({ createRoom, joinRoom, leaveRoom, isMultiplayer }){
   const [joinCode, setJoinCode] = useState('');
 
   const onSubmit = (e) => {
