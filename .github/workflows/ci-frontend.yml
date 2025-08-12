@@ -58,7 +58,7 @@ jobs:
         env:
           # Ensure jsdom is available for React Testing Library tests if configured
           NODE_ENV: test
-        run: npm test --if-present -- --run
+        run: npm run test --if-present
 
       - name: Build frontend
         run: npm run build

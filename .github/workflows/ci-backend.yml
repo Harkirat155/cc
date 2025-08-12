@@ -49,8 +49,8 @@ jobs:
         run: npm run lint --if-present
 
       - name: Server syntax check
-        run: node --check server/server.js
+        run: node --check server/app.js
 
       # Placeholder for server tests if/when added
       - name: Run server tests (if present)
-        run: npm test --if-present -- --run
+        run: npm run test --if-present
