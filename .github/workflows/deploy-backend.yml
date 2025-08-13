@@ -63,7 +63,7 @@ jobs:
       #  run: npm test --if-present
 
       - name: Deploy to Render
-        uses: johnbeynon/render-deploy-action@v1.4.0 # Use the latest version
+        uses: johnbeynon/render-deploy-action@v0.0.8 # Use the latest version
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
