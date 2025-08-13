@@ -67,7 +67,6 @@ jobs:
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-          wait-for-success: true # Optional: wait for the deployment to succeed
 
       - name: Summary
         if: success()
