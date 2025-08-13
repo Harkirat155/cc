@@ -62,51 +62,12 @@ jobs:
       #- name: Run tests
       #  run: npm test --if-present
 
-      - name: Trigger Render deploy
-        id: trigger
-        env:
-          SERVICE_ID: ${{ env.RENDER_SERVICE_ID }}
-          API_KEY: ${{ env.RENDER_API_KEY }}
-        run: |
-          if [ -z "$SERVICE_ID" ] || [ -z "$API_KEY" ]; then
-            echo "Missing Render secrets. Set RENDER_SERVICE_ID and RENDER_API_KEY in repo settings." >&2
-            exit 1
-          fi
-          RESP=$(curl -s -X POST "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $API_KEY" \
-            -H 'Content-Type: application/json' \
-            -d "{\"clearCache\": $CLEAR_CACHE}")
-          echo "$RESP" | jq . >/dev/null 2>&1 || { echo "Non-JSON response from Render"; echo "$RESP"; exit 1; }
-          ID=$(echo "$RESP" | jq -r .id)
-          if [ "$ID" = "null" ] || [ -z "$ID" ]; then
-            echo "Failed to get deploy id"; echo "$RESP"; exit 1; fi
-          echo "deploy_id=$ID" >> $GITHUB_OUTPUT
-          echo "Triggered deploy $ID"
-
-      - name: Poll deploy status
-        id: poll
-        env:
-          SERVICE_ID: ${{ env.RENDER_SERVICE_ID }}
-          API_KEY: ${{ env.RENDER_API_KEY }}
-          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
-        run: |
-          echo "Polling deploy $DEPLOY_ID"
-          ATTEMPTS=0
-          MAX_ATTEMPTS=60  # ~10 min (sleep 10)
-          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-            ATTEMPTS=$((ATTEMPTS+1))
-            STATUS_JSON=$(curl -s -H "Authorization: Bearer $API_KEY" "https://api.render.com/v1/services/$SERVICE_ID/deploys/$DEPLOY_ID")
-            PHASE=$(echo "$STATUS_JSON" | jq -r .status)
-            if [ "$PHASE" = "live" ]; then
-              echo "status=$PHASE" >> $GITHUB_OUTPUT
-              echo "Deploy succeeded"; exit 0; fi
-            if [ "$PHASE" = "failed" ] || [ "$PHASE" = "canceled" ]; then
-              echo "$STATUS_JSON"; echo "Deploy failed (status: $PHASE)" >&2; exit 1; fi
-            echo "Attempt $ATTEMPTS: $PHASE"
-            sleep 10
-          done
-          echo "Timed out waiting for deploy" >&2
-          exit 1
+      - name: Deploy to Render
+        uses: johnbeynon/render-deploy-action@v0.0.1 # Use the latest version
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+          wait-for-success: true # Optional: wait for the deployment to succeed
 
       - name: Summary
         if: success()
