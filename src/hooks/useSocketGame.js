@@ -64,7 +64,15 @@ export default function useSocketGame() {
     const url =
       import.meta.env.VITE_SOCKET_SERVER ||
       window.location.origin.replace(/:\d+$/, ":5123");
-    const s = io(url, { autoConnect: true });
+    const s = io(url, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+    });
+
+    s.on("connect_error", (error) => {
+      console.error("Connection error:", error);
+    });
+
     socketRef.current = s;
 
     s.on("connect", () => {
