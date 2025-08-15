@@ -5,7 +5,7 @@ import { Server } from 'socket.io';
 import compression from 'compression';
 import { registerSocketHandlers } from './socketHandlers.js';
 
-const PORT = process.env.PORT || 5123;
+const PORT = process.env.PORT || 10000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const app = express();
