@@ -3,7 +3,7 @@ import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
 import ResultModal from "./components/ResultModal";
-import ValueMark from "./components/ValueMark";
+import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import RoomControls from "./components/RoomControls";
 
@@ -20,7 +20,8 @@ const Game = () => {
     roomId,
     player,
     isMultiplayer,
-  showModal,
+    isRoomCreator,
+    showModal,
     newGameRequester,
     requestNewGame,
     createRoom,
@@ -57,7 +58,7 @@ const Game = () => {
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-  <HistoryPanel
+      <HistoryPanel
         history={history}
         completedGames={completedGames}
         viewIndex={viewIndex}
@@ -69,6 +70,8 @@ const Game = () => {
         joinRoom={joinRoom}
         leaveRoom={leaveRoom}
         isMultiplayer={isMultiplayer}
+        roomId={roomId}
+        isRoomCreator={isRoomCreator}
       />
       <MenuPanel onReset={resetScores} onNewGame={resetGame} />
       {showModal && (

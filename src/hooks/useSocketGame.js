@@ -50,6 +50,7 @@ export default function useSocketGame() {
   }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
+  const [isRoomCreator, setIsRoomCreator] = useState(false);
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
@@ -65,7 +66,7 @@ export default function useSocketGame() {
       import.meta.env.VITE_SOCKET_SERVER ||
       window.location.origin.replace(/:\d+$/, ":5123");
     const s = io(url, {
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       autoConnect: true,
     });
 
@@ -76,7 +77,7 @@ export default function useSocketGame() {
     socketRef.current = s;
 
     s.on("connect", () => {
-  setMessage((_prev) =>
+      setMessage((_prev) =>
         roomId ? `Connected as ${player || ""}` : "Connected"
       );
       // If there was a pending join request before socket was ready
@@ -159,6 +160,7 @@ export default function useSocketGame() {
     s.emit("createRoom", (resp) => {
       setRoomId(resp.roomId);
       setPlayer(resp.player);
+      setIsRoomCreator(true);
       setMessage(`Room ${resp.roomId} created. Waiting for opponent...`);
     });
   }, [ensureSocket]);
@@ -174,6 +176,7 @@ export default function useSocketGame() {
           }
           if (resp?.player) setPlayer(resp.player);
           setRoomId(code);
+          setIsRoomCreator(false);
           setMessage(
             `Joined room ${code}${
               resp?.player === "spectator" ? " as spectator" : ""
@@ -295,8 +298,8 @@ export default function useSocketGame() {
         return next;
       });
     },
-  // include gameState.turn to satisfy exhaustive-deps, but we only read it synchronously
-  [isMultiplayer, player, roomId, moveHistory.length, gameState.turn]
+    // include gameState.turn to satisfy exhaustive-deps, but we only read it synchronously
+    [isMultiplayer, player, roomId, moveHistory.length, gameState.turn]
   );
 
   const finalizeCurrentGameIfFinished = useCallback(() => {
@@ -350,7 +353,7 @@ export default function useSocketGame() {
       socketRef.current.emit("resetScores", { roomId });
       return;
     }
-  setGameState((_s) => ({ ...initialLocalState }));
+    setGameState((_s) => ({ ...initialLocalState }));
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
     setMoveHistory([
@@ -371,6 +374,7 @@ export default function useSocketGame() {
       finalizeCurrentGameIfFinished();
       setRoomId(null);
       setPlayer(null);
+      setIsRoomCreator(false);
       setMessage("Left room");
       setGameState(initialLocalState);
       moveSequenceRef.current = [];
@@ -401,14 +405,15 @@ export default function useSocketGame() {
     roomId,
     player,
     isMultiplayer,
+    isRoomCreator,
     showModal,
     setShowModal,
     newGameRequester,
     requestNewGame: () => {
       if (!isMultiplayer || !socketRef.current) return;
-  // Set requester locally for instant UI feedback
-  setNewGameRequester(socketRef.current.id);
-  socketRef.current.emit("requestNewGame", { roomId });
+      // Set requester locally for instant UI feedback
+      setNewGameRequester(socketRef.current.id);
+      socketRef.current.emit("requestNewGame", { roomId });
     },
     socketId: socketRef.current?.id || null,
     createRoom,
