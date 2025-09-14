@@ -12,24 +12,24 @@
     <link
       rel="icon"
       type="image/svg+xml"
-      href="/icons/icon-192x192.svg"
+      href="/crissCross/icons/icon-192x192.svg"
     />
     <link
       rel="alternate icon"
       type="image/svg+xml"
-      href="/icons/icon-512x512.svg"
+  href="/crissCross/icons/icon-512x512.svg"
     />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
-      href="/icons/icon-192x192.svg"
+  href="/crissCross/icons/icon-192x192.svg"
     />
     <link
       rel="mask-icon"
-      href="/icons/icon-192x192.svg"
+      href="/crissCross/icons/icon-192x192.svg"
       color="#3b82f6"
     />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/crissCross/manifest.json" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -37,8 +37,25 @@
     <meta name="msapplication-TileColor" content="#ffffff" />
     <meta
       name="msapplication-TileImage"
-      content="/icons/icon-192x192.svg"
+      content="/crissCross/icons/icon-192x192.svg"
     />
+    <script>
+      // If navigated from 404.html, restore the original path preserved in ?p=
+      (function restoreDeepLink() {
+        var params = new URLSearchParams(window.location.search);
+        var encoded = params.get('p');
+        if (!encoded) return;
+        try {
+          var target = decodeURIComponent(encoded);
+          // Normalize: ensure it starts with '/'
+          if (target.charAt(0) !== '/') target = '/' + target;
+          // Replace current URL so React Router can match client-side
+          var base = '/crissCross';
+          var newUrl = base + target.replace(/^\/+/, '/');
+          window.history.replaceState(null, '', newUrl);
+        } catch {}
+      })();
+    </script>
   </head>
   <body>
     <main>
@@ -55,6 +72,6 @@
         >GitHub Repository</a
       >
     </footer>
-    <script type="module" src="/src/index.jsx"></script>
+  <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>
