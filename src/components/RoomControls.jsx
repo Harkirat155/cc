@@ -1,18 +1,27 @@
 /* eslint-env browser */
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 // Props expected:
 // { roomId, isRoomCreator, createRoom, leaveRoom, isMultiplayer }
-export default function RoomControls({ createRoom, leaveRoom, isMultiplayer, roomId, isRoomCreator }){
+export default function RoomControls({
+  createRoom,
+  leaveRoom,
+  isMultiplayer,
+  roomId,
+  isRoomCreator,
+}) {
   const [copied, setCopied] = useState(false);
 
   // Build absolute share link like https://example.com/room/ABCDE
   // Respect any base path (e.g., GH Pages) using Vite's BASE_URL
   // Avoid duplicating current pathname when already under /room/:id
-  const base = (import.meta && import.meta.env && import.meta.env.BASE_URL) || '/';
-  const shareUrl = roomId
-    ? new window.URL(`/room/${roomId}`, window.location.origin + base).toString()
-    : '';
+  const toAbsoluteUrl = (path) =>
+    new window.URL(
+      path.replace(/^\//, ""),
+      window.location.origin + import.meta.env.BASE_URL
+    ).toString();
+
+  const shareUrl = toAbsoluteUrl(`/room/${roomId}`);
 
   // TODO react-share as a possible alternative
   // https://www.npmjs.com/package/react-share
@@ -23,12 +32,12 @@ export default function RoomControls({ createRoom, leaveRoom, isMultiplayer, roo
   // https://stackoverflow.com/questions/5717093/check-if-a-javascript-string-is-a-url
   const handleShare = async () => {
     if (!roomId) return;
-    const title = 'Join my Tic Tac Toe room';
+    const title = "Join my Tic Tac Toe room";
     const text = `Use this code ${roomId} or open this link to join:`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-  window.setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
       if (navigator.share) {
         await navigator.share({ title, text, url: shareUrl });
         return;
@@ -58,20 +67,20 @@ export default function RoomControls({ createRoom, leaveRoom, isMultiplayer, roo
           onClick={handleShare}
           className="px-4 py-2 bg-purple-600 text-white rounded shadow hover:bg-purple-700 transition"
           type="button"
-          aria-label="Share room link"
+          aria-label={copied ? "Link copied to clipboard" : "Share room link"}
         >
-          {copied ? 'Link Copied' : 'Share'}
+          {copied ? "Link Copied" : "Share"}
         </button>
       )}
       {isMultiplayer && (
-          <button
-            type="button"
-            onClick={leaveRoom}
-            className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition"
-          >
-            Leave
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={leaveRoom}
+          className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition"
+        >
+          Leave
+        </button>
+      )}
     </div>
   );
 }
