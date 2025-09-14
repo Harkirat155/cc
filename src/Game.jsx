@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useParams } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
@@ -8,6 +9,7 @@ import useSocketGame from "./hooks/useSocketGame";
 import RoomControls from "./components/RoomControls";
 
 const Game = () => {
+  const { roomId: paramRoomId } = useParams();
   const {
     gameState,
     history,
@@ -35,6 +37,17 @@ const Game = () => {
   const winningSquares = gameState.winningLine || [];
 
   // winningSquares derived from multiplayer/local hook state
+
+  // Auto-join a room when visiting /room/:roomId via a shared link
+  useEffect(() => {
+    const code = (paramRoomId || "").trim().toUpperCase();
+    if (!code) return;
+    // Only attempt auto-join if not already in a room
+    if (!isMultiplayer) {
+      joinRoom(code);
+    }
+    // If already in a different room, do nothing for now to avoid multi-room state
+  }, [paramRoomId, isMultiplayer, joinRoom]);
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100">

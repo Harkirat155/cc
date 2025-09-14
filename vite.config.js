@@ -5,7 +5,7 @@ import tailwindcss from 'tailwindcss';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/crissCross/',
+  base: '/',
   esbuild: {
     // loader: 'jsx', // Remove or set as string if needed
     minify: true, // Minify JS in dev and build

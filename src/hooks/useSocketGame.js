@@ -56,6 +56,8 @@ export default function useSocketGame() {
   const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
+  // Track a one-time 'connect' listener for joinRoom to avoid stacking
+  const joinOnConnectHandlerRef = useRef(null);
 
   const isMultiplayer = !!roomId;
 
@@ -167,8 +169,9 @@ export default function useSocketGame() {
 
   const joinRoom = useCallback(
     (code) => {
+      try {
       const s = ensureSocket();
-      if (s.connected) {
+      const emitJoin = () => {
         s.emit("joinRoom", { roomId: code }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
@@ -183,10 +186,30 @@ export default function useSocketGame() {
             }`
           );
         });
+      };
+      if (s.connected) {
+        emitJoin();
       } else {
-        // store for later
-        pendingJoinRef.current = code;
+        // Ensure we emit right after the connection is established (avoid stacking listeners)
+        if (joinOnConnectHandlerRef.current) {
+          try { s.off("connect", joinOnConnectHandlerRef.current); } catch {}
+        }
+        const handler = () => {
+          emitJoin();
+          joinOnConnectHandlerRef.current = null;
+        };
+        joinOnConnectHandlerRef.current = handler;
+        s.once("connect", handler);
+        // Kick off connection if not already
+        try { s.connect(); } catch {}
+        // If it connected in-between, emit now
+        if (s.connected) {
+          emitJoin();
+          try { s.off("connect", handler); } catch {}
+          joinOnConnectHandlerRef.current = null;
+        }
       }
+      } catch (e) { console.error("Join room error:", e)};
     },
     [ensureSocket]
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import ValueMark from './ValueMark';
+import ValueMark from './marks/ValueMark';
 
 const BoardSquare = ({ value, onClick, isWinning }) => (
   <button
