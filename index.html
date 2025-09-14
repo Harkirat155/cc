@@ -3,27 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="A modern, minimalist Tic Tac Toe game built with React and Tailwind CSS. Play, track history, and enjoy a beautiful UI." />
+    <meta
+      name="description"
+      content="A modern, minimalist Tic Tac Toe game built with React and Tailwind CSS. Play, track history, and enjoy a beautiful UI."
+    />
     <title>Tic Tac Toe</title>
-    <link rel="icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- App icons -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/icons/icon-192x192.svg"
+    />
+    <link
+      rel="alternate icon"
+      type="image/svg+xml"
+      href="/icons/icon-512x512.svg"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/icons/icon-192x192.svg"
+    />
+    <link
+      rel="mask-icon"
+      href="/icons/icon-192x192.svg"
+      color="#3b82f6"
+    />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="msapplication-TileColor" content="#ffffff" />
-    <meta name="msapplication-TileImage" content="/mstile-150x150.png" />
-    <link rel="stylesheet" href="/src/index.css" />
+    <meta
+      name="msapplication-TileImage"
+      content="/icons/icon-192x192.svg"
+    />
   </head>
   <body>
-    <div id="root"></div>
+    <main>
+      <div id="root"></div>
+    </main>
     <!-- Example crawlable link for SEO best practices: 
          Crawlable links allow search engines to discover and index your site, 
          which can improve your site's visibility in search results. -->
     <footer class="text-center mt-8">
-      <a href="https://github.com/harkirat155/crissCross" rel="noopener" target="_blank">GitHub Repository</a>
+      <a
+        href="https://github.com/harkirat155/crissCross"
+        rel="noopener"
+        target="_blank"
+        >GitHub Repository</a
+      >
     </footer>
-    <script type="module" src="src/index.jsx"></script>
+    <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

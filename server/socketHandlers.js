@@ -21,6 +21,8 @@ export function registerSocketHandlers(io) {
     });
 
     socket.on("joinRoom", ({ roomId }, ack) => {
+      roomId = (roomId || "").trim().toUpperCase();
+      if (!roomId) return ack?.({ error: "Invalid room ID" });
       const room = rooms.get(roomId);
       if (!room) return ack?.({ error: "Room not found" });
       touch(roomId);

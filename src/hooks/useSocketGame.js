@@ -50,11 +50,14 @@ export default function useSocketGame() {
   }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
+  const [isRoomCreator, setIsRoomCreator] = useState(false);
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
+  // Track a one-time 'connect' listener for joinRoom to avoid stacking
+  const joinOnConnectHandlerRef = useRef(null);
 
   const isMultiplayer = !!roomId;
 
@@ -65,7 +68,7 @@ export default function useSocketGame() {
       import.meta.env.VITE_SOCKET_SERVER ||
       window.location.origin.replace(/:\d+$/, ":5123");
     const s = io(url, {
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
       autoConnect: true,
     });
 
@@ -76,7 +79,7 @@ export default function useSocketGame() {
     socketRef.current = s;
 
     s.on("connect", () => {
-  setMessage((_prev) =>
+      setMessage((_prev) =>
         roomId ? `Connected as ${player || ""}` : "Connected"
       );
       // If there was a pending join request before socket was ready
@@ -159,14 +162,16 @@ export default function useSocketGame() {
     s.emit("createRoom", (resp) => {
       setRoomId(resp.roomId);
       setPlayer(resp.player);
+      setIsRoomCreator(true);
       setMessage(`Room ${resp.roomId} created. Waiting for opponent...`);
     });
   }, [ensureSocket]);
 
   const joinRoom = useCallback(
     (code) => {
+      try {
       const s = ensureSocket();
-      if (s.connected) {
+      const emitJoin = () => {
         s.emit("joinRoom", { roomId: code }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
@@ -174,16 +179,43 @@ export default function useSocketGame() {
           }
           if (resp?.player) setPlayer(resp.player);
           setRoomId(code);
+          setIsRoomCreator(false);
           setMessage(
             `Joined room ${code}${
               resp?.player === "spectator" ? " as spectator" : ""
             }`
           );
         });
+      };
+      if (s.connected) {
+        emitJoin();
       } else {
-        // store for later
-        pendingJoinRef.current = code;
+        // Ensure we emit right after the connection is established (avoid stacking listeners)
+        if (joinOnConnectHandlerRef.current) {
+          try { s.off("connect", joinOnConnectHandlerRef.current); } catch {
+            console.warn("Failed to remove previous connect listener");
+          }
+        }
+        const handler = () => {
+          emitJoin();
+          joinOnConnectHandlerRef.current = null;
+        };
+        joinOnConnectHandlerRef.current = handler;
+        s.once("connect", handler);
+        // Kick off connection if not already
+        try { s.connect(); } catch {
+          console.warn("Socket connect() failed");
+        }
+        // If it connected in-between, emit now
+        if (s.connected) {
+          emitJoin();
+          try { s.off("connect", handler); } catch {
+            console.warn("Failed to remove connect listener");
+          }
+          joinOnConnectHandlerRef.current = null;
+        }
       }
+      } catch (e) { console.error("Join room error:", e); };
     },
     [ensureSocket]
   );
@@ -295,8 +327,8 @@ export default function useSocketGame() {
         return next;
       });
     },
-  // include gameState.turn to satisfy exhaustive-deps, but we only read it synchronously
-  [isMultiplayer, player, roomId, moveHistory.length, gameState.turn]
+    // include gameState.turn to satisfy exhaustive-deps, but we only read it synchronously
+    [isMultiplayer, player, roomId, moveHistory.length, gameState.turn]
   );
 
   const finalizeCurrentGameIfFinished = useCallback(() => {
@@ -350,7 +382,7 @@ export default function useSocketGame() {
       socketRef.current.emit("resetScores", { roomId });
       return;
     }
-  setGameState((_s) => ({ ...initialLocalState }));
+    setGameState((_s) => ({ ...initialLocalState }));
     moveSequenceRef.current = [];
     lastBoardRef.current = emptyBoard();
     setMoveHistory([
@@ -371,6 +403,7 @@ export default function useSocketGame() {
       finalizeCurrentGameIfFinished();
       setRoomId(null);
       setPlayer(null);
+      setIsRoomCreator(false);
       setMessage("Left room");
       setGameState(initialLocalState);
       moveSequenceRef.current = [];
@@ -401,14 +434,15 @@ export default function useSocketGame() {
     roomId,
     player,
     isMultiplayer,
+    isRoomCreator,
     showModal,
     setShowModal,
     newGameRequester,
     requestNewGame: () => {
       if (!isMultiplayer || !socketRef.current) return;
-  // Set requester locally for instant UI feedback
-  setNewGameRequester(socketRef.current.id);
-  socketRef.current.emit("requestNewGame", { roomId });
+      // Set requester locally for instant UI feedback
+      setNewGameRequester(socketRef.current.id);
+      socketRef.current.emit("requestNewGame", { roomId });
     },
     socketId: socketRef.current?.id || null,
     createRoom,
