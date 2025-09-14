@@ -1,3 +1,4 @@
+/* eslint-env browser */
 import React, { useState } from 'react';
 
 // Props expected:
@@ -10,7 +11,7 @@ export default function RoomControls({ createRoom, leaveRoom, isMultiplayer, roo
   // Avoid duplicating current pathname when already under /room/:id
   const base = (import.meta && import.meta.env && import.meta.env.BASE_URL) || '/';
   const shareUrl = roomId
-    ? new URL(`/room/${roomId}`, window.location.origin + base).toString()
+    ? new window.URL(`/room/${roomId}`, window.location.origin + base).toString()
     : '';
 
   // TODO react-share as a possible alternative
@@ -27,7 +28,7 @@ export default function RoomControls({ createRoom, leaveRoom, isMultiplayer, roo
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  window.setTimeout(() => setCopied(false), 2000);
       if (navigator.share) {
         await navigator.share({ title, text, url: shareUrl });
         return;
