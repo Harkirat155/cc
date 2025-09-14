@@ -192,7 +192,9 @@ export default function useSocketGame() {
       } else {
         // Ensure we emit right after the connection is established (avoid stacking listeners)
         if (joinOnConnectHandlerRef.current) {
-          try { s.off("connect", joinOnConnectHandlerRef.current); } catch {}
+          try { s.off("connect", joinOnConnectHandlerRef.current); } catch {
+            console.warn("Failed to remove previous connect listener");
+          }
         }
         const handler = () => {
           emitJoin();
@@ -201,15 +203,19 @@ export default function useSocketGame() {
         joinOnConnectHandlerRef.current = handler;
         s.once("connect", handler);
         // Kick off connection if not already
-        try { s.connect(); } catch {}
+        try { s.connect(); } catch {
+          console.warn("Socket connect() failed");
+        }
         // If it connected in-between, emit now
         if (s.connected) {
           emitJoin();
-          try { s.off("connect", handler); } catch {}
+          try { s.off("connect", handler); } catch {
+            console.warn("Failed to remove connect listener");
+          }
           joinOnConnectHandlerRef.current = null;
         }
       }
-      } catch (e) { console.error("Join room error:", e)};
+      } catch (e) { console.error("Join room error:", e); };
     },
     [ensureSocket]
   );

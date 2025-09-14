@@ -1,5 +1,6 @@
-// PostCSS config (ESM) that merges ReShaped defaults with Tailwind & Autoprefixer
-import { config as reshapedConfig } from "reshaped/config/postcss";
+/* eslint-env node */
+// PostCSS config (CJS) merging ReShaped defaults with Tailwind & Autoprefixer
+const { config: reshapedConfig } = require('reshaped/config/postcss');
 
 // ReShaped exports plugin map object. Ensure Tailwind/Autoprefixer run before cssnano.
 const base = reshapedConfig ?? {};
@@ -18,7 +19,7 @@ const mergedPlugins = {
   ...(cssnanoConfig ? { cssnano: cssnanoConfig } : {}),
 };
 
-export default {
+module.exports = {
   ...base,
   plugins: mergedPlugins,
 };

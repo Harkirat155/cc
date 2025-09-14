@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
-import ValueMark from '../components/ValueMark';
+import ValueMark from './ValueMark';
 
 // Cleanup after each test to prevent DOM pollution
 afterEach(() => {
