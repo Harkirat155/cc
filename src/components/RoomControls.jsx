@@ -16,7 +16,7 @@ export default function RoomControls({
   // Respect any base path (e.g., GH Pages) using Vite's BASE_URL
   // Avoid duplicating current pathname when already under /room/:id
   const toAbsoluteUrl = (path) =>
-    new URL(
+    new window.URL(
       path.replace(/^\//, ""),
       window.location.origin + import.meta.env.BASE_URL
     ).toString();
@@ -67,7 +67,7 @@ export default function RoomControls({
           onClick={handleShare}
           className="px-4 py-2 bg-purple-600 text-white rounded shadow hover:bg-purple-700 transition"
           type="button"
-          aria-label="Share room link"
+          aria-label={copied ? "Link copied to clipboard" : "Share room link"}
         >
           {copied ? "Link Copied" : "Share"}
         </button>
