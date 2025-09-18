@@ -52,7 +52,7 @@ const Game = () => {
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="absolute top-4 right-4">
+      <div className="fixed top-4 right-4">
         <ThemeToggle />
       </div>
       <h1 className="text-4xl font-bold mb-8 text-gray-800 dark:text-gray-100 animate-pulse">

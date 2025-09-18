@@ -25,7 +25,7 @@ const HistoryPanel = ({ history, completedGames = [], viewIndex, jumpTo, resumeL
   return (
     <div
       ref={panelRef}
-      className={`absolute top-4 left-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-md border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
+      className={`fixed top-4 left-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-md border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
         expanded
           ? "p-4 w-72 max-h-[420px] overflow-hidden flex flex-col"
           : "p-2 w-56 cursor-pointer"
