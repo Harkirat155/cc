@@ -7,6 +7,7 @@ import ResultModal from "./components/ResultModal";
 import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import RoomControls from "./components/RoomControls";
+import ThemeToggle from "./components/ThemeToggle";
 
 const Game = () => {
   const { roomId: paramRoomId } = useParams();
@@ -50,20 +51,23 @@ const Game = () => {
   }, [paramRoomId, isMultiplayer, joinRoom]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-4xl font-bold mb-8 text-gray-800 animate-pulse">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <h1 className="text-4xl font-bold mb-8 text-gray-800 dark:text-gray-100 animate-pulse">
         Tic Tac Toe
       </h1>
-      <div className="mb-2 text-sm text-gray-600">{message}</div>
-      <div className="mb-2 text-sm text-gray-600">
+      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
+      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
         Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
         {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
       </div>
-      <div className="mb-4 text-lg font-medium text-gray-700">
+      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
         Score: <ValueMark value="X" /> - {gameState.xScore} |{" "}
         <ValueMark value="O" /> - {gameState.oScore}
       </div>
-      <div className="mb-4 text-lg font-medium text-gray-700">
+      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
         Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
       </div>
       <GameBoard

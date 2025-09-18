@@ -56,7 +56,7 @@ export default function RoomControls({
       {!showShare && (
         <button
           onClick={createRoom}
-          className="px-4 py-2 bg-green-500 text-white rounded shadow hover:bg-green-600 transition"
+          className="px-4 py-2 bg-green-500 text-white rounded shadow hover:bg-green-600 transition border border-gray-200 dark:border-gray-700"
           type="button"
         >
           Create Room
@@ -65,7 +65,7 @@ export default function RoomControls({
       {showShare && (
         <button
           onClick={handleShare}
-          className="px-4 py-2 bg-purple-600 text-white rounded shadow hover:bg-purple-700 transition"
+          className="px-4 py-2 bg-purple-600 text-white rounded shadow hover:bg-purple-700 transition border border-gray-200 dark:border-gray-700"
           type="button"
           aria-label={copied ? "Link copied to clipboard" : "Share room link"}
         >
@@ -76,7 +76,7 @@ export default function RoomControls({
         <button
           type="button"
           onClick={leaveRoom}
-          className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition"
+          className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition border border-gray-200 dark:border-gray-700"
         >
           Leave
         </button>

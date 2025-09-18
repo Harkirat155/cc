@@ -18,9 +18,9 @@ const ResultModal = ({
     newGameRequester === socketId;
   const someoneRequested = isMultiplayer && !!newGameRequester;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center animate-fadeIn">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full transform transition-all duration-300 scale-100 flex flex-col items-center justify-center space-y-3">
-        <h2 className="text-2xl font-bold text-gray-800 text-center">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/60 flex items-center justify-center animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-sm w-full transform transition-all duration-300 scale-100 flex flex-col items-center justify-center space-y-3 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 text-center">
           {result}
         </h2>
         {!isMultiplayer && (
@@ -56,7 +56,7 @@ const ResultModal = ({
           </>
         )}
         {isMultiplayer && someoneRequested && isRequester && (
-          <div className="text-sm text-gray-600">Waiting for opponent...</div>
+          <div className="text-sm text-gray-600 dark:text-gray-300">Waiting for opponent...</div>
         )}
       </div>
     </div>

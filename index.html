@@ -30,7 +30,8 @@
       color="#3b82f6"
     />
     <link rel="manifest" href="/crissCross/manifest.json" />
-    <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -39,6 +40,20 @@
       name="msapplication-TileImage"
       content="/crissCross/icons/icon-192x192.svg"
     />
+    <script>
+      // Apply theme ASAP to avoid flash of incorrect theme
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = saved === 'dark' || (!saved && prefersDark);
+          var root = document.documentElement;
+          if (dark) root.classList.add('dark'); else root.classList.remove('dark');
+          // Also set a data attribute for potential future styling hooks
+          root.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (e) {}
+      })();
+    </script>
     <script>
       // If navigated from 404.html, restore the original path preserved in ?p=
       (function restoreDeepLink() {
