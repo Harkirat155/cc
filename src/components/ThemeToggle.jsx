@@ -22,8 +22,12 @@ const ThemeToggle = ({ className = '' }) => {
     const isDark = theme === 'dark';
     root.classList.toggle('dark', isDark);
     root.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    try { window.localStorage.setItem('theme', theme); } catch {
-      // ignore write errors
+    try {
+      window.localStorage.setItem('theme', theme);
+      const meta = document.querySelector("meta[name='theme-color']");
+      if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#ffffff');
+    } catch {
+      console.warn('Could not save theme preference');
     }
   }, [theme]);
 
@@ -52,9 +56,9 @@ const ThemeToggle = ({ className = '' }) => {
     <button
       type="button"
       aria-label="Toggle theme"
+      aria-pressed={theme === 'dark'}
       onClick={toggle}
-      className={`inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur border border-gray-200 dark:border-gray-700 shadow hover:bg-white dark:hover:bg-gray-800 transition text-gray-700 dark:text-gray-200 ${className}`}
-      style={{ zIndex: 40 }}
+      className={`inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur border border-gray-200 dark:border-gray-700 shadow hover:bg-white dark:hover:bg-gray-800 transition text-gray-700 dark:text-gray-200 z-40 ${className}`}
     >
       {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
       <span className="text-xs font-medium hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
