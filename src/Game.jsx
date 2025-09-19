@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
@@ -7,7 +7,7 @@ import ResultModal from "./components/ResultModal";
 import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import RoomControls from "./components/RoomControls";
-import ThemeToggle from "./components/ThemeToggle";
+import Navbar from "./components/Navbar";
 
 const Game = () => {
   const { roomId: paramRoomId } = useParams();
@@ -36,6 +36,7 @@ const Game = () => {
     socketId,
   } = useSocketGame();
   const winningSquares = gameState.winningLine || [];
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // winningSquares derived from multiplayer/local hook state
 
@@ -52,12 +53,13 @@ const Game = () => {
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="fixed top-4 right-4">
-        <ThemeToggle />
-      </div>
-      <h1 className="text-4xl font-bold mb-8 text-gray-800 dark:text-gray-100 animate-pulse">
-        Tic Tac Toe
-      </h1>
+      {/* Navbar with brand + actions */}
+      <Navbar
+        onToggleHistory={() => setIsHistoryOpen((v) => !v)}
+        isHistoryOpen={isHistoryOpen}
+      />
+      {/* push content below navbar height */}
+      <div className="h-16" />
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
         Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
@@ -75,13 +77,20 @@ const Game = () => {
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-      <HistoryPanel
-        history={history}
-        completedGames={completedGames}
-        viewIndex={viewIndex}
-        jumpTo={jumpTo}
-        resumeLatest={resumeLatest}
-      />
+      {/* Slide-over History Panel */}
+      <div
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
+          isHistoryOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <HistoryPanel
+          history={history}
+          completedGames={completedGames}
+          viewIndex={viewIndex}
+          jumpTo={jumpTo}
+          resumeLatest={resumeLatest}
+        />
+      </div>
       <RoomControls
         createRoom={createRoom}
         joinRoom={joinRoom}
