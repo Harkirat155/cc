@@ -6,7 +6,6 @@ import MenuPanel from "./components/MenuPanel";
 import ResultModal from "./components/ResultModal";
 import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
-import RoomControls from "./components/RoomControls";
 import Navbar from "./components/Navbar";
 
 const Game = () => {
@@ -23,7 +22,6 @@ const Game = () => {
     roomId,
     player,
     isMultiplayer,
-    isRoomCreator,
     showModal,
     newGameRequester,
     requestNewGame,
@@ -91,15 +89,16 @@ const Game = () => {
           resumeLatest={resumeLatest}
         />
       </div>
-      <RoomControls
+      <MenuPanel
+        onReset={resetScores}
+        onNewGame={resetGame}
+        hasMoves={history.length > 1}
+        canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
         createRoom={createRoom}
-        joinRoom={joinRoom}
         leaveRoom={leaveRoom}
         isMultiplayer={isMultiplayer}
         roomId={roomId}
-        isRoomCreator={isRoomCreator}
       />
-      <MenuPanel onReset={resetScores} onNewGame={resetGame} />
       {showModal && (
         <ResultModal
           result={
