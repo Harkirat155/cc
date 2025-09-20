@@ -162,7 +162,6 @@ const Game = () => {
           requestNewGame={requestNewGame}
           cancelNewGameRequest={() => {
             cancelNewGameRequest();
-            navigate("/");
           }}
           socketId={socketId}
           newGameRequestedAt={newGameRequestedAt}
