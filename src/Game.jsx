@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
@@ -10,6 +10,7 @@ import Navbar from "./components/Navbar";
 import PeoplePanel from "./components/PeoplePanel";
 
 const Game = () => {
+  const navigate = useNavigate();
   const { roomId: paramRoomId } = useParams();
   const {
     gameState,
@@ -26,6 +27,7 @@ const Game = () => {
     showModal,
     newGameRequester,
     requestNewGame,
+  cancelNewGameRequest,
     createRoom,
     joinRoom,
     handleSquareClick,
@@ -34,6 +36,7 @@ const Game = () => {
     leaveRoom,
     socketId,
     roster,
+    newGameRequestedAt,
   } = useSocketGame();
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -131,7 +134,10 @@ const Game = () => {
         hasMoves={history.length > 1}
         canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
         createRoom={createRoom}
-        leaveRoom={leaveRoom}
+        leaveRoom={() => {
+          leaveRoom();
+          navigate("/");
+        }}
         isMultiplayer={isMultiplayer}
         roomId={roomId}
       />
@@ -146,12 +152,21 @@ const Game = () => {
           }
           onStartNewLocal={resetGame}
           onJoinNewGame={resetGame}
-          onLeaveRoom={leaveRoom}
+          onLeaveRoom={() => {
+            leaveRoom();
+            navigate("/");
+          }}
           isMultiplayer={isMultiplayer}
           player={player}
           newGameRequester={newGameRequester}
           requestNewGame={requestNewGame}
+          cancelNewGameRequest={() => {
+            cancelNewGameRequest();
+            navigate("/");
+          }}
           socketId={socketId}
+          newGameRequestedAt={newGameRequestedAt}
+          rematchTimeoutSec={20}
         />
       )}
     </div>

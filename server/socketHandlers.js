@@ -114,6 +114,17 @@ export function registerSocketHandlers(io) {
       if (!room) return;
       touch(roomId);
       room.state.newGameRequester = socket.id;
+      room.state.newGameRequestedAt = Date.now();
+      publish(io, roomId);
+    });
+
+    socket.on("cancelNewGameRequest", ({ roomId }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      touch(roomId);
+      // Only requester or opponent can clear; keep simple and allow anyone in room
+      room.state.newGameRequester = null;
+      room.state.newGameRequestedAt = null;
       publish(io, roomId);
     });
 
