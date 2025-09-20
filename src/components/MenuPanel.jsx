@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 
 const useWindowSize = () => {
   const [size, setSize] = useState({
@@ -32,11 +31,10 @@ const MenuPanel = ({
   const menuRef = useRef(null);
   const { width } = useWindowSize();
   const [copied, setCopied] = useState(false);
-  const navigate = useNavigate();
 
   // Collapse menu if width < 500px or if overlapping board (simulate with small width)
   useEffect(() => {
-    if (width < 10) {
+    if (width < 300) {
       setCollapsed(true);
       setExpanded(false);
     } else {
