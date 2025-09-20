@@ -116,7 +116,7 @@ const MenuPanel = ({
       ) : (
         <div
           className={`flex ${
-            width > 498 ? "flex-row" : "flex-col"
+            width > 300 ? "flex-row" : "flex-col"
           } gap-3 items-center justify-center w-full`}
         >
           {/* Game actions */}
