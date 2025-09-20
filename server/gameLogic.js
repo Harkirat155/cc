@@ -33,5 +33,7 @@ export function initialState() {
     winningLine: [],
     xScore: 0,
     oScore: 0,
+    newGameRequester: null,
+    newGameRequestedAt: null,
   };
 }
