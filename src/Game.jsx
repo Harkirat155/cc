@@ -7,6 +7,7 @@ import ResultModal from "./components/ResultModal";
 import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import Navbar from "./components/Navbar";
+import PeoplePanel from "./components/PeoplePanel";
 
 const Game = () => {
   const { roomId: paramRoomId } = useParams();
@@ -32,9 +33,28 @@ const Game = () => {
     resetScores,
     leaveRoom,
     socketId,
+    roster,
   } = useSocketGame();
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isPeopleOpen, setIsPeopleOpen] = useState(false);
+
+  // Ensure only one side panel is open at a time
+  const handleTogglePeople = () => {
+    setIsPeopleOpen((prev) => {
+      const next = !prev;
+      if (next) setIsHistoryOpen(false);
+      return next;
+    });
+  };
+
+  const handleToggleHistory = () => {
+    setIsHistoryOpen((prev) => {
+      const next = !prev;
+      if (next) setIsPeopleOpen(false);
+      return next;
+    });
+  };
 
   // winningSquares derived from multiplayer/local hook state
 
@@ -53,8 +73,10 @@ const Game = () => {
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* Navbar with brand + actions */}
       <Navbar
-        onToggleHistory={() => setIsHistoryOpen((v) => !v)}
+        onToggleHistory={handleToggleHistory}
         isHistoryOpen={isHistoryOpen}
+        onTogglePeople={handleTogglePeople}
+        isPeopleOpen={isPeopleOpen}
       />
       {/* push content below navbar height */}
       <div className="h-16" />
@@ -75,7 +97,21 @@ const Game = () => {
         onSquareClick={handleSquareClick}
         winningSquares={winningSquares}
       />
-      {/* Slide-over History Panel */}
+      {/* Slide-over panels */}
+      {/* People Panel (right slide-over) */}
+      <div
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
+          isPeopleOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <PeoplePanel
+          roster={roster}
+          socketId={socketId}
+          isMultiplayer={isMultiplayer}
+          roomId={roomId}
+        />
+      </div>
+      {/* History Panel (right slide-over) */}
       <div
         className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
           isHistoryOpen ? "translate-x-0" : "translate-x-full"

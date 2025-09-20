@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const useWindowSize = () => {
   const [size, setSize] = useState({
@@ -31,10 +32,11 @@ const MenuPanel = ({
   const menuRef = useRef(null);
   const { width } = useWindowSize();
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
 
   // Collapse menu if width < 500px or if overlapping board (simulate with small width)
   useEffect(() => {
-    if (width < 500) {
+    if (width < 10) {
       setCollapsed(true);
       setExpanded(false);
     } else {
@@ -178,6 +180,7 @@ const MenuPanel = ({
               onClick={(e) => {
                 e.stopPropagation();
                 handleButtonClick(leaveRoom);
+                navigate("/"); // go back to main screen
               }}
               className="py-2 px-5 min-w-[120px] rounded-xl border bg-gray-700 text-white border-gray-700/30 dark:border-gray-500/20 shadow-sm hover:bg-gray-800 hover:border-gray-900/40 active:bg-gray-700 transition-all duration-200 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-gray-400/40"
               type="button"

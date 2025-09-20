@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { History } from "lucide-react";
+import { History, Users } from "lucide-react";
 
-const Navbar = ({ onToggleHistory, isHistoryOpen = false }) => {
+const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeopleOpen = false }) => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800">
       <div className="mx-auto max-w-6xl px-4">
@@ -19,6 +19,17 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false }) => {
 
           {/* Actions: History + Theme */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onTogglePeople}
+              className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
+                isPeopleOpen ? "ring-2 ring-indigo-500/50" : ""
+              }`}
+              aria-label={isPeopleOpen ? "Close people" : "Open people"}
+              title="People"
+            >
+              <Users size={16} strokeWidth={2} className="text-gray-700 dark:text-gray-200" />
+            </button>
             <button
               type="button"
               onClick={onToggleHistory}

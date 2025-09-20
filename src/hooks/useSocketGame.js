@@ -50,6 +50,7 @@ export default function useSocketGame() {
   }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
+  const [roster, setRoster] = useState({ X: null, O: null, spectators: [] });
   const [isRoomCreator, setIsRoomCreator] = useState(false);
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
@@ -100,6 +101,7 @@ export default function useSocketGame() {
     s.on("gameUpdate", (payload) => {
       setRoomId(payload.roomId || roomId);
       setGameState((prev) => ({ ...prev, ...payload }));
+      if (payload.roster) setRoster(payload.roster);
       if (payload.newGameRequester !== undefined) {
         setNewGameRequester(payload.newGameRequester);
       } else if (payload.winner) {
@@ -406,6 +408,7 @@ export default function useSocketGame() {
       setIsRoomCreator(false);
       setMessage("Left room");
       setGameState(initialLocalState);
+      setRoster({ X: null, O: null, spectators: [] });
       moveSequenceRef.current = [];
       lastBoardRef.current = emptyBoard();
       setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
@@ -433,6 +436,7 @@ export default function useSocketGame() {
     message,
     roomId,
     player,
+    roster,
     isMultiplayer,
     isRoomCreator,
     showModal,
