@@ -50,10 +50,12 @@ export default function useSocketGame() {
   }, [viewIndex]);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
+  const [roster, setRoster] = useState({ X: null, O: null, spectators: [] });
   const [isRoomCreator, setIsRoomCreator] = useState(false);
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
+  const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
   // Track a one-time 'connect' listener for joinRoom to avoid stacking
@@ -100,11 +102,18 @@ export default function useSocketGame() {
     s.on("gameUpdate", (payload) => {
       setRoomId(payload.roomId || roomId);
       setGameState((prev) => ({ ...prev, ...payload }));
+      if (payload.roster) setRoster(payload.roster);
       if (payload.newGameRequester !== undefined) {
         setNewGameRequester(payload.newGameRequester);
+        if (payload.newGameRequester) {
+          setNewGameRequestedAt(payload.newGameRequestedAt || Date.now());
+        } else {
+          setNewGameRequestedAt(null);
+        }
       } else if (payload.winner) {
         // winner state but no requester yet
         setNewGameRequester(null);
+        setNewGameRequestedAt(null);
       }
       const resultText = payload.winner
         ? payload.winner === "draw"
@@ -150,6 +159,7 @@ export default function useSocketGame() {
     s.on("gameReset", () => {
       // Reset came from someone (maybe opponent). Clear requester flags & modal for everyone.
       setNewGameRequester(null);
+      setNewGameRequestedAt(null);
       setShowModal(false);
     });
     s.on("startGame", () => setMessage("Game started"));
@@ -406,6 +416,7 @@ export default function useSocketGame() {
       setIsRoomCreator(false);
       setMessage("Left room");
       setGameState(initialLocalState);
+      setRoster({ X: null, O: null, spectators: [] });
       moveSequenceRef.current = [];
       lastBoardRef.current = emptyBoard();
       setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
@@ -433,6 +444,7 @@ export default function useSocketGame() {
     message,
     roomId,
     player,
+    roster,
     isMultiplayer,
     isRoomCreator,
     showModal,
@@ -442,9 +454,17 @@ export default function useSocketGame() {
       if (!isMultiplayer || !socketRef.current) return;
       // Set requester locally for instant UI feedback
       setNewGameRequester(socketRef.current.id);
+      setNewGameRequestedAt(Date.now());
       socketRef.current.emit("requestNewGame", { roomId });
     },
+    cancelNewGameRequest: () => {
+      if (!isMultiplayer || !socketRef.current) return;
+      socketRef.current.emit("cancelNewGameRequest", { roomId });
+      setNewGameRequester(null);
+      setNewGameRequestedAt(null);
+    },
     socketId: socketRef.current?.id || null,
+    newGameRequestedAt,
     createRoom,
     joinRoom,
     handleSquareClick,

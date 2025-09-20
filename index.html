@@ -7,7 +7,9 @@
       name="description"
       content="A modern, minimalist Tic Tac Toe game built with React and Tailwind CSS. Play, track history, and enjoy a beautiful UI."
     />
-    <title>Tic Tac Toe</title>
+    <title>CrissCross</title>
+    <!-- Load base styles early to avoid FOUC -->
+    <link rel="stylesheet" href="/src/index.css" />
     <!-- App icons -->
     <link
       rel="icon"
@@ -79,14 +81,16 @@
     <!-- Example crawlable link for SEO best practices: 
          Crawlable links allow search engines to discover and index your site, 
          which can improve your site's visibility in search results. -->
-    <footer class="text-center mt-8">
-      <a
-        href="https://github.com/harkirat155/crissCross"
-        rel="noopener"
-        target="_blank"
-        >GitHub Repository</a
-      >
-    </footer>
+      <!-- Keep a crawlable link for SEO, but hide it visually to avoid any FOUC or layout impact -->
+      <footer class="sr-only">
+        <a href="https://github.com/harkirat155/crissCross" rel="noopener noreferrer" target="_blank">Project on GitHub</a>
+      </footer>
+      <noscript>
+        <!-- Fallback for users/crawlers without JS: simple, minimal link -->
+        <div class="text-center mt-8">
+          <a href="https://github.com/harkirat155/crissCross" rel="noopener" target="_blank">Project on GitHub</a>
+        </div>
+      </noscript>
   <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

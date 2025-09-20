@@ -21,5 +21,10 @@ export function enforceLRU() {
 export function publish(io, roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
-  io.to(roomId).emit("gameUpdate", { ...room.state, roomId });
+  const roster = {
+    X: room.players.X,
+    O: room.players.O,
+    spectators: Array.from(room.spectators || []),
+  };
+  io.to(roomId).emit("gameUpdate", { ...room.state, roomId, roster });
 }

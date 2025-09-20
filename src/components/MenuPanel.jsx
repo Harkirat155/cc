@@ -34,7 +34,7 @@ const MenuPanel = ({
 
   // Collapse menu if width < 500px or if overlapping board (simulate with small width)
   useEffect(() => {
-    if (width < 500) {
+    if (width < 300) {
       setCollapsed(true);
       setExpanded(false);
     } else {
