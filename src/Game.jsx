@@ -73,7 +73,7 @@ const Game = () => {
   }, [paramRoomId, isMultiplayer, joinRoom]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 pb-28 sm:pb-32">
       {/* Navbar with brand + actions */}
       <Navbar
         onToggleHistory={handleToggleHistory}
@@ -82,7 +82,7 @@ const Game = () => {
         isPeopleOpen={isPeopleOpen}
       />
       {/* push content below navbar height */}
-      <div className="h-16" />
+      <div className="h-20" />
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
         Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
