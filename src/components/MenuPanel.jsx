@@ -27,7 +27,7 @@ const MenuPanel = ({
   const [copied, setCopied] = useState(false);
 
   // Layout mode
-  const useSideDrawer = width < 420 || height < 650;
+  const useSideDrawer = width < 410 || height < 650;
 
   useEffect(() => {
     if (useSideDrawer) {
@@ -87,7 +87,7 @@ const MenuPanel = ({
   const showLeave = Boolean(isMultiplayer);
 
   const Buttons = ({ stacked = false }) => (
-    <div className={`flex ${stacked ? "flex-col" : width > 300 ? "flex-row" : "flex-col"} gap-3 items-center justify-center w-full`}>
+    <div className={`flex ${stacked ? "flex-col" : width > 300 ? "flex-row" : "flex-col"} gap-3 items-center justify-center ${stacked ? "w-auto" : "w-full"}`}>
       {showNewGame && (
         <button
           className={`py-2 px-5 min-w-[120px] rounded-xl border whitespace-nowrap text-center bg-blue-600 text-white border-blue-700/20 dark:border-blue-400/20 shadow-sm hover:bg-blue-700 hover:border-blue-800/30 active:bg-blue-600 transition-all duration-200 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-blue-400/40`}
@@ -225,7 +225,7 @@ const MenuPanel = ({
           ref={menuRef}
           className={`fixed right-4 z-30 transform transition-all duration-200 origin-bottom-right ${
             expanded ? "opacity-100 scale-100" : "opacity-0 pointer-events-none scale-50"
-          } rounded-2xl border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35 p-3 shadow-2xl min-w-[220px]`}
+          } rounded-2xl border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35 p-3 shadow-2xl w-fit`}
           style={{ bottom: `${cylHeight + 24}px` }}
           onClick={handleExpand}
           id="menu-panel-popover"
