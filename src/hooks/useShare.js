@@ -3,12 +3,10 @@ import { useCallback, useMemo, useState } from "react";
 function toAbsoluteUrl(path) {
   if (typeof window === "undefined") return "";
   // Share helpers
-  const toAbsoluteUrl = (path) =>
-    new window.URL(
-      path.replace(/^\//, ""),
-      window.location.origin + import.meta.env.BASE_URL
-    ).toString();
-  return toAbsoluteUrl(path);
+  return new window.URL(
+    path.replace(/^\//, ""),
+    window.location.origin + import.meta.env.BASE_URL
+  ).toString();
 }
 
 export default function useShare({ roomId }) {
