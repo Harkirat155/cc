@@ -41,8 +41,8 @@ export function publish(io, roomId) {
 
 // Start a lightweight GC loop that removes rooms which have been empty and inactive beyond TTL
 export function startRoomGC() {
-  // use globalThis.setInterval to avoid bundler/ESLint env confusion
-  globalThis.setInterval(() => {
+  // Start periodic GC for inactive rooms
+  setInterval(() => {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
       const hasOccupants = !!(room.players?.X || room.players?.O || (room.spectators && room.spectators.size > 0));
