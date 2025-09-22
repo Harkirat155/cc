@@ -141,7 +141,7 @@ export function registerSocketHandlers(io) {
       // Final safety: ensure a single socket isn't occupying both seats
       if (room.players.X === socket.id && room.players.O === socket.id) {
         // Prefer the seat dictated by seatByClient mapping if present
-        const prefer = (clientId && room.seatByClient[clientId]) || role || "X";
+        const prefer = (clientId && room.seatByClient[clientId] != null ? room.seatByClient[clientId] : (role ?? "X"));
         if (prefer === "X") room.players.O = null;
         else room.players.X = null;
       }
