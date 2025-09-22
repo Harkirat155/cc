@@ -1,12 +1,15 @@
 // Room and socket management
 
 const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 10);
-export const rooms = new Map(); // roomId -> { players, spectators, state, voice }
+const ROOM_TTL_MS = parseInt(process.env.ROOM_TTL_MS || "120000", 10); // 120s inactivity TTL for empty rooms
+export const rooms = new Map(); // roomId -> { players, spectators, state, voice, lastTouched }
 export const socketRooms = new Map(); // socketId -> Set(roomId)
 
 export function touch(id) {
   const r = rooms.get(id);
   if (!r) return;
+  // update last activity timestamp and move to the end for LRU ordering
+  r.lastTouched = Date.now();
   rooms.delete(id);
   rooms.set(id, r);
 }
@@ -34,4 +37,20 @@ export function publish(io, roomId) {
     }
   }
   io.to(roomId).emit("gameUpdate", { ...room.state, roomId, roster, voiceRoster });
+}
+
+// Start a lightweight GC loop that removes rooms which have been empty and inactive beyond TTL
+export function startRoomGC() {
+  // use globalThis.setInterval to avoid bundler/ESLint env confusion
+  globalThis.setInterval(() => {
+    const now = Date.now();
+    for (const [roomId, room] of rooms.entries()) {
+      const hasOccupants = !!(room.players?.X || room.players?.O || (room.spectators && room.spectators.size > 0));
+      if (hasOccupants) continue;
+      const last = room.lastTouched || 0;
+      if (now - last > ROOM_TTL_MS) {
+        rooms.delete(roomId);
+      }
+    }
+  }, 10_000); // check every 10s
 }
