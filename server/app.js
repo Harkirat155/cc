@@ -38,8 +38,12 @@ server.listen(PORT, () => {
         http
           .get(url, (res) => {
             // Drain response to free sockets without logging noise
-            res.on('data', () => {console.log('ping');});
-            res.on('end', () => {console.log('pong');});
+            res.on('data', () => {
+              if (process.env.SELF_PING_DEBUG === '1') console.log('ping');
+            });
+            res.on('end', () => {
+              if (process.env.SELF_PING_DEBUG === '1') console.log('pong');
+            });
           })
           .on('error', () => {
             // Ignore errors; this is best-effort keep-alive
