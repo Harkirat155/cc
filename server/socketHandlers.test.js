@@ -51,6 +51,7 @@ describe('socketHandlers duplicate seat prevention', () => {
     expect(['X', 'spectator']).toContain(joined.player);
     const r = rooms.get(roomId);
     // Ensure not both seats are same socket id
-    expect(!(r.players.X === sock2.id && r.players.O === sock2.id)).toBe(true);
+    expect(r.players.X).not.toBe(sock2.id);
+    expect(r.players.O).not.toBe(sock2.id);
   });
 });
