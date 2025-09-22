@@ -12,6 +12,8 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
   const [remoteAudioStreams, setRemoteAudioStreams] = useState({}); // peerId -> MediaStream
   const localStreamRef = useRef(null);
   const peersRef = useRef({});
+  // Avoid stale muted value during async permission prompts
+  const mutedRef = useRef(initialMuted);
 
   // Helpers to update state maps safely
   const setPeersMap = (fn) => {
@@ -136,15 +138,32 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     };
   }, [socket, roomId, selfId, createPeer]);
 
+  const setMutedState = useCallback((m) => {
+    setMuted(m);
+    mutedRef.current = m;
+    if (localStreamRef.current) {
+      for (const track of localStreamRef.current.getAudioTracks()) track.enabled = !m;
+    }
+    if (socket && roomId) socket.emit("voice:mute-state", { roomId, muted: m });
+  }, [socket, roomId]);
+
   // Enable/disable mic (publish)
-  const enableMic = useCallback(async () => {
+  const enableMic = useCallback(async (desiredMuted = null) => {
     if (!socket || !roomId) return;
     try {
       const stream = await getMedia();
-      // Ensure audio tracks enabled based on muted state
-      for (const track of stream.getAudioTracks()) track.enabled = !muted;
+      // Determine final mute state (explicit override wins; else latest ref)
+      const finalMuted = desiredMuted !== null ? desiredMuted : mutedRef.current;
+      // Ensure audio tracks enabled based on final mute state
+      for (const track of stream.getAudioTracks()) track.enabled = !finalMuted;
       setMicEnabled(true);
-      socket.emit("voice:join", { roomId, muted });
+      socket.emit("voice:join", { roomId, muted: finalMuted });
+      // Sync React state if caller provided an explicit desired state
+      if (desiredMuted !== null) {
+        // This also updates local tracks (idempotent) and emits mute-state
+        // but since we just emitted join with the same value, this keeps UIs consistent
+        setMutedState(finalMuted);
+      }
       // Create peers to everyone in the room roster (players + spectators) using deterministic initiator rule
       const ids = new Set();
       if (roster?.X) ids.add(roster.X);
@@ -158,7 +177,7 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
       // permission denied already handled by state
       void 0;
     }
-  }, [getMedia, socket, roomId, muted, roster, selfId, createPeer]);
+  }, [getMedia, socket, roomId, roster, selfId, createPeer, setMutedState]);
 
   const disableMic = useCallback(() => {
     setMicEnabled(false);
@@ -184,13 +203,7 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     };
   }, [disableMic]);
 
-  const setMutedState = useCallback((m) => {
-    setMuted(m);
-    if (localStreamRef.current) {
-      for (const track of localStreamRef.current.getAudioTracks()) track.enabled = !m;
-    }
-    if (socket && roomId) socket.emit("voice:mute-state", { roomId, muted: m });
-  }, [socket, roomId]);
+  
 
   // When mic becomes enabled later, attach local stream to all existing peers
   useEffect(() => {

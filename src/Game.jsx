@@ -49,7 +49,6 @@ const Game = () => {
     remoteAudioStreams,
     enableMic,
     disableMic,
-    setMuted,
   } = useVoiceChat({ socket, roomId, selfId: socketId, roster, voiceRoster, initialMuted: true });
 
   const handleToggleMic = () => {
@@ -59,8 +58,7 @@ const Game = () => {
       disableMic();
     } else {
       // Currently OFF -> turn ON (enable and unmute)
-      enableMic();
-      setMuted(false);
+      enableMic(false);
     }
   };
   const winningSquares = gameState.winningLine || [];
