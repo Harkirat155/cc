@@ -59,6 +59,42 @@ export default function useSocketGame() {
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
+  // Stable clientId per browser tab/session for seat restoration across reconnects
+  const clientIdRef = useRef(null);
+  if (!clientIdRef.current) {
+    try {
+      const key = "cc_client_id";
+      let id = (typeof window !== "undefined" && window.sessionStorage)
+        ? window.sessionStorage.getItem(key)
+        : null;
+      if (!id) {
+        id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        if (typeof window !== "undefined" && window.sessionStorage) {
+          window.sessionStorage.setItem(key, id);
+        }
+      }
+      clientIdRef.current = id;
+    } catch {
+      clientIdRef.current = Math.random().toString(36).slice(2);
+    }
+  }
+  const persistedRoomKey = "cc_room_id";
+  const safeSetPersistedRoom = (value) => {
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        if (value) window.sessionStorage.setItem(persistedRoomKey, value);
+        else window.sessionStorage.removeItem(persistedRoomKey);
+      }
+    } catch {/* ignore */}
+  };
+  const safeGetPersistedRoom = () => {
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        return window.sessionStorage.getItem(persistedRoomKey);
+      }
+    } catch {/* ignore */}
+    return null;
+  };
   // Track a one-time 'connect' listener for joinRoom to avoid stacking
   const joinOnConnectHandlerRef = useRef(null);
 
@@ -89,7 +125,7 @@ export default function useSocketGame() {
       if (pendingJoinRef.current) {
         const code = pendingJoinRef.current;
         pendingJoinRef.current = null;
-        s.emit("joinRoom", { roomId: code }, (resp) => {
+        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
             return;
@@ -97,11 +133,29 @@ export default function useSocketGame() {
           if (resp?.player) setPlayer(resp.player);
         });
       }
+      // If we were in a room before a transient disconnect, proactively re-join
+      try {
+        const saved = safeGetPersistedRoom();
+        const toJoin = roomId || saved;
+        if (toJoin) {
+          s.emit("joinRoom", { roomId: toJoin, clientId: clientIdRef.current }, (resp) => {
+            if (resp?.error) {
+              setMessage(resp.error);
+              if (resp.error === "Room not found") safeSetPersistedRoom(null);
+              return;
+            }
+            if (resp?.player) setPlayer(resp.player);
+            if (!roomId && toJoin) setRoomId(toJoin);
+          });
+        }
+      } catch {/* ignore */}
     });
     s.on("disconnect", () => setMessage("Disconnected"));
 
     s.on("gameUpdate", (payload) => {
-      setRoomId(payload.roomId || roomId);
+      const effectiveRoomId = payload.roomId || roomId;
+      if (effectiveRoomId) safeSetPersistedRoom(effectiveRoomId);
+      setRoomId(effectiveRoomId);
       setGameState((prev) => ({ ...prev, ...payload }));
       if (payload.roster) setRoster(payload.roster);
       if (payload.voiceRoster) setVoiceRoster(payload.voiceRoster || {});
@@ -171,11 +225,12 @@ export default function useSocketGame() {
 
   const createRoom = useCallback(() => {
     const s = ensureSocket();
-    s.emit("createRoom", (resp) => {
+    s.emit("createRoom", { clientId: clientIdRef.current }, (resp) => {
       setRoomId(resp.roomId);
       setPlayer(resp.player);
       setIsRoomCreator(true);
       setMessage(`Room ${resp.roomId} created. Waiting for opponent...`);
+      safeSetPersistedRoom(resp.roomId);
     });
   }, [ensureSocket]);
 
@@ -184,9 +239,10 @@ export default function useSocketGame() {
       try {
       const s = ensureSocket();
       const emitJoin = () => {
-        s.emit("joinRoom", { roomId: code }, (resp) => {
+        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
+            if (resp.error === "Room not found") safeSetPersistedRoom(null);
             return;
           }
           if (resp?.player) setPlayer(resp.player);
@@ -197,6 +253,7 @@ export default function useSocketGame() {
               resp?.player === "spectator" ? " as spectator" : ""
             }`
           );
+          safeSetPersistedRoom(code);
         });
       };
       if (s.connected) {
@@ -406,25 +463,54 @@ export default function useSocketGame() {
   }, [isMultiplayer, roomId]);
 
   const leaveRoom = useCallback(() => {
-    if (!isMultiplayer || !socketRef.current) return;
-    socketRef.current.emit("leaveRoom", { roomId }, (resp) => {
-      if (resp?.error) {
-        setMessage(resp.error);
+    // Return a promise so callers can await before navigating
+    return new Promise((resolve) => {
+      // Snapshot current room before clearing for server ack
+      const currentRoomId = roomId;
+
+      const doLocalCleanup = () => {
+        try { finalizeCurrentGameIfFinished(); } catch { /* ignore */ }
+        setRoomId(null);
+        setPlayer(null);
+        setIsRoomCreator(false);
+        setMessage("Left room");
+        setGameState(initialLocalState);
+        setRoster({ X: null, O: null, spectators: [] });
+        moveSequenceRef.current = [];
+        lastBoardRef.current = emptyBoard();
+        setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
+        setViewIndex(0);
+        setShowModal(false);
+        setNewGameRequester(null);
+        safeSetPersistedRoom(null);
+      };
+
+      // If not in multiplayer or socket missing, just cleanup and resolve
+      if (!isMultiplayer || !socketRef.current || !currentRoomId) {
+        doLocalCleanup();
+        resolve();
         return;
       }
-      finalizeCurrentGameIfFinished();
-      setRoomId(null);
-      setPlayer(null);
-      setIsRoomCreator(false);
-      setMessage("Left room");
-      setGameState(initialLocalState);
-      setRoster({ X: null, O: null, spectators: [] });
-      moveSequenceRef.current = [];
-      lastBoardRef.current = emptyBoard();
-      setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
-      setViewIndex(0);
-      setShowModal(false);
-      setNewGameRequester(null);
+
+      // Optimistically cleanup first to avoid URL flicker from auto-redirect effect
+      doLocalCleanup();
+
+      // Inform server; resolve regardless of ack result to not block UI
+      try {
+        socketRef.current.emit(
+          "leaveRoom",
+          { roomId: currentRoomId, clientId: clientIdRef.current },
+          (resp) => {
+            if (resp?.error) {
+              setMessage(resp.error);
+            }
+            resolve();
+          }
+        );
+      } catch (e) {
+        console.warn("leaveRoom emit failed", e);
+        resolve();
+      }
     });
   }, [isMultiplayer, roomId, finalizeCurrentGameIfFinished]);
 

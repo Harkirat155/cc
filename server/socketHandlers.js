@@ -4,7 +4,16 @@ import { rooms, socketRooms, touch, enforceLRU, publish } from './roomManager.js
 
 export function registerSocketHandlers(io) {
   io.on("connection", (socket) => {
-    socket.on("createRoom", (ack) => {
+    // Create a room; support optional payload { clientId }
+    socket.on("createRoom", (payloadOrAck, maybeAck) => {
+      let payload = {};
+      let ack = maybeAck;
+      if (typeof payloadOrAck === "function") {
+        ack = payloadOrAck;
+      } else if (payloadOrAck && typeof payloadOrAck === "object") {
+        payload = payloadOrAck;
+      }
+      const clientId = (payload && payload.clientId) || null;
       let roomId = genCode();
       while (rooms.has(roomId)) roomId = genCode();
       rooms.set(roomId, {
@@ -12,6 +21,8 @@ export function registerSocketHandlers(io) {
         spectators: new Set(),
         state: initialState(),
         voice: {}, // socketId -> { muted: boolean }
+        seatByClient: clientId ? { [clientId]: "X" } : {},
+        lastTouched: Date.now(),
       });
       socket.join(roomId);
       let set = socketRooms.get(socket.id); if (!set){ set = new Set(); socketRooms.set(socket.id, set); }
@@ -21,24 +32,43 @@ export function registerSocketHandlers(io) {
       publish(io, roomId);
     });
 
-    socket.on("joinRoom", ({ roomId }, ack) => {
+    // Join a room; supports { roomId, clientId }
+    socket.on("joinRoom", ({ roomId, clientId }, ack) => {
       roomId = (roomId || "").trim().toUpperCase();
       if (!roomId) return ack?.({ error: "Invalid room ID" });
       const room = rooms.get(roomId);
       if (!room) return ack?.({ error: "Room not found" });
       touch(roomId);
       let role;
-      if (!room.players.X) {
-        room.players.X = socket.id;
-        role = "X";
-      } else if (!room.players.O) {
-        room.players.O = socket.id;
-        role = "O";
-      } else if (room.players.X === socket.id) role = "X";
-      else if (room.players.O === socket.id) role = "O";
-      else {
-        room.spectators.add(socket.id);
-        role = "spectator";
+      // Try to restore seat by clientId if provided
+      if (clientId && room.seatByClient && room.seatByClient[clientId]) {
+        const preferred = room.seatByClient[clientId]; // 'X' | 'O'
+        if ((preferred === "X" || preferred === "O") && !room.players[preferred]) {
+          room.players[preferred] = socket.id;
+          role = preferred;
+        }
+      }
+      if (!role) {
+        if (!room.players.X) {
+          room.players.X = socket.id;
+          role = "X";
+          if (clientId) {
+            if (!room.seatByClient) room.seatByClient = {};
+            room.seatByClient[clientId] = "X";
+          }
+        } else if (!room.players.O) {
+          room.players.O = socket.id;
+          role = "O";
+          if (clientId) {
+            if (!room.seatByClient) room.seatByClient = {};
+            room.seatByClient[clientId] = "O";
+          }
+        } else if (room.players.X === socket.id) role = "X";
+        else if (room.players.O === socket.id) role = "O";
+        else {
+          room.spectators.add(socket.id);
+          role = "spectator";
+        }
       }
       socket.join(roomId);
       let set = socketRooms.get(socket.id); if (!set){ set = new Set(); socketRooms.set(socket.id, set); }
@@ -129,7 +159,7 @@ export function registerSocketHandlers(io) {
       publish(io, roomId);
     });
 
-    socket.on("leaveRoom", ({ roomId }, ack) => {
+    socket.on("leaveRoom", ({ roomId, clientId }, ack) => {
       const room = rooms.get(roomId);
       if (!room) return ack?.({ error: "Room not found" });
       let changed = false;
@@ -146,10 +176,16 @@ export function registerSocketHandlers(io) {
         delete room.voice[socket.id];
         changed = true;
       }
+      // Free seat reservation only on explicit leave
+      if (clientId && room.seatByClient && (room.seatByClient[clientId] === "X" || room.seatByClient[clientId] === "O")) {
+        delete room.seatByClient[clientId];
+      }
       if (changed) {
-        if (!room.players.X && !room.players.O && room.spectators.size === 0) {
-          rooms.delete(roomId);
-        } else publish(io, roomId);
+        touch(roomId);
+        // Ensure socket leaves the Socket.IO room to stop receiving events
+        try { socket.leave(roomId); } catch { /* ignore */ }
+        // Do not delete immediately; allow GC to remove after TTL if empty
+        publish(io, roomId);
         const set = socketRooms.get(socket.id); if (set){ set.delete(roomId); if (set.size === 0) socketRooms.delete(socket.id); }
         return ack?.({ ok: true });
       }
@@ -168,7 +204,9 @@ export function registerSocketHandlers(io) {
         if (room.spectators.delete(socket.id)) changed = true;
         if (room.voice && room.voice[socket.id]) { delete room.voice[socket.id]; changed = true; }
         if (changed){
-          if (!room.players.X && !room.players.O && room.spectators.size === 0) rooms.delete(roomId); else publish(io, roomId);
+          touch(roomId);
+          // Keep room for a grace period; GC will remove after TTL
+          publish(io, roomId);
         }
       }
       socketRooms.delete(socket.id);

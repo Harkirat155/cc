@@ -29,7 +29,7 @@ const Game = () => {
     showModal,
     newGameRequester,
     requestNewGame,
-  cancelNewGameRequest,
+    cancelNewGameRequest,
     createRoom,
     joinRoom,
     handleSquareClick,
@@ -43,13 +43,15 @@ const Game = () => {
     socket,
   } = useSocketGame();
   // Voice chat hook
-  const {
-    micEnabled,
-    muted,
-    remoteAudioStreams,
-    enableMic,
-    disableMic,
-  } = useVoiceChat({ socket, roomId, selfId: socketId, roster, voiceRoster, initialMuted: true });
+  const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
+    useVoiceChat({
+      socket,
+      roomId,
+      selfId: socketId,
+      roster,
+      voiceRoster,
+      initialMuted: true,
+    });
 
   const handleToggleMic = () => {
     // Single-button behavior: ON = enabled + unmuted, OFF = disabled
@@ -64,6 +66,8 @@ const Game = () => {
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPeopleOpen, setIsPeopleOpen] = useState(false);
+  // Prevent auto-join when user is actively leaving a room from a room URL
+  const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
 
   // Ensure only one side panel is open at a time
   const handleTogglePeople = () => {
@@ -89,11 +93,33 @@ const Game = () => {
     const code = (paramRoomId || "").trim().toUpperCase();
     if (!code) return;
     // Only attempt auto-join if not already in a room
-    if (!isMultiplayer) {
+    if (!isMultiplayer && !suppressAutoJoin) {
       joinRoom(code);
     }
     // If already in a different room, do nothing for now to avoid multi-room state
-  }, [paramRoomId, isMultiplayer, joinRoom]);
+  }, [paramRoomId, isMultiplayer, joinRoom, suppressAutoJoin]);
+
+  // If room not found, redirect to root
+  useEffect(() => {
+    if ((paramRoomId || "").trim() && message === "Room not found") {
+      navigate("/", { replace: true });
+    }
+  }, [paramRoomId, message, navigate]);
+
+  // When we navigate away from a room URL, re-enable auto-join for future shares
+  useEffect(() => {
+    if (!paramRoomId && suppressAutoJoin) setSuppressAutoJoin(false);
+  }, [paramRoomId, suppressAutoJoin]);
+
+  // When a room is created (or joined manually), push the room URL so it matches the share link
+  useEffect(() => {
+    if (!roomId) return;
+    const expected = `/room/${roomId}`;
+    // Avoid redundant navigations if URL already has the same roomId
+    if ((paramRoomId || "").toUpperCase() === (roomId || "").toUpperCase())
+      return;
+    navigate(expected);
+  }, [roomId, navigate, paramRoomId]);
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 pb-28 sm:pb-32">
@@ -110,9 +136,11 @@ const Game = () => {
       />
       {/* push content below navbar height */}
       <div className="h-20" />
-      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
-  {/* Hidden audio elements for remote peers */}
-  <AudioRenderer streamsById={remoteAudioStreams} />
+      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
+        {message}
+      </div>
+      {/* Hidden audio elements for remote peers */}
+      <AudioRenderer streamsById={remoteAudioStreams} />
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
         Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
         {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
@@ -164,9 +192,10 @@ const Game = () => {
         hasMoves={history.length > 1}
         canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
         createRoom={createRoom}
-        leaveRoom={() => {
-          leaveRoom();
-          navigate("/");
+        leaveRoom={async () => {
+          setSuppressAutoJoin(true);
+          await leaveRoom();
+          navigate("/", { replace: true });
         }}
         isMultiplayer={isMultiplayer}
         roomId={roomId}
@@ -182,9 +211,10 @@ const Game = () => {
           }
           onStartNewLocal={resetGame}
           onJoinNewGame={resetGame}
-          onLeaveRoom={() => {
-            leaveRoom();
-            navigate("/");
+          onLeaveRoom={async () => {
+            setSuppressAutoJoin(true);
+            await leaveRoom();
+            navigate("/", { replace: true });
           }}
           isMultiplayer={isMultiplayer}
           player={player}

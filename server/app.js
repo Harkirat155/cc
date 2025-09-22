@@ -4,6 +4,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import compression from 'compression';
 import { registerSocketHandlers } from './socketHandlers.js';
+import { startRoomGC } from './roomManager.js';
 
 const PORT = process.env.PORT || 10000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
@@ -18,6 +19,7 @@ const io = new Server(server, {
 });
 
 registerSocketHandlers(io);
+startRoomGC();
 
 server.listen(PORT, () => {
   console.log(`Realtime server listening on ${PORT}`);
