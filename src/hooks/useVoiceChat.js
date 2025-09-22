@@ -203,8 +203,6 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     };
   }, [disableMic]);
 
-  
-
   // When mic becomes enabled later, attach local stream to all existing peers
   useEffect(() => {
     if (!micEnabled || !localStreamRef.current) return;
