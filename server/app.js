@@ -30,7 +30,8 @@ server.listen(PORT, () => {
   // - SELF_PING_INTERVAL_MS: override interval (default 300000 = 5 minutes)
   const selfPingEnabled = process.env.SELF_PING !== '0';
   if (selfPingEnabled) {
-  const interval = Number(process.env.SELF_PING_INTERVAL_MS) || 5 * 60 * 1000;
+  const parsedInterval = parseInt(process.env.SELF_PING_INTERVAL_MS, 10);
+  const interval = isNaN(parsedInterval) ? 5 * 60 * 1000 : parsedInterval;
   const base = process.env.SELF_PING_URL || process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${PORT}`;
   const url = `${base.replace(/\/$/, '')}/health`;
     const ping = () => {
