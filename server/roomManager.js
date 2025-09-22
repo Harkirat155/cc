@@ -1,7 +1,7 @@
 // Room and socket management
 
 const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 10);
-export const rooms = new Map(); // roomId -> { players, spectators, state }
+export const rooms = new Map(); // roomId -> { players, spectators, state, voice }
 export const socketRooms = new Map(); // socketId -> Set(roomId)
 
 export function touch(id) {
@@ -26,5 +26,12 @@ export function publish(io, roomId) {
     O: room.players.O,
     spectators: Array.from(room.spectators || []),
   };
-  io.to(roomId).emit("gameUpdate", { ...room.state, roomId, roster });
+  // voiceRoster: { [socketId]: { muted: boolean } }
+  const voiceRoster = {};
+  if (room.voice) {
+    for (const [sid, v] of Object.entries(room.voice)) {
+      voiceRoster[sid] = { muted: !!(v && v.muted) };
+    }
+  }
+  io.to(roomId).emit("gameUpdate", { ...room.state, roomId, roster, voiceRoster });
 }

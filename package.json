@@ -23,6 +23,7 @@
         "compression": "^1.8.1",
         "express": "^5.1.0",
         "lucide-react": "^0.544.0",
+        "simple-peer": "^9.11.1",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-router-dom": "^7.9.1",

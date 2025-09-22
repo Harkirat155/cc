@@ -8,6 +8,8 @@ import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import Navbar from "./components/Navbar";
 import PeoplePanel from "./components/PeoplePanel";
+import useVoiceChat from "./hooks/useVoiceChat";
+import AudioRenderer from "./components/AudioRenderer";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -36,8 +38,31 @@ const Game = () => {
     leaveRoom,
     socketId,
     roster,
+    voiceRoster,
     newGameRequestedAt,
+    socket,
   } = useSocketGame();
+  // Voice chat hook
+  const {
+    micEnabled,
+    muted,
+    remoteAudioStreams,
+    enableMic,
+    disableMic,
+    setMuted,
+  } = useVoiceChat({ socket, roomId, selfId: socketId, roster, voiceRoster, initialMuted: true });
+
+  const handleToggleMic = () => {
+    // Single-button behavior: ON = enabled + unmuted, OFF = disabled
+    if (micEnabled && !muted) {
+      // Currently ON -> turn OFF
+      disableMic();
+    } else {
+      // Currently OFF -> turn ON (enable and unmute)
+      enableMic();
+      setMuted(false);
+    }
+  };
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPeopleOpen, setIsPeopleOpen] = useState(false);
@@ -80,10 +105,16 @@ const Game = () => {
         isHistoryOpen={isHistoryOpen}
         onTogglePeople={handleTogglePeople}
         isPeopleOpen={isPeopleOpen}
+        isMultiplayer={isMultiplayer}
+        voiceEnabled={micEnabled}
+        micMuted={muted}
+        onToggleMic={handleToggleMic}
       />
       {/* push content below navbar height */}
       <div className="h-20" />
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">{message}</div>
+  {/* Hidden audio elements for remote peers */}
+  <AudioRenderer streamsById={remoteAudioStreams} />
       <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
         Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
         {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
@@ -112,6 +143,7 @@ const Game = () => {
           socketId={socketId}
           isMultiplayer={isMultiplayer}
           roomId={roomId}
+          voiceRoster={voiceRoster}
         />
       </div>
       {/* History Panel (right slide-over) */}

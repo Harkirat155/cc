@@ -11,6 +11,7 @@ export function registerSocketHandlers(io) {
         players: { X: socket.id, O: null },
         spectators: new Set(),
         state: initialState(),
+        voice: {}, // socketId -> { muted: boolean }
       });
       socket.join(roomId);
       let set = socketRooms.get(socket.id); if (!set){ set = new Set(); socketRooms.set(socket.id, set); }
@@ -141,6 +142,10 @@ export function registerSocketHandlers(io) {
         changed = true;
       }
       if (room.spectators.delete(socket.id)) changed = true;
+      if (room.voice && room.voice[socket.id]) {
+        delete room.voice[socket.id];
+        changed = true;
+      }
       if (changed) {
         if (!room.players.X && !room.players.O && room.spectators.size === 0) {
           rooms.delete(roomId);
@@ -161,11 +166,53 @@ export function registerSocketHandlers(io) {
         if (room.players.X === socket.id) { room.players.X = null; changed = true; }
         if (room.players.O === socket.id) { room.players.O = null; changed = true; }
         if (room.spectators.delete(socket.id)) changed = true;
+        if (room.voice && room.voice[socket.id]) { delete room.voice[socket.id]; changed = true; }
         if (changed){
           if (!room.players.X && !room.players.O && room.spectators.size === 0) rooms.delete(roomId); else publish(io, roomId);
         }
       }
       socketRooms.delete(socket.id);
+    });
+
+    // Voice signaling and state
+    socket.on("voice:join", ({ roomId, muted }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      touch(roomId);
+      if (!room.voice) room.voice = {};
+      room.voice[socket.id] = { muted: !!muted };
+      // Notify others that this socket joined voice
+      socket.to(roomId).emit("voice:user-joined", { socketId: socket.id, muted: !!muted });
+      publish(io, roomId);
+    });
+
+    socket.on("voice:leave", ({ roomId }) => {
+      const room = rooms.get(roomId);
+      if (!room || !room.voice) return;
+      touch(roomId);
+      if (room.voice[socket.id]) delete room.voice[socket.id];
+      socket.to(roomId).emit("voice:user-left", { socketId: socket.id });
+      publish(io, roomId);
+    });
+
+    socket.on("voice:mute-state", ({ roomId, muted }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      touch(roomId);
+      if (!room.voice) room.voice = {};
+      if (!room.voice[socket.id]) room.voice[socket.id] = { muted: !!muted };
+      else room.voice[socket.id].muted = !!muted;
+      socket.to(roomId).emit("voice:mute-state", { socketId: socket.id, muted: !!muted });
+      publish(io, roomId);
+    });
+
+    // WebRTC signaling exchange within room (one-to-many fanout controlled by client)
+    socket.on("voice:signal", ({ roomId, targetId, data }) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      // Relay only to target within the room
+      // Note: no strict membership check here; relies on client-provided room. Could be hardened.
+      socket.to(targetId).emit("voice:signal", { from: socket.id, data, roomId });
     });
   });
 }
