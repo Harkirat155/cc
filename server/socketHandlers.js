@@ -31,15 +31,11 @@ export function registerSocketHandlers(io) {
         lastTouched: Date.now(),
       });
       // Optional debug log
-      try {
-        console.debug(
-          `[createRoom] room=${roomId} socket=${socket.id} client=${
-            clientId || "-"
-          } -> X`
-        );
-      } catch {
-        /* noop */
-      }
+      console.debug(
+        `[createRoom] room=${roomId} socket=${socket.id} client=${
+          clientId || "-"
+        } -> X`
+      );
       socket.join(roomId);
       let set = socketRooms.get(socket.id);
       if (!set) {
