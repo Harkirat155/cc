@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, User, Eye } from "lucide-react";
+import { Users, User, Eye, Mic, MicOff } from "lucide-react";
 import ValueMark from "./marks/ValueMark";
 
 // Props:
@@ -7,12 +7,15 @@ import ValueMark from "./marks/ValueMark";
 // - socketId: string|null
 // - isMultiplayer: boolean
 // - roomId: string|null
-const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId }) => {
+// - voiceRoster: { [socketId]: { muted: boolean } }
+const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {} }) => {
   const { X, O, spectators = [] } = roster || {};
 
   const renderPerson = (id, roleLabel, mark) => {
     if (!id) return null;
     const isYou = socketId && id === socketId;
+    const voice = voiceRoster[id];
+    const isMuted = !voice || voice.muted; // show red crossed if not publishing or muted
     return (
       <li
         key={id + roleLabel}
@@ -36,6 +39,12 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId }) => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {mark && <ValueMark value={mark} />}
+          {/* Mic status */}
+          {isMuted ? (
+            <MicOff size={14} className="text-red-600" title="Muted or not in voice" />
+          ) : (
+            <Mic size={14} className="text-emerald-600" title="Speaking" />
+          )}
           <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {roleLabel}
           </span>
@@ -75,32 +84,7 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId }) => {
               </div>
               {spectators.length ? (
                 <ul className="space-y-2">
-                  {spectators.map((sid) => (
-                    <li
-                      key={sid}
-                      className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
-                        socketId && sid === socketId
-                          ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
-                          : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
-                      }`}
-                      title={sid}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <User size={14} className="text-gray-600 dark:text-gray-300 shrink-0" />
-                        <span className="truncate text-gray-800 dark:text-gray-100">
-                          {sid.slice(0, 6)}…
-                        </span>
-                        {socketId && sid === socketId && (
-                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                            You
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Spectator
-                      </span>
-                    </li>
-                  ))}
+                  {spectators.map((sid) => renderPerson(sid, "Spectator", null))}
                 </ul>
               ) : (
                 <div className="text-sm text-gray-500 dark:text-gray-400">None</div>

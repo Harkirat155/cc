@@ -51,6 +51,7 @@ export default function useSocketGame() {
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null); // 'X' | 'O' | 'spectator'
   const [roster, setRoster] = useState({ X: null, O: null, spectators: [] });
+  const [voiceRoster, setVoiceRoster] = useState({}); // { socketId: { muted: boolean } }
   const [isRoomCreator, setIsRoomCreator] = useState(false);
   const [message, setMessage] = useState("Local game ready");
   const [showModal, setShowModal] = useState(false);
@@ -103,6 +104,7 @@ export default function useSocketGame() {
       setRoomId(payload.roomId || roomId);
       setGameState((prev) => ({ ...prev, ...payload }));
       if (payload.roster) setRoster(payload.roster);
+      if (payload.voiceRoster) setVoiceRoster(payload.voiceRoster || {});
       if (payload.newGameRequester !== undefined) {
         setNewGameRequester(payload.newGameRequester);
         if (payload.newGameRequester) {
@@ -445,6 +447,7 @@ export default function useSocketGame() {
     roomId,
     player,
     roster,
+    voiceRoster,
     isMultiplayer,
     isRoomCreator,
     showModal,
@@ -463,7 +466,8 @@ export default function useSocketGame() {
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
     },
-    socketId: socketRef.current?.id || null,
+  socketId: socketRef.current?.id || null,
+  socket: socketRef.current || null,
     newGameRequestedAt,
     createRoom,
     joinRoom,
