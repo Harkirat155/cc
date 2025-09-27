@@ -3,6 +3,7 @@ import useWindowSize from "../hooks/useWindowSize.js";
 import useShare from "../hooks/useShare.js";
 import ActionButtons from "./Menu/ActionButtons.jsx";
 import FabCylinder from "./Menu/FabCylinder.jsx";
+import { Tooltip } from "./ui/Tooltip.jsx";
 
 const MenuPanel = ({
   onReset,
@@ -139,21 +140,25 @@ const MenuPanel = ({
   }
 
   // Bottom-centered pill for comfortable screens
+  const menuTooltip = collapsed && !expanded ? "Open quick menu" : undefined;
+
   return (
-    <div
-      ref={menuRef}
-      className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-2xl shadow-2xl transition-all duration-300 ${expanded ? "p-2" : "p-1"} z-30 border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35`}
-      onClick={handleExpand}
-    >
-      {collapsed && !expanded ? (
-        <div className="flex items-center justify-center cursor-pointer">
-          <span className="text-base font-semibold text-gray-800 dark:text-gray-100">Menu</span>
-          <span className="ml-2 text-xs text-blue-500">▲</span>
-        </div>
-      ) : (
-        <Buttons />
-      )}
-    </div>
+    <Tooltip content={menuTooltip} sideOffset={14} side="top">
+      <div
+        ref={menuRef}
+        className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-2xl shadow-2xl transition-all duration-300 ${expanded ? "p-2" : "p-1"} z-30 border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35`}
+        onClick={handleExpand}
+      >
+        {collapsed && !expanded ? (
+          <div className="flex items-center justify-center cursor-pointer">
+            <span className="text-base font-semibold text-gray-800 dark:text-gray-100">Menu</span>
+            <span className="ml-2 text-xs text-blue-500">▲</span>
+          </div>
+        ) : (
+          <Buttons />
+        )}
+      </div>
+    </Tooltip>
   );
 };
 

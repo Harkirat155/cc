@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Tooltip } from "./ui/Tooltip";
 
 const ResultModal = ({
   result,
@@ -109,55 +110,67 @@ const ResultModal = ({
             {/* Actions */}
             <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
               {!isMultiplayer && (
-                <button
-                  className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors sm:col-span-2 justify-self-center"
-                  onClick={onStartNewLocal}
-                >
-                  Start new game
-                </button>
+                <Tooltip content="Play another local game" side="top">
+                  <button
+                    className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors sm:col-span-2 justify-self-center"
+                    onClick={onStartNewLocal}
+                  >
+                    Start new game
+                  </button>
+                </Tooltip>
               )}
 
               {isMultiplayer && !someoneRequested && (
                 <>
-                  <button
-                    className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors"
-                    onClick={requestNewGame}
-                  >
-                    Request rematch
-                  </button>
-                  <button
-                    className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
-                    onClick={onLeaveRoom}
-                  >
-                    Leave room
-                  </button>
+                  <Tooltip content="Ask your opponent to play again" side="top">
+                    <button
+                      className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors"
+                      onClick={requestNewGame}
+                    >
+                      Request rematch
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Exit this multiplayer room" side="top">
+                    <button
+                      className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
+                      onClick={onLeaveRoom}
+                    >
+                      Leave room
+                    </button>
+                  </Tooltip>
                 </>
               )}
 
               {isMultiplayer && someoneRequested && !isRequester && (
                 <>
-                  <button
-                    className="inline-flex items-center justify-center rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white h-11 px-4 transition-colors"
-                    onClick={onStartNewLocal}
-                  >
-                    Accept rematch
-                  </button>
-                  <button
-                    className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
-                    onClick={onLeaveRoom}
-                  >
-                    Leave room
-                  </button>
+                  <Tooltip content="Accept the rematch and start playing" side="top">
+                    <button
+                      className="inline-flex items-center justify-center rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white h-11 px-4 transition-colors"
+                      onClick={onStartNewLocal}
+                    >
+                      Accept rematch
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Exit this multiplayer room" side="top">
+                    <button
+                      className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
+                      onClick={onLeaveRoom}
+                    >
+                      Leave room
+                    </button>
+                  </Tooltip>
                 </>
               )}
 
               {isMultiplayer && someoneRequested && isRequester && (
-                <button
-                  className="inline-flex items-center justify-center rounded-lg bg-gray-700/80 hover:bg-gray-700 text-white h-11 px-4 transition-colors col-span-1 sm:col-span-2"
-                  onClick={cancelNewGameRequest}
-                >
-                  Cancel request
-                </button>
+                <Tooltip content="Withdraw your rematch request" side="top">
+                  <button
+                    className="inline-flex items-center justify-center rounded-lg bg-gray-700/80 hover:bg-gray-700 text-white h-11 px-4 transition-colors col-span-1 sm:col-span-2"
+                    onClick={cancelNewGameRequest}
+                  >
+                    Cancel request
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>

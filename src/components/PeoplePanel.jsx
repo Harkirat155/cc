@@ -1,6 +1,7 @@
 import React from "react";
 import { Users, User, Eye, Mic, MicOff } from "lucide-react";
 import ValueMark from "./marks/ValueMark";
+import { Tooltip } from "./ui/Tooltip";
 
 // Props:
 // - roster: { X: string|null, O: string|null, spectators: string[] }
@@ -16,16 +17,19 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
     const isYou = socketId && id === socketId;
     const voice = voiceRoster[id];
     const isMuted = !voice || voice.muted; // show red crossed if not publishing or muted
+    const baseLabel = `${roleLabel} ${mark ? `(${mark})` : ""}`.trim();
+    const tooltipContent = `${baseLabel}${isYou ? " • You" : ""}\n${id}`;
+
     return (
-      <li
-        key={id + roleLabel}
-        className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
-          isYou
-            ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
-            : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
-        }`}
-        title={id}
-      >
+      <Tooltip key={id + roleLabel} content={tooltipContent} side="right" align="start">
+        <li
+          className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
+            isYou
+              ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
+              : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
+          }`}
+          aria-label={`${baseLabel} ${isYou ? "(You)" : ""}`}
+        >
         <div className="flex items-center gap-2 min-w-0">
           <User size={14} className="text-gray-600 dark:text-gray-300 shrink-0" />
           <span className="truncate text-gray-800 dark:text-gray-100">
@@ -40,16 +44,19 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
         <div className="flex items-center gap-2 shrink-0">
           {mark && <ValueMark value={mark} />}
           {/* Mic status */}
-          {isMuted ? (
-            <MicOff size={14} className="text-red-600" title="Muted or not in voice" />
-          ) : (
-            <Mic size={14} className="text-emerald-600" title="Speaking" />
-          )}
+            <Tooltip content={isMuted ? "Muted or not publishing audio" : "Voice channel active"}>
+              {isMuted ? (
+                <MicOff size={14} className="text-red-600" />
+              ) : (
+                <Mic size={14} className="text-emerald-600" />
+              )}
+            </Tooltip>
           <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {roleLabel}
           </span>
         </div>
-      </li>
+        </li>
+      </Tooltip>
     );
   };
 

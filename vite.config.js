@@ -16,7 +16,20 @@ export default defineConfig({
     rollupOptions: {
       treeshake: true, // Remove unused code
       output: {
-        manualChunks: undefined, // Reduce chunk splitting for smaller files
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('simple-peer')) {
+              return 'voice';
+            }
+            if (id.includes('socket.io-client')) {
+              return 'socket';
+            }
+            if (id.includes('@radix-ui') || id.includes('lucide-react')) {
+              return 'ui';
+            }
+            return 'vendor';
+          }
+        },
       },
     },
   },

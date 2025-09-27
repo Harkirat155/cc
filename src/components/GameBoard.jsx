@@ -9,6 +9,7 @@ const GameBoard = ({ squares, onSquareClick, winningSquares }) => (
         value={square}
         onClick={() => onSquareClick(index)}
         isWinning={winningSquares.includes(index)}
+        index={index}
       />
     ))}
   </div>
