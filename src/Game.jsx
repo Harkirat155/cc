@@ -203,6 +203,13 @@ const Game = () => {
           viewIndex={viewIndex}
           jumpTo={jumpTo}
           resumeLatest={resumeLatest}
+          onClose={() => setIsHistoryOpen(false)}
+          roster={roster}
+          socketId={socketId}
+          isMultiplayer={isMultiplayer}
+          youAre={player}
+          currentTurn={gameState.turn}
+          winner={gameState.winner}
         />
       </div>
       <MenuPanel

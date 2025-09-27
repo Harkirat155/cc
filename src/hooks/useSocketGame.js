@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import {
+  appendHistorySnapshot,
+  createSystemEntry,
+  detectChangedIndex,
+} from "../utils/history";
+import { shouldArchiveCompletedGame } from "../utils/completedGames";
 
 // Local game helpers (fallback when not in a multiplayer room)
 const emptyBoard = () => Array(9).fill("");
@@ -34,13 +40,18 @@ const initialLocalState = {
 export default function useSocketGame() {
   const [gameState, setGameState] = useState(initialLocalState);
   // Move-by-move history for the CURRENT (ongoing) game
-  const [moveHistory, setMoveHistory] = useState([
-    { squares: emptyBoard(), result: "Game start: X to move" },
+  const [moveHistory, setMoveHistory] = useState(() => [
+    createSystemEntry({
+      board: emptyBoard(),
+      message: "Game start • X to move",
+      moveNumber: 0,
+    }),
   ]);
   // Concise summaries of COMPLETED games
   const [completedGames, setCompletedGames] = useState([]); // {id, winner, draw, sequence:["X0","O4",...], totalMoves, finishedAt}
   // Sequence of moves for current game (compact form)
   const moveSequenceRef = useRef([]); // array of { mark, index }
+  const lastArchivedSignatureRef = useRef(null);
   const lastBoardRef = useRef(emptyBoard());
   // Time-travel index (which snapshot user is viewing)
   const [viewIndex, setViewIndex] = useState(0); // 0..moveHistory.length-1
@@ -176,39 +187,52 @@ export default function useSocketGame() {
           ? "Draw"
           : `${payload.winner} wins`
         : `${payload.turn}'s turn`;
-      setMoveHistory((h) => {
-        const last = h[h.length - 1];
-        if (
-          last &&
-          last.squares &&
-          last.squares.every((v, i) => v === payload.board[i])
-        ) {
-          return h; // duplicate board state
-        }
-        // Detect changed cell to append to sequence
-        const prevBoard = lastBoardRef.current;
-        let changedIndex = null;
-        for (let i = 0; i < payload.board.length; i++)
-          if (prevBoard[i] !== payload.board[i]) {
-            changedIndex = i;
-            break;
-          }
-        if (changedIndex !== null) {
-          moveSequenceRef.current.push({
-            mark: payload.board[changedIndex],
+      const boardSnapshot = Array.isArray(payload.board)
+        ? payload.board.slice()
+        : emptyBoard();
+      const changedIndex = detectChangedIndex(
+        lastBoardRef.current,
+        boardSnapshot
+      );
+      const mark =
+        changedIndex !== null && changedIndex >= 0
+          ? boardSnapshot[changedIndex]
+          : null;
+      const entryType = payload.winner
+        ? payload.winner === "draw"
+          ? "draw"
+          : "win"
+        : "move";
+      const timestamp = Date.now();
+      setMoveHistory((historyList) => {
+        const moveNumber =
+          mark && changedIndex !== null
+            ? moveSequenceRef.current.length + 1
+            : historyList.length;
+        const { history: nextHistory, appended } = appendHistorySnapshot(
+          historyList,
+          {
+            board: boardSnapshot,
+            result: resultText,
+            type: entryType,
+            moveNumber,
+            mark,
             index: changedIndex,
+            timestamp,
+          }
+        );
+        if (appended && mark && changedIndex !== null) {
+          moveSequenceRef.current.push({
+            mark,
+            index: changedIndex,
+            timestamp,
           });
         }
-        lastBoardRef.current = payload.board.slice();
-        const next = [
-          ...h,
-          { squares: payload.board.slice(), result: resultText },
-        ];
-        // Auto-follow if user was at latest
-        if (viewIndexRef.current === h.length - 1) {
-          setViewIndex(next.length - 1);
+        if (appended && viewIndexRef.current === historyList.length - 1) {
+          setViewIndex(nextHistory.length - 1);
         }
-        return next;
+        lastBoardRef.current = boardSnapshot.slice();
+        return nextHistory;
       });
       if (payload.winner) setShowModal(true);
     });
@@ -314,26 +338,48 @@ export default function useSocketGame() {
               ? "Draw"
               : `${result.winner} wins`
             : `${nextTurn}'s turn`;
-          // History optimistic append
-          setMoveHistory((h) => {
-            const last = h[h.length - 1];
-            if (last && last.squares.every((v, i) => v === board[i])) return h;
-            const placedIndex = board.findIndex(
-              (cell, idx) => cell !== last.squares[idx]
+          const changedIndex = detectChangedIndex(
+            lastBoardRef.current,
+            board
+          );
+          const mark =
+            changedIndex !== null && changedIndex >= 0 ? board[changedIndex] : null;
+          const entryType = result
+            ? result.winner === "draw"
+              ? "draw"
+              : "win"
+            : "move";
+          const timestamp = Date.now();
+          // History optimistic append with de-duplication
+          setMoveHistory((historyList) => {
+            const moveNumber =
+              mark && changedIndex !== null
+                ? moveSequenceRef.current.length + 1
+                : historyList.length;
+            const { history: nextHistory, appended } = appendHistorySnapshot(
+              historyList,
+              {
+                board,
+                result: resultText,
+                type: entryType,
+                moveNumber,
+                mark,
+                index: changedIndex,
+                timestamp,
+              }
             );
-            if (placedIndex >= 0)
+            if (appended && mark && changedIndex !== null) {
               moveSequenceRef.current.push({
-                mark: board[placedIndex],
-                index: placedIndex,
+                mark,
+                index: changedIndex,
+                timestamp,
               });
+            }
+            if (appended && viewIndexRef.current === historyList.length - 1) {
+              setViewIndex(nextHistory.length - 1);
+            }
             lastBoardRef.current = board.slice();
-            const nextArr = [
-              ...h,
-              { squares: board.slice(), result: resultText },
-            ];
-            if (viewIndexRef.current === h.length - 1)
-              setViewIndex(nextArr.length - 1);
-            return nextArr;
+            return nextHistory;
           });
           return {
             ...curr,
@@ -367,31 +413,43 @@ export default function useSocketGame() {
             ? "Draw"
             : `${result.winner} wins`
           : `${next.turn}'s turn`;
-        setMoveHistory((h) => {
-          const last = h[h.length - 1];
-          if (
-            last &&
-            last.squares &&
-            last.squares.every((v, i) => v === board[i])
-          )
-            return h;
-          // Record move in sequence
-          const placedIndex = board.findIndex(
-            (cell, idx) => cell !== last.squares[idx]
+        const changedIndex = detectChangedIndex(lastBoardRef.current, board);
+        const mark =
+          changedIndex !== null && changedIndex >= 0 ? board[changedIndex] : null;
+        const entryType = result
+          ? result.winner === "draw"
+            ? "draw"
+            : "win"
+          : "move";
+        const timestamp = Date.now();
+        setMoveHistory((historyList) => {
+          const moveNumber =
+            mark && changedIndex !== null
+              ? moveSequenceRef.current.length + 1
+              : historyList.length;
+          const { history: nextHistory, appended } = appendHistorySnapshot(
+            historyList,
+            {
+              board,
+              result: resultText,
+              type: entryType,
+              moveNumber,
+              mark,
+              index: changedIndex,
+              timestamp,
+            }
           );
-          if (placedIndex >= 0)
+          if (appended && mark && changedIndex !== null) {
             moveSequenceRef.current.push({
-              mark: board[placedIndex],
-              index: placedIndex,
+              mark,
+              index: changedIndex,
+              timestamp,
             });
+          }
+          if (appended && viewIndexRef.current === historyList.length - 1)
+            setViewIndex(nextHistory.length - 1);
           lastBoardRef.current = board.slice();
-          const nextArr = [
-            ...h,
-            { squares: board.slice(), result: resultText },
-          ];
-          if (viewIndexRef.current === h.length - 1)
-            setViewIndex(nextArr.length - 1);
-          return nextArr;
+          return nextHistory;
         });
         return next;
       });
@@ -402,27 +460,38 @@ export default function useSocketGame() {
 
   const finalizeCurrentGameIfFinished = useCallback(() => {
     if (!gameState.winner) return; // only store completed
-    // Avoid duplicating if already stored (check last completed sequence string)
-    const seqStr = moveSequenceRef.current
-      .map((m) => m.mark + "" + m.index)
-      .join("-");
-    if (
-      completedGames.length &&
-      completedGames[completedGames.length - 1].sequence.join("-") === seqStr
-    )
+
+    const sequenceStrings = moveSequenceRef.current.map(
+      (m) => `${m.mark ?? ""}${m.index ?? ""}`
+    );
+    const lastMoveTimestamp =
+      moveSequenceRef.current.length > 0
+        ? moveSequenceRef.current[moveSequenceRef.current.length - 1].timestamp
+        : null;
+
+    const { shouldArchive, signature } = shouldArchiveCompletedGame({
+      lastSignature: lastArchivedSignatureRef.current,
+      sequenceStrings,
+      lastMoveTimestamp,
+    });
+
+    if (!shouldArchive) {
+      lastArchivedSignatureRef.current = signature;
       return;
-    setCompletedGames((g) => [
-      ...g,
-      {
-        id: Date.now(),
-        winner: gameState.winner === "draw" ? null : gameState.winner,
-        draw: gameState.winner === "draw",
-        sequence: moveSequenceRef.current.map((m) => m.mark + "" + m.index),
-        totalMoves: moveSequenceRef.current.length,
-        finishedAt: new Date().toISOString(),
-      },
-    ]);
-  }, [gameState.winner, completedGames]);
+    }
+
+    const summary = {
+      id: Date.now(),
+      winner: gameState.winner === "draw" ? null : gameState.winner,
+      draw: gameState.winner === "draw",
+      sequence: sequenceStrings,
+      totalMoves: sequenceStrings.length,
+      finishedAt: new Date().toISOString(),
+    };
+
+    setCompletedGames((g) => [...g, summary]);
+    lastArchivedSignatureRef.current = signature;
+  }, [gameState.winner]);
 
   const resetGame = useCallback(() => {
     // If current game finished, persist summary
@@ -438,9 +507,17 @@ export default function useSocketGame() {
       }));
     }
     // Reset per-game tracking
+    const freshBoard = emptyBoard();
     moveSequenceRef.current = [];
-    lastBoardRef.current = emptyBoard();
-    setMoveHistory([{ squares: emptyBoard(), result: "New game: X to move" }]);
+    lastBoardRef.current = freshBoard;
+    setMoveHistory([
+      createSystemEntry({
+        board: freshBoard,
+        message: "New game • X to move",
+        moveNumber: 0,
+        tag: "reset",
+      }),
+    ]);
     setViewIndex(0);
     setShowModal(false);
     setNewGameRequester(null);
@@ -452,10 +529,16 @@ export default function useSocketGame() {
       return;
     }
     setGameState((_s) => ({ ...initialLocalState }));
+    const freshBoard = emptyBoard();
     moveSequenceRef.current = [];
-    lastBoardRef.current = emptyBoard();
+    lastBoardRef.current = freshBoard;
     setMoveHistory([
-      { squares: emptyBoard(), result: "Scores reset: X to move" },
+      createSystemEntry({
+        board: freshBoard,
+        message: "Scores reset • X to move",
+        moveNumber: 0,
+        tag: "system",
+      }),
     ]);
     setViewIndex(0);
     setShowModal(false);
@@ -477,8 +560,16 @@ export default function useSocketGame() {
         setGameState(initialLocalState);
         setRoster({ X: null, O: null, spectators: [] });
         moveSequenceRef.current = [];
-        lastBoardRef.current = emptyBoard();
-        setMoveHistory([{ squares: emptyBoard(), result: "Left room" }]);
+        const freshBoard = emptyBoard();
+        lastBoardRef.current = freshBoard;
+        setMoveHistory([
+          createSystemEntry({
+            board: freshBoard,
+            message: "Left room",
+            moveNumber: 0,
+            tag: "system",
+          }),
+        ]);
         setViewIndex(0);
         setShowModal(false);
         setNewGameRequester(null);
