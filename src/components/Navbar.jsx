@@ -5,8 +5,17 @@ import { History, Users, Mic, MicOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
 
-const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeopleOpen = false, 
-  voiceEnabled = false, micMuted = true, onToggleMic, isMultiplayer = false, onShowWalkthrough }) => {
+const Navbar = ({
+  onToggleHistory,
+  isHistoryOpen = false,
+  onTogglePeople,
+  isPeopleOpen = false,
+  voiceEnabled = false,
+  micMuted = true,
+  onToggleMic,
+  isMultiplayer = false,
+  onShowWalkthrough,
+}) => {
   // Single-button voice control: consider voice "on" only when enabled and not muted
   const isVoiceOn = Boolean(voiceEnabled && !micMuted);
   const menuActions = [];
@@ -42,7 +51,9 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeop
             {isMultiplayer && (
               <div className="flex items-center gap-2 mr-1">
                 {/* Single voice toggle (on/off) */}
-                <Tooltip content={isVoiceOn ? "Turn voice off" : "Turn voice on"}>
+                <Tooltip
+                  content={isVoiceOn ? "Turn voice off" : "Turn voice on"}
+                >
                   <button
                     type="button"
                     onClick={onToggleMic}
@@ -52,27 +63,51 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeop
                     aria-label={isVoiceOn ? "Turn voice off" : "Turn voice on"}
                   >
                     {isVoiceOn ? (
-                      <Mic size={16} strokeWidth={2} className="text-emerald-600 dark:text-emerald-300" />
+                      <Mic
+                        size={16}
+                        strokeWidth={2}
+                        className="text-emerald-600 dark:text-emerald-300"
+                      />
                     ) : (
-                      <MicOff size={16} strokeWidth={2} className="text-gray-700 dark:text-gray-200" />
+                      <MicOff
+                        size={16}
+                        strokeWidth={2}
+                        className="text-gray-700 dark:text-gray-200"
+                      />
                     )}
                   </button>
                 </Tooltip>
               </div>
             )}
-            <Tooltip content={isPeopleOpen ? "Close people panel" : "Open people panel"}>
-              <button
-                type="button"
-                onClick={onTogglePeople}
-                className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
-                  isPeopleOpen ? "ring-2 ring-indigo-500/50" : ""
-                }`}
-                aria-label={isPeopleOpen ? "Close people" : "Open people"}
-              >
-                <Users size={16} strokeWidth={2} className="text-gray-700 dark:text-gray-200" />
-              </button>
-            </Tooltip>
-            <Tooltip content={isHistoryOpen ? "Close move history" : "Open move history"}>
+            {isMultiplayer && (
+              <div className="flex items-center gap-2 mr-1">
+                <Tooltip
+                  content={
+                    isPeopleOpen ? "Close people panel" : "Open people panel"
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={onTogglePeople}
+                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
+                      isPeopleOpen ? "ring-2 ring-indigo-500/50" : ""
+                    }`}
+                    aria-label={isPeopleOpen ? "Close people" : "Open people"}
+                  >
+                    <Users
+                      size={16}
+                      strokeWidth={2}
+                      className="text-gray-700 dark:text-gray-200"
+                    />
+                  </button>
+                </Tooltip>
+              </div>
+            )}
+            <Tooltip
+              content={
+                isHistoryOpen ? "Close move history" : "Open move history"
+              }
+            >
               <button
                 type="button"
                 onClick={onToggleHistory}
@@ -82,7 +117,11 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeop
                 aria-label={isHistoryOpen ? "Close history" : "Open history"}
               >
                 {/* History icon */}
-                <History size={16} strokeWidth={2} className="text-gray-700 dark:text-gray-200" />
+                <History
+                  size={16}
+                  strokeWidth={2}
+                  className="text-gray-700 dark:text-gray-200"
+                />
               </button>
             </Tooltip>
 
