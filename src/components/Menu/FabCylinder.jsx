@@ -6,6 +6,7 @@ export default function FabCylinder({
   indicators = [],
   expanded,
   onToggle,
+  ...rest
 }) {
   return (
     <Tooltip content={expanded ? "Close quick menu" : "Open quick menu"} side="left">
@@ -17,6 +18,7 @@ export default function FabCylinder({
         onClick={onToggle}
         className="group fixed bottom-4 right-4 z-40 outline-none"
         tabIndex={expanded ? -1 : 0}
+        {...rest}
       >
         <span
           className={`relative block w-[58px] rounded-full shadow-2xl ring-1 ring-white/25 border border-white/20 dark:border-gray-700/50 backdrop-blur-xl backdrop-saturate-150 bg-white/25 dark:bg-gray-800/25 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35 transition-transform duration-200 ${

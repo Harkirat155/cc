@@ -26,6 +26,7 @@
         "lucide-react": "^0.544.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-joyride": "^2.9.3",
         "react-router-dom": "^7.9.1",
         "simple-peer": "^9.11.1",
         "socket.io": "^4.7.5",

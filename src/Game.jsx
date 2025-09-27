@@ -10,10 +10,18 @@ import Navbar from "./components/Navbar";
 import PeoplePanel from "./components/PeoplePanel";
 import useVoiceChat from "./hooks/useVoiceChat";
 import AudioRenderer from "./components/AudioRenderer";
+import useWalkthrough from "./hooks/useWalkthrough";
+import Walkthrough from "./components/Walkthrough";
 
 const Game = () => {
   const navigate = useNavigate();
   const { roomId: paramRoomId } = useParams();
+  const {
+    run: runWalkthrough,
+    steps: walkthroughSteps,
+    handleCallback: handleWalkthroughCallback,
+    restart: restartWalkthrough,
+  } = useWalkthrough();
   const {
     gameState,
     history,
@@ -123,6 +131,11 @@ const Game = () => {
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 pb-28 sm:pb-32">
+      <Walkthrough
+        run={runWalkthrough}
+        steps={walkthroughSteps}
+        onCallback={handleWalkthroughCallback}
+      />
       {/* Navbar with brand + actions */}
       <Navbar
         onToggleHistory={handleToggleHistory}
@@ -133,24 +146,30 @@ const Game = () => {
         voiceEnabled={micEnabled}
         micMuted={muted}
         onToggleMic={handleToggleMic}
+        onShowWalkthrough={restartWalkthrough}
       />
       {/* push content below navbar height */}
       <div className="h-20" />
-      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
-        {message}
-      </div>
       {/* Hidden audio elements for remote peers */}
       <AudioRenderer streamsById={remoteAudioStreams} />
-      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
-        Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
-        {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
-      </div>
-      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
-        Score: <ValueMark value="X" /> - {gameState.xScore} |{" "}
-        <ValueMark value="O" /> - {gameState.oScore}
-      </div>
-      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
-        Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
+      <div
+        data-tour="status"
+        className="mb-6 flex flex-col items-center gap-2 text-center"
+      >
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {message}
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
+          {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
+        </div>
+        <div className="text-lg font-medium text-gray-700 dark:text-gray-200">
+          Score: <ValueMark value="X" /> - {gameState.xScore} |{" "}
+          <ValueMark value="O" /> - {gameState.oScore}
+        </div>
+        <div className="text-lg font-medium text-gray-700 dark:text-gray-200">
+          Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
+        </div>
       </div>
       <GameBoard
         squares={displayedBoard}

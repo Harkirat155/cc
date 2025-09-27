@@ -79,7 +79,7 @@ export default function ActionButtons({
   return (
     <div className={`flex ${layout} gap-3 items-center justify-center`}>
       {actions.map(({ key, tooltip, variant, onClick, label, ariaLabel, children }) => (
-  <Tooltip key={key} content={tooltip} side={tooltipSide} align={tooltipAlign} sideOffset={tooltipOffset}>
+        <Tooltip key={key} content={tooltip} side={tooltipSide} align={tooltipAlign} sideOffset={tooltipOffset}>
           <Button
             variant={variant}
             aria-label={ariaLabel || label}

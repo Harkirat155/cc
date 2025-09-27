@@ -3,13 +3,27 @@ import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
 import { History, Users, Mic, MicOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
+import NavMenu from "./NavMenu";
 
 const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeopleOpen = false, 
-  voiceEnabled = false, micMuted = true, onToggleMic, isMultiplayer = false }) => {
+  voiceEnabled = false, micMuted = true, onToggleMic, isMultiplayer = false, onShowWalkthrough }) => {
   // Single-button voice control: consider voice "on" only when enabled and not muted
   const isVoiceOn = Boolean(voiceEnabled && !micMuted);
+  const menuActions = [];
+
+  if (typeof onShowWalkthrough === "function") {
+    menuActions.push({
+      key: "tour",
+      label: "Tour",
+      description: "Replay the guided walkthrough",
+      onSelect: onShowWalkthrough,
+    });
+  }
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+    <nav
+      className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800"
+      data-tour="navbar"
+    >
       <div className="mx-auto max-w-6xl px-4">
         <div className="h-16 flex items-center justify-between">
           {/* Brand */}
@@ -24,7 +38,7 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeop
           </Tooltip>
 
           {/* Actions: History + Theme */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tour="panels">
             {isMultiplayer && (
               <div className="flex items-center gap-2 mr-1">
                 {/* Single voice toggle (on/off) */}
@@ -73,6 +87,7 @@ const Navbar = ({ onToggleHistory, isHistoryOpen = false, onTogglePeople, isPeop
             </Tooltip>
 
             <ThemeToggle />
+            <NavMenu actions={menuActions} />
           </div>
         </div>
       </div>
