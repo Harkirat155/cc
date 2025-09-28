@@ -1,17 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
 import ResultModal from "./components/ResultModal";
-import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import Navbar from "./components/Navbar";
-import PeoplePanel from "./components/PeoplePanel";
 import useVoiceChat from "./hooks/useVoiceChat";
 import AudioRenderer from "./components/AudioRenderer";
 import useWalkthrough from "./hooks/useWalkthrough";
 import Walkthrough from "./components/Walkthrough";
+import ScorePanel from "./components/ScorePanel";
+import ToastStack from "./components/ui/ToastStack";
+import PeoplePanel from "./components/PeoplePanel";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -73,28 +74,39 @@ const Game = () => {
   };
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isPeopleOpen, setIsPeopleOpen] = useState(false);
   // Prevent auto-join when user is actively leaving a room from a room URL
   const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
-
-  // Ensure only one side panel is open at a time
-  const handleTogglePeople = () => {
-    setIsPeopleOpen((prev) => {
-      const next = !prev;
-      if (next) setIsHistoryOpen(false);
-      return next;
-    });
-  };
+  const [toasts, setToasts] = useState([]);
+  const lastToastRef = useRef({ text: null, at: 0 });
 
   const handleToggleHistory = () => {
-    setIsHistoryOpen((prev) => {
-      const next = !prev;
-      if (next) setIsPeopleOpen(false);
-      return next;
-    });
+    setIsHistoryOpen((prev) => !prev);
   };
 
   // winningSquares derived from multiplayer/local hook state
+
+  useEffect(() => {
+    if (!message) return undefined;
+    const now = Date.now();
+    const { text: lastText, at: lastAt } = lastToastRef.current || {};
+    if (lastText === message && now - lastAt < 1500) return undefined;
+
+    const id = `${now}-${Math.random().toString(36).slice(2)}`;
+    const duration = 5000;
+
+    setToasts((prev) => [...prev.slice(-3), { id, text: message, duration }]);
+    lastToastRef.current = { text: message, at: now };
+
+    const timer = window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, duration);
+
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
+  const handleToastDismiss = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   // Auto-join a room when visiting /room/:roomId via a shared link
   useEffect(() => {
@@ -130,7 +142,7 @@ const Game = () => {
   }, [roomId, navigate, paramRoomId]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 pb-28 sm:pb-32">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-x-hidden bg-slate-100 text-slate-900 transition-colors duration-500 dark:bg-slate-950 dark:text-slate-100">
       <Walkthrough
         run={runWalkthrough}
         steps={walkthroughSteps}
@@ -140,60 +152,64 @@ const Game = () => {
       <Navbar
         onToggleHistory={handleToggleHistory}
         isHistoryOpen={isHistoryOpen}
-        onTogglePeople={handleTogglePeople}
-        isPeopleOpen={isPeopleOpen}
         isMultiplayer={isMultiplayer}
+        onShowWalkthrough={restartWalkthrough}
         voiceEnabled={micEnabled}
         micMuted={muted}
         onToggleMic={handleToggleMic}
-        onShowWalkthrough={restartWalkthrough}
+        menuPanel={
+          isMultiplayer ? (
+            <PeoplePanel
+              roster={roster}
+              socketId={socketId}
+              isMultiplayer={isMultiplayer}
+              roomId={roomId}
+              voiceRoster={voiceRoster}
+              variant="menu"
+            />
+          ) : null
+        }
       />
       {/* push content below navbar height */}
       <div className="h-20" />
       {/* Hidden audio elements for remote peers */}
       <AudioRenderer streamsById={remoteAudioStreams} />
-      <div
-        data-tour="status"
-        className="mb-6 flex flex-col items-center gap-2 text-center"
-      >
-        <div className="text-sm text-gray-600 dark:text-gray-300">
-          {message}
+      <main className="relative z-0 flex w-full flex-1 justify-center px-4">
+        <div className="flex w-full max-w-5xl flex-col items-center gap-10">
+          <ScorePanel
+            gameState={gameState}
+            roster={roster}
+            socketId={socketId}
+            isMultiplayer={isMultiplayer}
+            roomId={roomId}
+          />
+          <div className="relative flex w-full flex-col items-center gap-8">
+            <GameBoard
+              squares={displayedBoard}
+              onSquareClick={handleSquareClick}
+              winningSquares={winningSquares}
+            />
+            <MenuPanel
+              onReset={resetScores}
+              onNewGame={resetGame}
+              hasMoves={history.length > 1}
+              canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
+              createRoom={createRoom}
+              leaveRoom={async () => {
+                setSuppressAutoJoin(true);
+                await leaveRoom();
+                navigate("/", { replace: true });
+              }}
+              isMultiplayer={isMultiplayer}
+              roomId={roomId}
+            />
+          </div>
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-300">
-          Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
-          {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
-        </div>
-        <div className="text-lg font-medium text-gray-700 dark:text-gray-200">
-          Score: <ValueMark value="X" /> - {gameState.xScore} |{" "}
-          <ValueMark value="O" /> - {gameState.oScore}
-        </div>
-        <div className="text-lg font-medium text-gray-700 dark:text-gray-200">
-          Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
-        </div>
-      </div>
-      <GameBoard
-        squares={displayedBoard}
-        onSquareClick={handleSquareClick}
-        winningSquares={winningSquares}
-      />
+      </main>
       {/* Slide-over panels */}
-      {/* People Panel (right slide-over) */}
-      <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
-          isPeopleOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <PeoplePanel
-          roster={roster}
-          socketId={socketId}
-          isMultiplayer={isMultiplayer}
-          roomId={roomId}
-          voiceRoster={voiceRoster}
-        />
-      </div>
       {/* History Panel (right slide-over) */}
       <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-slate-200/70 bg-white/80 backdrop-blur-xl shadow-xl transition-transform duration-300 dark:border-slate-700/70 dark:bg-slate-950/70 ${
           isHistoryOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -212,20 +228,6 @@ const Game = () => {
           winner={gameState.winner}
         />
       </div>
-      <MenuPanel
-        onReset={resetScores}
-        onNewGame={resetGame}
-        hasMoves={history.length > 1}
-        canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
-        createRoom={createRoom}
-        leaveRoom={async () => {
-          setSuppressAutoJoin(true);
-          await leaveRoom();
-          navigate("/", { replace: true });
-        }}
-        isMultiplayer={isMultiplayer}
-        roomId={roomId}
-      />
       {showModal && (
         <ResultModal
           result={
@@ -254,6 +256,7 @@ const Game = () => {
           rematchTimeoutSec={20}
         />
       )}
+      <ToastStack messages={toasts} onDismiss={handleToastDismiss} />
     </div>
   );
 };

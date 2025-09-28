@@ -22,7 +22,7 @@ const MenuPanel = ({
   const { shareUrl, copied, share } = useShare({ roomId });
 
   // Layout mode
-  const useSideDrawer = width < 410 || height < 650;
+  const useSideDrawer = height < 710;
 
   useEffect(() => {
     if (useSideDrawer) {

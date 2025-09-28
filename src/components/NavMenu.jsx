@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "./ui/Tooltip";
 
-const NavMenu = ({ actions = [] }) => {
+const NavMenu = ({ actions = [], panel = null }) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const buttonRef = useRef(null);
@@ -35,7 +35,7 @@ const NavMenu = ({ actions = [] }) => {
     };
   }, [open]);
 
-  if (visibleActions.length === 0) {
+  if (visibleActions.length === 0 && !panel) {
     return null;
   }
 
@@ -78,29 +78,36 @@ const NavMenu = ({ actions = [] }) => {
       <div
         role="menu"
         aria-hidden={!open}
-        className={`absolute right-0 mt-3 w-48 origin-top-right rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl transition-all duration-150 ${
+        className={`absolute right-0 mt-3 w-72 max-w-[85vw] origin-top-right rounded-xl border border-gray-200 dark:border-gray-700 bg-white/95 backdrop-blur dark:bg-gray-900/95 shadow-xl transition-all duration-150 ${
           open ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
         }`}
       >
-        <ul className="py-2">
-          {visibleActions.map(({ key, label, description, onSelect }) => (
-            <li key={key}>
-              <button
-                type="button"
-                role="menuitem"
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 rounded-lg transition"
-                onClick={() => handleSelect(onSelect)}
-              >
-                <span className="font-medium">{label}</span>
-                {description && (
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {description}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
+        {panel && (
+          <div className="max-h-80 overflow-y-auto border-b border-gray-200/80 p-3 dark:border-gray-700/80">
+            {panel}
+          </div>
+        )}
+        {visibleActions.length > 0 && (
+          <ul className="py-2">
+            {visibleActions.map(({ key, label, description, onSelect }) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 rounded-lg transition"
+                  onClick={() => handleSelect(onSelect)}
+                >
+                  <span className="font-medium">{label}</span>
+                  {description && (
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {description}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

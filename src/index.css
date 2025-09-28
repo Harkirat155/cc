@@ -20,3 +20,12 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+@keyframes shrink-bar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}

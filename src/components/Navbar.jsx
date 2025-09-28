@@ -1,24 +1,22 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { History, Users, Mic, MicOff } from "lucide-react";
+import { History, Mic, MicOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
 
 const Navbar = ({
   onToggleHistory,
   isHistoryOpen = false,
-  onTogglePeople,
-  isPeopleOpen = false,
+  isMultiplayer = false,
+  onShowWalkthrough,
   voiceEnabled = false,
   micMuted = true,
   onToggleMic,
-  isMultiplayer = false,
-  onShowWalkthrough,
+  menuPanel = null,
+  menuItems = [],
 }) => {
-  // Single-button voice control: consider voice "on" only when enabled and not muted
-  const isVoiceOn = Boolean(voiceEnabled && !micMuted);
-  const menuActions = [];
+  const menuActions = [...menuItems];
 
   if (typeof onShowWalkthrough === "function") {
     menuActions.push({
@@ -28,6 +26,9 @@ const Navbar = ({
       onSelect: onShowWalkthrough,
     });
   }
+  const showVoiceControl = isMultiplayer && typeof onToggleMic === "function";
+  const micIsOn = showVoiceControl && voiceEnabled && !micMuted;
+
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800"
@@ -48,60 +49,25 @@ const Navbar = ({
 
           {/* Actions: History + Theme */}
           <div className="flex items-center gap-2" data-tour="panels">
-            {isMultiplayer && (
-              <div className="flex items-center gap-2 mr-1">
-                {/* Single voice toggle (on/off) */}
-                <Tooltip
-                  content={isVoiceOn ? "Turn voice off" : "Turn voice on"}
+            {showVoiceControl && (
+              <Tooltip
+                content={micIsOn ? "Mute microphone" : "Enable microphone"}
+              >
+                <button
+                  type="button"
+                  onClick={onToggleMic}
+                  className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
+                    micIsOn ? "ring-2 ring-emerald-500/50 dark:ring-emerald-500/60" : ""
+                  }`}
+                  aria-label={micIsOn ? "Mute microphone" : "Enable microphone"}
                 >
-                  <button
-                    type="button"
-                    onClick={onToggleMic}
-                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
-                      isVoiceOn ? "ring-2 ring-emerald-500/50" : ""
-                    }`}
-                    aria-label={isVoiceOn ? "Turn voice off" : "Turn voice on"}
-                  >
-                    {isVoiceOn ? (
-                      <Mic
-                        size={16}
-                        strokeWidth={2}
-                        className="text-emerald-600 dark:text-emerald-300"
-                      />
-                    ) : (
-                      <MicOff
-                        size={16}
-                        strokeWidth={2}
-                        className="text-gray-700 dark:text-gray-200"
-                      />
-                    )}
-                  </button>
-                </Tooltip>
-              </div>
-            )}
-            {isMultiplayer && (
-              <div className="flex items-center gap-2 mr-1">
-                <Tooltip
-                  content={
-                    isPeopleOpen ? "Close people panel" : "Open people panel"
-                  }
-                >
-                  <button
-                    type="button"
-                    onClick={onTogglePeople}
-                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
-                      isPeopleOpen ? "ring-2 ring-indigo-500/50" : ""
-                    }`}
-                    aria-label={isPeopleOpen ? "Close people" : "Open people"}
-                  >
-                    <Users
-                      size={16}
-                      strokeWidth={2}
-                      className="text-gray-700 dark:text-gray-200"
-                    />
-                  </button>
-                </Tooltip>
-              </div>
+                  {micIsOn ? (
+                    <Mic size={16} className="text-emerald-600 dark:text-emerald-300" />
+                  ) : (
+                    <MicOff size={16} className="text-gray-700 dark:text-gray-200" />
+                  )}
+                </button>
+              </Tooltip>
             )}
             <Tooltip
               content={
@@ -126,7 +92,7 @@ const Navbar = ({
             </Tooltip>
 
             <ThemeToggle />
-            <NavMenu actions={menuActions} />
+            <NavMenu actions={menuActions} panel={menuPanel} />
           </div>
         </div>
       </div>

@@ -9,8 +9,17 @@ import { Tooltip } from "./ui/Tooltip";
 // - isMultiplayer: boolean
 // - roomId: string|null
 // - voiceRoster: { [socketId]: { muted: boolean } }
-const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {} }) => {
+const PeoplePanel = ({
+  roster,
+  socketId,
+  isMultiplayer,
+  roomId,
+  voiceRoster = {},
+  variant = "panel",
+  className = "",
+}) => {
   const { X, O, spectators = [] } = roster || {};
+  const isMenuVariant = variant === "menu";
 
   const renderPerson = (id, roleLabel, mark) => {
     if (!id) return null;
@@ -61,8 +70,16 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/50">
+    <div
+      className={`flex flex-col ${isMenuVariant ? "gap-3" : "h-full"} ${className}`}
+    >
+      <div
+        className={`flex items-center justify-between border-b border-gray-200 dark:border-gray-700 ${
+          isMenuVariant
+            ? "px-2.5 py-2 text-sm text-gray-700 dark:text-gray-200"
+            : "px-4 py-3 bg-white/70 dark:bg-gray-900/50"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Users size={16} className="text-gray-700 dark:text-gray-200" />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">People</h3>
@@ -71,7 +88,11 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
           <span className="text-[11px] text-gray-500 dark:text-gray-400">Room {roomId}</span>
         )}
       </div>
-      <div className="p-4 space-y-3 overflow-y-auto">
+      <div
+        className={`${
+          isMenuVariant ? "px-2.5 pb-3 pt-1" : "p-4"
+        } space-y-3 overflow-y-auto`}
+      >
         {!isMultiplayer ? (
           <div className="text-sm text-gray-600 dark:text-gray-300">
             Local mode — no room members.
