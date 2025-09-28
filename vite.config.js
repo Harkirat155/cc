@@ -32,8 +32,8 @@ export default defineConfig({
             return 'walkthrough';
           }
           // Let React and its helpers live with the rest of the vendor chunk to
-          // avoid circular imports at runtime (React depending on other vendor
-          // utilities that in turn depend on React).
+          // prevent chunk loading order issues at runtime (e.g., React depending on
+          // other vendor utilities that in turn depend on React).
           if (normalized.includes('@radix-ui') || normalized.includes('lucide-react')) {
             return 'ui';
           }
