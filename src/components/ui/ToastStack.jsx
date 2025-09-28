@@ -21,7 +21,7 @@ const ToastStack = ({ messages = [], onDismiss }) => {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return undefined;
+    if (typeof window === "undefined") return () => {};
 
     const activeIds = new Set(stackedMessages.map((toast) => toast.id));
     const topToast = stackedMessages[0];
@@ -33,7 +33,7 @@ const ToastStack = ({ messages = [], onDismiss }) => {
       }
     });
 
-    if (!topToast) return undefined;
+  if (!topToast) return () => {};
 
     if (!timersRef.current.has(topToast.id)) {
       const timeoutId = window.setTimeout(() => {
@@ -43,7 +43,7 @@ const ToastStack = ({ messages = [], onDismiss }) => {
       timersRef.current.set(topToast.id, timeoutId);
     }
 
-    return undefined;
+    return () => {};
   }, [stackedMessages, handleDismiss]);
 
   useEffect(() => () => {

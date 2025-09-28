@@ -7,18 +7,7 @@ import { registerSocketHandlers } from './socketHandlers.js';
 import { startRoomGC } from './roomManager.js';
 import { addFeedback } from './feedbackStore.js';
 import { appendFeedbackRow } from './googleSheetsClient.js';
-
-if (typeof Object.hasOwn !== 'function') {
-  Object.defineProperty(Object, 'hasOwn', {
-    value(obj, key) {
-      return Object.prototype.hasOwnProperty.call(Object(obj), key);
-    },
-    configurable: true,
-    enumerable: false,
-    writable: true,
-  });
-}
-
+import './polyfills/objectHasOwn.js';
 
 const PORT = process.env.PORT || 10000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
