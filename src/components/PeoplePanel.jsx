@@ -1,6 +1,7 @@
 import React from "react";
 import { Users, User, Eye, Mic, MicOff } from "lucide-react";
 import ValueMark from "./marks/ValueMark";
+import { Tooltip } from "./ui/Tooltip";
 
 // Props:
 // - roster: { X: string|null, O: string|null, spectators: string[] }
@@ -8,24 +9,36 @@ import ValueMark from "./marks/ValueMark";
 // - isMultiplayer: boolean
 // - roomId: string|null
 // - voiceRoster: { [socketId]: { muted: boolean } }
-const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {} }) => {
+const PeoplePanel = ({
+  roster,
+  socketId,
+  isMultiplayer,
+  roomId,
+  voiceRoster = {},
+  variant = "panel",
+  className = "",
+}) => {
   const { X, O, spectators = [] } = roster || {};
+  const isMenuVariant = variant === "menu";
 
   const renderPerson = (id, roleLabel, mark) => {
     if (!id) return null;
     const isYou = socketId && id === socketId;
     const voice = voiceRoster[id];
     const isMuted = !voice || voice.muted; // show red crossed if not publishing or muted
+    const baseLabel = `${roleLabel} ${mark ? `(${mark})` : ""}`.trim();
+    const tooltipContent = `${baseLabel}${isYou ? " • You" : ""}\n${id}`;
+
     return (
-      <li
-        key={id + roleLabel}
-        className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
-          isYou
-            ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
-            : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
-        }`}
-        title={id}
-      >
+      <Tooltip key={id + roleLabel} content={tooltipContent} side="right" align="start">
+        <li
+          className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
+            isYou
+              ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
+              : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
+          }`}
+          aria-label={`${baseLabel} ${isYou ? "(You)" : ""}`}
+        >
         <div className="flex items-center gap-2 min-w-0">
           <User size={14} className="text-gray-600 dark:text-gray-300 shrink-0" />
           <span className="truncate text-gray-800 dark:text-gray-100">
@@ -40,22 +53,33 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
         <div className="flex items-center gap-2 shrink-0">
           {mark && <ValueMark value={mark} />}
           {/* Mic status */}
-          {isMuted ? (
-            <MicOff size={14} className="text-red-600" title="Muted or not in voice" />
-          ) : (
-            <Mic size={14} className="text-emerald-600" title="Speaking" />
-          )}
+            <Tooltip content={isMuted ? "Muted or not publishing audio" : "Voice channel active"}>
+              {isMuted ? (
+                <MicOff size={14} className="text-red-600" />
+              ) : (
+                <Mic size={14} className="text-emerald-600" />
+              )}
+            </Tooltip>
           <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {roleLabel}
           </span>
         </div>
-      </li>
+        </li>
+      </Tooltip>
     );
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/50">
+    <div
+      className={`flex flex-col ${isMenuVariant ? "gap-3" : "h-full"} ${className}`}
+    >
+      <div
+        className={`flex items-center justify-between border-b border-gray-200 dark:border-gray-700 ${
+          isMenuVariant
+            ? "px-2.5 py-2 text-sm text-gray-700 dark:text-gray-200"
+            : "px-4 py-3 bg-white/70 dark:bg-gray-900/50"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Users size={16} className="text-gray-700 dark:text-gray-200" />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">People</h3>
@@ -64,7 +88,11 @@ const PeoplePanel = ({ roster, socketId, isMultiplayer, roomId, voiceRoster = {}
           <span className="text-[11px] text-gray-500 dark:text-gray-400">Room {roomId}</span>
         )}
       </div>
-      <div className="p-4 space-y-3 overflow-y-auto">
+      <div
+        className={`${
+          isMenuVariant ? "px-2.5 pb-3 pt-1" : "p-4"
+        } space-y-3 overflow-y-auto`}
+      >
         {!isMultiplayer ? (
           <div className="text-sm text-gray-600 dark:text-gray-300">
             Local mode — no room members.

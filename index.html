@@ -11,32 +11,48 @@
     <!-- Load base styles early to avoid FOUC -->
     <link rel="stylesheet" href="/src/index.css" />
     <!-- App icons -->
-    <link rel="icon" type="image/svg+xml" href="/crissCross/icons/icon-192x192.svg" />
-    <link rel="alternate icon" type="image/svg+xml" href="/crissCross/icons/icon-512x512.svg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/crissCross/icons/icon-192x192.svg" />
-    <link rel="mask-icon" href="/crissCross/icons/icon-192x192.svg" color="#3b82f6" />
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="icons/icon-192x192.svg" />
+    <link
+      rel="alternate icon"
+      type="image/svg+xml"
+      href="icons/icon-512x512.svg"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="icons/icon-192x192.svg"
+    />
+    <link rel="mask-icon" href="icons/icon-192x192.svg" color="#3b82f6" />
+    <link rel="manifest" href="manifest.json" />
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0f172a"
+      media="(prefers-color-scheme: dark)"
+    />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="msapplication-TileColor" content="#ffffff" />
-    <meta
-      name="msapplication-TileImage"
-  content="/crissCross/icons/icon-192x192.svg"
-    />
+    <meta name="msapplication-TileImage" content="icons/icon-192x192.svg" />
     <script>
       // Apply theme ASAP to avoid flash of incorrect theme
       (function () {
         try {
-          var saved = localStorage.getItem('theme');
-          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var dark = saved === 'dark' || (!saved && prefersDark);
+          var saved = localStorage.getItem("theme");
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var dark = saved === "dark" || (!saved && prefersDark);
           var root = document.documentElement;
-          if (dark) root.classList.add('dark'); else root.classList.remove('dark');
+          if (dark) root.classList.add("dark");
+          else root.classList.remove("dark");
           // Also set a data attribute for potential future styling hooks
-          root.setAttribute('data-theme', dark ? 'dark' : 'light');
+          root.setAttribute("data-theme", dark ? "dark" : "light");
         } catch (e) {}
       })();
     </script>
@@ -44,16 +60,16 @@
       // If navigated from 404.html, restore the original path preserved in ?p=
       (function restoreDeepLink() {
         var params = new URLSearchParams(window.location.search);
-        var encoded = params.get('p');
+        var encoded = params.get("p");
         if (!encoded) return;
         try {
           var target = decodeURIComponent(encoded);
           // Normalize: ensure it starts with '/'
-          if (target.charAt(0) !== '/') target = '/' + target;
+          if (target.charAt(0) !== "/") target = "/" + target;
           // Replace current URL so React Router can match client-side
-          var base = '/crissCross';
-          var newUrl = base + target.replace(/^\/+/, '/');
-          window.history.replaceState(null, '', newUrl);
+          var base = "/cc";
+          var newUrl = base + target.replace(/^\/+/, "/");
+          window.history.replaceState(null, "", newUrl);
         } catch {}
       })();
     </script>
@@ -65,16 +81,26 @@
     <!-- Example crawlable link for SEO best practices: 
          Crawlable links allow search engines to discover and index your site, 
          which can improve your site's visibility in search results. -->
-      <!-- Keep a crawlable link for SEO, but hide it visually to avoid any FOUC or layout impact -->
-      <footer class="sr-only">
-        <a href="https://github.com/harkirat155/crissCross" rel="noopener noreferrer" target="_blank">Project on GitHub</a>
-      </footer>
-      <noscript>
-        <!-- Fallback for users/crawlers without JS: simple, minimal link -->
-        <div class="text-center mt-8">
-          <a href="https://github.com/harkirat155/crissCross" rel="noopener" target="_blank">Project on GitHub</a>
-        </div>
-      </noscript>
-  <script type="module" src="/src/index.jsx"></script>
+    <!-- Keep a crawlable link for SEO, but hide it visually to avoid any FOUC or layout impact -->
+    <footer class="sr-only">
+      <a
+        href="https://github.com/harkirat155/crissCross"
+        rel="noopener noreferrer"
+        target="_blank"
+        >Project on GitHub</a
+      >
+    </footer>
+    <noscript>
+      <!-- Fallback for users/crawlers without JS: simple, minimal link -->
+      <div class="text-center mt-8">
+        <a
+          href="https://github.com/harkirat155/crissCross"
+          rel="noopener"
+          target="_blank"
+          >Project on GitHub</a
+        >
+      </div>
+    </noscript>
+    <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

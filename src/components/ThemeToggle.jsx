@@ -1,5 +1,6 @@
 /* eslint-env browser */
 import React, { useEffect, useState } from 'react';
+import { Tooltip } from './ui/Tooltip';
 
 function getInitialTheme() {
   if (typeof window === 'undefined') return 'light';
@@ -102,20 +103,23 @@ const ThemeToggle = ({ className = '' }) => {
 
   const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
+  const tooltip = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+
   return (
-    <button
-      type="button"
-      aria-label="Toggle theme"
-      aria-pressed={theme === 'dark'}
-      onClick={toggle}
-      className={`inline-flex items-center justify-center h-10 w-10 rounded-full border transition z-40 
+    <Tooltip content={tooltip}>
+      <button
+        type="button"
+        aria-label="Toggle theme"
+        aria-pressed={theme === 'dark'}
+        onClick={toggle}
+        className={`inline-flex items-center justify-center h-10 w-10 rounded-full border transition z-40 
         bg-slate-900 text-white border-slate-800 hover:bg-slate-800 
         dark:bg-white dark:text-slate-900 dark:border-slate-200 dark:hover:bg-slate-50 
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:focus-visible:ring-slate-600 ${className}`}
-      title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-    >
-      {theme === 'dark' ? <VividSun size={20} /> : <VividMoon size={20} />}
-    </button>
+      >
+        {theme === 'dark' ? <VividSun size={20} /> : <VividMoon size={20} />}
+      </button>
+    </Tooltip>
   );
 };
 

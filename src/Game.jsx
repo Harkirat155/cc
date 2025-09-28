@@ -1,19 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
 import ResultModal from "./components/ResultModal";
-import ValueMark from "./components/marks/ValueMark";
 import useSocketGame from "./hooks/useSocketGame";
 import Navbar from "./components/Navbar";
-import PeoplePanel from "./components/PeoplePanel";
 import useVoiceChat from "./hooks/useVoiceChat";
 import AudioRenderer from "./components/AudioRenderer";
+import useWalkthrough from "./hooks/useWalkthrough";
+import Walkthrough from "./components/Walkthrough";
+import ScorePanel from "./components/ScorePanel";
+import ToastStack from "./components/ui/ToastStack";
+import PeoplePanel from "./components/PeoplePanel";
+import FeedbackDialog from "./components/FeedbackDialog";
 
 const Game = () => {
   const navigate = useNavigate();
   const { roomId: paramRoomId } = useParams();
+  const {
+    run: runWalkthrough,
+    steps: walkthroughSteps,
+    handleCallback: handleWalkthroughCallback,
+    restart: restartWalkthrough,
+  } = useWalkthrough();
   const {
     gameState,
     history,
@@ -65,28 +75,190 @@ const Game = () => {
   };
   const winningSquares = gameState.winningLine || [];
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isPeopleOpen, setIsPeopleOpen] = useState(false);
   // Prevent auto-join when user is actively leaving a room from a room URL
   const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const lastToastRef = useRef({ text: null, at: 0 });
+  const toastTimeoutsRef = useRef(new Map());
+  const feedbackAbortRef = useRef(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
+  const feedbackEndpoint = useMemo(() => {
+    const resolveBase = () => {
+      const apiBase = import.meta.env.VITE_API_BASE?.trim();
+      if (apiBase) return apiBase;
+      const socketBase = import.meta.env.VITE_SOCKET_SERVER?.trim();
+      if (socketBase) return socketBase;
+      if (typeof window !== "undefined") {
+        const origin = window.location.origin || "";
+        if (/:\d+$/.test(origin)) {
+          return origin.replace(/:\d+$/, ":5123");
+        }
+        return origin;
+      }
+      return "";
+    };
 
-  // Ensure only one side panel is open at a time
-  const handleTogglePeople = () => {
-    setIsPeopleOpen((prev) => {
-      const next = !prev;
-      if (next) setIsHistoryOpen(false);
-      return next;
-    });
-  };
+    const base = resolveBase();
+    if (!base) return "/feedback";
+    const normalized = base.endsWith("/") ? base.slice(0, -1) : base;
+    return `${normalized}/feedback`;
+  }, []);
 
   const handleToggleHistory = () => {
-    setIsHistoryOpen((prev) => {
-      const next = !prev;
-      if (next) setIsPeopleOpen(false);
-      return next;
-    });
+    setIsHistoryOpen((prev) => !prev);
   };
 
   // winningSquares derived from multiplayer/local hook state
+
+  const dismissToast = useCallback((id) => {
+    const timeoutId = toastTimeoutsRef.current.get(id);
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      toastTimeoutsRef.current.delete(id);
+    }
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  const enqueueToast = useCallback(
+    (text, { duration = 5000, dedupe = true } = {}) => {
+      if (!text) return null;
+      const now = Date.now();
+      if (dedupe) {
+        const { text: lastText, at: lastAt } = lastToastRef.current || {};
+        if (lastText === text && now - lastAt < 1500) return null;
+      }
+
+      const id = `${now}-${Math.random().toString(36).slice(2)}`;
+      setToasts((prev) => [...prev.slice(-3), { id, text, duration }]);
+      lastToastRef.current = { text, at: now };
+
+      const timeoutId = window.setTimeout(() => {
+        toastTimeoutsRef.current.delete(id);
+        dismissToast(id);
+      }, duration);
+      toastTimeoutsRef.current.set(id, timeoutId);
+      return id;
+    },
+    [dismissToast]
+  );
+
+  useEffect(() => {
+    if (!message) return undefined;
+    enqueueToast(message);
+    return undefined;
+  }, [message, enqueueToast]);
+
+  useEffect(
+    () => () => {
+      toastTimeoutsRef.current.forEach((timeoutId) =>
+        window.clearTimeout(timeoutId)
+      );
+      toastTimeoutsRef.current.clear();
+    },
+    []
+  );
+
+  const openFeedbackForm = useCallback(() => {
+    setFeedbackError("");
+    setIsFeedbackOpen(true);
+  }, []);
+
+  const closeFeedbackForm = useCallback(() => {
+    if (feedbackAbortRef.current) {
+      feedbackAbortRef.current.abort?.();
+      feedbackAbortRef.current = null;
+    }
+    setIsFeedbackSubmitting(false);
+    setIsFeedbackOpen(false);
+  }, []);
+
+  const handleFeedbackSubmit = useCallback(
+    async ({ rating, message: feedbackMessage }) => {
+      setFeedbackError("");
+      setIsFeedbackSubmitting(true);
+
+      if (feedbackAbortRef.current) {
+        feedbackAbortRef.current.abort();
+      }
+
+  const abortCtor = globalThis.AbortController;
+  const controller = abortCtor ? new abortCtor() : null;
+  feedbackAbortRef.current = controller;
+
+      try {
+        const payload = {
+          rating,
+          message: feedbackMessage,
+          context: {
+            roomId,
+            isMultiplayer,
+            socketId,
+            url:
+              typeof window !== "undefined" ? window.location.href : undefined,
+            userAgent:
+              typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+          },
+        };
+
+        const fetchFn = globalThis.fetch;
+        if (!fetchFn) {
+          throw new Error("Feedback API unavailable in this browser.");
+        }
+
+        const response = await fetchFn(feedbackEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller?.signal,
+        });
+
+        feedbackAbortRef.current = null;
+
+        if (!response.ok) {
+          let errorDetail = "";
+          try {
+            const data = await response.json();
+            errorDetail = data?.error || data?.message || "";
+          } catch (parseError) {
+            console.error("Failed to parse feedback response", parseError);
+          }
+          throw new Error(
+            errorDetail || "We couldn't send your feedback. Please try again."
+          );
+        }
+
+        setIsFeedbackSubmitting(false);
+        setIsFeedbackOpen(false);
+        enqueueToast("Thanks! Your feedback was sent.", { dedupe: false });
+      } catch (error) {
+        feedbackAbortRef.current = null;
+        if (error?.name === "AbortError") {
+          setIsFeedbackSubmitting(false);
+          return;
+        }
+        console.error("Feedback submission failed", error);
+        const description =
+          error?.message || "We couldn't send your feedback. Please try again.";
+        setFeedbackError(description);
+        setIsFeedbackSubmitting(false);
+      }
+    },
+    [enqueueToast, feedbackEndpoint, isMultiplayer, roomId, socketId]
+  );
+
+  const menuItems = useMemo(
+    () => [
+      {
+        key: "feedback",
+        label: "Send feedback",
+        description: "Rate your experience and share ideas",
+        onSelect: openFeedbackForm,
+      },
+    ],
+    [openFeedbackForm]
+  );
 
   // Auto-join a room when visiting /room/:roomId via a shared link
   useEffect(() => {
@@ -122,59 +294,75 @@ const Game = () => {
   }, [roomId, navigate, paramRoomId]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 pb-28 sm:pb-32">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-x-hidden bg-slate-100 text-slate-900 transition-colors duration-500 dark:bg-slate-950 dark:text-slate-100">
+      <Walkthrough
+        run={runWalkthrough}
+        steps={walkthroughSteps}
+        onCallback={handleWalkthroughCallback}
+      />
       {/* Navbar with brand + actions */}
       <Navbar
         onToggleHistory={handleToggleHistory}
         isHistoryOpen={isHistoryOpen}
-        onTogglePeople={handleTogglePeople}
-        isPeopleOpen={isPeopleOpen}
         isMultiplayer={isMultiplayer}
+        onShowWalkthrough={restartWalkthrough}
         voiceEnabled={micEnabled}
         micMuted={muted}
         onToggleMic={handleToggleMic}
+        menuPanel={
+          isMultiplayer ? (
+            <PeoplePanel
+              roster={roster}
+              socketId={socketId}
+              isMultiplayer={isMultiplayer}
+              roomId={roomId}
+              voiceRoster={voiceRoster}
+              variant="menu"
+            />
+          ) : null
+        }
+        menuItems={menuItems}
       />
       {/* push content below navbar height */}
       <div className="h-20" />
-      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
-        {message}
-      </div>
       {/* Hidden audio elements for remote peers */}
       <AudioRenderer streamsById={remoteAudioStreams} />
-      <div className="mb-2 text-sm text-gray-600 dark:text-gray-300">
-        Mode: {isMultiplayer ? "Multiplayer" : "Local"}{" "}
-        {roomId && `| Room: ${roomId}`} {player && `| You: ${player}`}
-      </div>
-      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
-        Score: <ValueMark value="X" /> - {gameState.xScore} |{" "}
-        <ValueMark value="O" /> - {gameState.oScore}
-      </div>
-      <div className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-200">
-        Turn: {gameState.turn ? <ValueMark value={gameState.turn} /> : "-"}
-      </div>
-      <GameBoard
-        squares={displayedBoard}
-        onSquareClick={handleSquareClick}
-        winningSquares={winningSquares}
-      />
+      <main className="relative z-0 flex w-full flex-1 justify-center px-4">
+        <div className="flex w-full max-w-5xl flex-col items-center gap-10">
+          <ScorePanel
+            gameState={gameState}
+            roster={roster}
+            socketId={socketId}
+            isMultiplayer={isMultiplayer}
+            roomId={roomId}
+          />
+          <div className="relative flex w-full flex-col items-center gap-8">
+            <GameBoard
+              squares={displayedBoard}
+              onSquareClick={handleSquareClick}
+              winningSquares={winningSquares}
+            />
+            <MenuPanel
+              onReset={resetScores}
+              onNewGame={resetGame}
+              hasMoves={history.length > 1}
+              canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
+              createRoom={createRoom}
+              leaveRoom={async () => {
+                setSuppressAutoJoin(true);
+                await leaveRoom();
+                navigate("/", { replace: true });
+              }}
+              isMultiplayer={isMultiplayer}
+              roomId={roomId}
+            />
+          </div>
+        </div>
+      </main>
       {/* Slide-over panels */}
-      {/* People Panel (right slide-over) */}
-      <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
-          isPeopleOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <PeoplePanel
-          roster={roster}
-          socketId={socketId}
-          isMultiplayer={isMultiplayer}
-          roomId={roomId}
-          voiceRoster={voiceRoster}
-        />
-      </div>
       {/* History Panel (right slide-over) */}
       <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-xl transition-transform duration-300 ${
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-slate-200/70 bg-white/80 backdrop-blur-xl shadow-xl transition-transform duration-300 dark:border-slate-700/70 dark:bg-slate-950/70 ${
           isHistoryOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -184,22 +372,15 @@ const Game = () => {
           viewIndex={viewIndex}
           jumpTo={jumpTo}
           resumeLatest={resumeLatest}
+          onClose={() => setIsHistoryOpen(false)}
+          roster={roster}
+          socketId={socketId}
+          isMultiplayer={isMultiplayer}
+          youAre={player}
+          currentTurn={gameState.turn}
+          winner={gameState.winner}
         />
       </div>
-      <MenuPanel
-        onReset={resetScores}
-        onNewGame={resetGame}
-        hasMoves={history.length > 1}
-        canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
-        createRoom={createRoom}
-        leaveRoom={async () => {
-          setSuppressAutoJoin(true);
-          await leaveRoom();
-          navigate("/", { replace: true });
-        }}
-        isMultiplayer={isMultiplayer}
-        roomId={roomId}
-      />
       {showModal && (
         <ResultModal
           result={
@@ -228,6 +409,14 @@ const Game = () => {
           rematchTimeoutSec={20}
         />
       )}
+  <ToastStack messages={toasts} onDismiss={dismissToast} />
+      <FeedbackDialog
+        open={isFeedbackOpen}
+        onClose={closeFeedbackForm}
+        onSubmit={handleFeedbackSubmit}
+        submitting={isFeedbackSubmitting}
+        errorMessage={feedbackError}
+      />
     </div>
   );
 };

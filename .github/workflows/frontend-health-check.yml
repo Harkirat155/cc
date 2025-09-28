@@ -1,0 +1,33 @@
+name: Frontend Deployment Health Check
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve backend health URL
+        id: resolve-url
+        run: |
+          BACKEND_URL_RAW="${{ secrets.BACKEND_URL }}"
+          if [ -z "$BACKEND_URL_RAW" ]; then
+            echo "::error title=Missing backend URL::Add BACKEND_URL repository secret with the backend base URL." >&2
+            exit 1
+          fi
+
+          # Strip trailing slash for a clean join
+          HEALTH_URL="${BACKEND_URL_RAW%/}/health"
+          echo "health-url=$HEALTH_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Ping backend /health
+        env:
+          HEALTH_URL: ${{ steps.resolve-url.outputs.health-url }}
+        run: |
+          echo "Pinging $HEALTH_URL"
+          curl --fail --silent --show-error "$HEALTH_URL"

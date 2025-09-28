@@ -1,4 +1,4 @@
-import React from "react";
+import React, { forwardRef } from "react";
 
 const base =
   "py-2 px-5 min-w-[120px] rounded-xl border whitespace-nowrap text-center shadow-sm transition-all duration-200 backdrop-blur-md focus:outline-none focus:ring-2";
@@ -16,11 +16,16 @@ const variants = {
     "bg-purple-600 text-white border-purple-700/20 dark:border-purple-400/20 hover:bg-purple-700 hover:border-purple-800/30 active:bg-purple-600 focus:ring-purple-400/40",
 };
 
-export default function Button({ variant = "primary", className = "", children, ...props }) {
+const Button = forwardRef(function Button(
+  { variant = "primary", className = "", children, type = "button", ...props },
+  ref
+) {
   const cls = [base, variants[variant], className].filter(Boolean).join(" ");
   return (
-    <button className={cls} type="button" {...props}>
+    <button ref={ref} className={cls} type={type} {...props}>
       {children}
     </button>
   );
-}
+});
+
+export default Button;
