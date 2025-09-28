@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
@@ -13,6 +13,7 @@ import Walkthrough from "./components/Walkthrough";
 import ScorePanel from "./components/ScorePanel";
 import ToastStack from "./components/ui/ToastStack";
 import PeoplePanel from "./components/PeoplePanel";
+import FeedbackDialog from "./components/FeedbackDialog";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -78,6 +79,32 @@ const Game = () => {
   const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
   const [toasts, setToasts] = useState([]);
   const lastToastRef = useRef({ text: null, at: 0 });
+  const toastTimeoutsRef = useRef(new Map());
+  const feedbackAbortRef = useRef(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
+  const feedbackEndpoint = useMemo(() => {
+    const resolveBase = () => {
+      const apiBase = import.meta.env.VITE_API_BASE?.trim();
+      if (apiBase) return apiBase;
+      const socketBase = import.meta.env.VITE_SOCKET_SERVER?.trim();
+      if (socketBase) return socketBase;
+      if (typeof window !== "undefined") {
+        const origin = window.location.origin || "";
+        if (/:\d+$/.test(origin)) {
+          return origin.replace(/:\d+$/, ":5123");
+        }
+        return origin;
+      }
+      return "";
+    };
+
+    const base = resolveBase();
+    if (!base) return "/feedback";
+    const normalized = base.endsWith("/") ? base.slice(0, -1) : base;
+    return `${normalized}/feedback`;
+  }, []);
 
   const handleToggleHistory = () => {
     setIsHistoryOpen((prev) => !prev);
@@ -85,28 +112,153 @@ const Game = () => {
 
   // winningSquares derived from multiplayer/local hook state
 
-  useEffect(() => {
-    if (!message) return undefined;
-    const now = Date.now();
-    const { text: lastText, at: lastAt } = lastToastRef.current || {};
-    if (lastText === message && now - lastAt < 1500) return undefined;
-
-    const id = `${now}-${Math.random().toString(36).slice(2)}`;
-    const duration = 5000;
-
-    setToasts((prev) => [...prev.slice(-3), { id, text: message, duration }]);
-    lastToastRef.current = { text: message, at: now };
-
-    const timer = window.setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, duration);
-
-    return () => window.clearTimeout(timer);
-  }, [message]);
-
-  const handleToastDismiss = useCallback((id) => {
+  const dismissToast = useCallback((id) => {
+    const timeoutId = toastTimeoutsRef.current.get(id);
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      toastTimeoutsRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
+
+  const enqueueToast = useCallback(
+    (text, { duration = 5000, dedupe = true } = {}) => {
+      if (!text) return null;
+      const now = Date.now();
+      if (dedupe) {
+        const { text: lastText, at: lastAt } = lastToastRef.current || {};
+        if (lastText === text && now - lastAt < 1500) return null;
+      }
+
+      const id = `${now}-${Math.random().toString(36).slice(2)}`;
+      setToasts((prev) => [...prev.slice(-3), { id, text, duration }]);
+      lastToastRef.current = { text, at: now };
+
+      const timeoutId = window.setTimeout(() => {
+        toastTimeoutsRef.current.delete(id);
+        dismissToast(id);
+      }, duration);
+      toastTimeoutsRef.current.set(id, timeoutId);
+      return id;
+    },
+    [dismissToast]
+  );
+
+  useEffect(() => {
+    if (!message) return undefined;
+    enqueueToast(message);
+    return undefined;
+  }, [message, enqueueToast]);
+
+  useEffect(
+    () => () => {
+      toastTimeoutsRef.current.forEach((timeoutId) =>
+        window.clearTimeout(timeoutId)
+      );
+      toastTimeoutsRef.current.clear();
+    },
+    []
+  );
+
+  const openFeedbackForm = useCallback(() => {
+    setFeedbackError("");
+    setIsFeedbackOpen(true);
+  }, []);
+
+  const closeFeedbackForm = useCallback(() => {
+    if (feedbackAbortRef.current) {
+      feedbackAbortRef.current.abort?.();
+      feedbackAbortRef.current = null;
+    }
+    setIsFeedbackSubmitting(false);
+    setIsFeedbackOpen(false);
+  }, []);
+
+  const handleFeedbackSubmit = useCallback(
+    async ({ rating, message: feedbackMessage }) => {
+      setFeedbackError("");
+      setIsFeedbackSubmitting(true);
+
+      if (feedbackAbortRef.current) {
+        feedbackAbortRef.current.abort();
+      }
+
+  const abortCtor = globalThis.AbortController;
+  const controller = abortCtor ? new abortCtor() : null;
+  feedbackAbortRef.current = controller;
+
+      try {
+        const payload = {
+          rating,
+          message: feedbackMessage,
+          context: {
+            roomId,
+            isMultiplayer,
+            socketId,
+            url:
+              typeof window !== "undefined" ? window.location.href : undefined,
+            userAgent:
+              typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+          },
+        };
+
+        const fetchFn = globalThis.fetch;
+        if (!fetchFn) {
+          throw new Error("Feedback API unavailable in this browser.");
+        }
+
+        const response = await fetchFn(feedbackEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller?.signal,
+        });
+
+        feedbackAbortRef.current = null;
+
+        if (!response.ok) {
+          let errorDetail = "";
+          try {
+            const data = await response.json();
+            errorDetail = data?.error || data?.message || "";
+          } catch (parseError) {
+            console.error("Failed to parse feedback response", parseError);
+          }
+          throw new Error(
+            errorDetail || "We couldn't send your feedback. Please try again."
+          );
+        }
+
+        setIsFeedbackSubmitting(false);
+        setIsFeedbackOpen(false);
+        enqueueToast("Thanks! Your feedback was sent.", { dedupe: false });
+      } catch (error) {
+        feedbackAbortRef.current = null;
+        if (error?.name === "AbortError") {
+          setIsFeedbackSubmitting(false);
+          return;
+        }
+        console.error("Feedback submission failed", error);
+        const description =
+          error?.message || "We couldn't send your feedback. Please try again.";
+        setFeedbackError(description);
+        setIsFeedbackSubmitting(false);
+      }
+    },
+    [enqueueToast, feedbackEndpoint, isMultiplayer, roomId, socketId]
+  );
+
+  const menuItems = useMemo(
+    () => [
+      {
+        key: "feedback",
+        label: "Send feedback",
+        description: "Rate your experience and share ideas",
+        onSelect: openFeedbackForm,
+      },
+    ],
+    [openFeedbackForm]
+  );
 
   // Auto-join a room when visiting /room/:roomId via a shared link
   useEffect(() => {
@@ -169,6 +321,7 @@ const Game = () => {
             />
           ) : null
         }
+        menuItems={menuItems}
       />
       {/* push content below navbar height */}
       <div className="h-20" />
@@ -256,7 +409,14 @@ const Game = () => {
           rematchTimeoutSec={20}
         />
       )}
-      <ToastStack messages={toasts} onDismiss={handleToastDismiss} />
+  <ToastStack messages={toasts} onDismiss={dismissToast} />
+      <FeedbackDialog
+        open={isFeedbackOpen}
+        onClose={closeFeedbackForm}
+        onSubmit={handleFeedbackSubmit}
+        submitting={isFeedbackSubmitting}
+        errorMessage={feedbackError}
+      />
     </div>
   );
 };

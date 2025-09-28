@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { STATUS } from "react-joyride";
 
 const STORAGE_KEY = "crisscross_walkthrough_seen_v1";
 
@@ -70,7 +69,7 @@ export default function useWalkthrough() {
       return;
     }
 
-    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+    if (status === "finished" || status === "skipped") {
       markSeen();
       setRun(false);
     }

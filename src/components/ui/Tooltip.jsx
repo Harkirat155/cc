@@ -144,20 +144,22 @@ export function Tooltip({
     };
   }, [isCoarsePointer, touchOpen]);
 
-  const open = isCoarsePointer ? (isControlled ? controlledOpen : touchOpen) : controlledOpen;
-  const defaultOpenProp = isCoarsePointer ? undefined : defaultOpen;
+  const rootControlProps = {};
+
+  if (isControlled) {
+    rootControlProps.open = controlledOpen;
+  } else if (isCoarsePointer) {
+    rootControlProps.open = touchOpen;
+  } else if (defaultOpen !== undefined) {
+    rootControlProps.defaultOpen = defaultOpen;
+  }
 
   if (!hasContent) {
     return <>{children}</>;
   }
 
   return (
-    <RadixTooltip.Root
-      {...rootProps}
-      open={open}
-      defaultOpen={defaultOpenProp}
-      onOpenChange={handleRootOpenChange}
-    >
+    <RadixTooltip.Root {...rootControlProps} {...rootProps} onOpenChange={handleRootOpenChange}>
       <RadixTooltip.Trigger
         ref={triggerRef}
         asChild={asChild}

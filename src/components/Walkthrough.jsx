@@ -1,5 +1,8 @@
-import React from "react";
-import Joyride from "react-joyride";
+import React, { Suspense, lazy } from "react";
+
+const Joyride = lazy(() =>
+  import("react-joyride").then((module) => ({ default: module.default }))
+);
 
 const joyrideStyles = {
   options: {
@@ -48,28 +51,30 @@ const locale = {
 };
 
 const Walkthrough = ({ run, steps, onCallback }) => (
-  <Joyride
-    steps={steps}
-    run={run}
-    continuous
-    showProgress
-    showSkipButton
-    disableOverlayClose
-    disableScrolling
-    scrollToFirstStep
-    spotlightPadding={16}
-    styles={joyrideStyles}
-    locale={locale}
-    callback={onCallback}
-    floaterProps={{
-      styles: {
-        arrow: {
-          length: 16,
-          spread: 20,
+  <Suspense fallback={null}>
+    <Joyride
+      steps={steps}
+      run={run}
+      continuous
+      showProgress
+      showSkipButton
+      disableOverlayClose
+      disableScrolling
+      scrollToFirstStep
+      spotlightPadding={16}
+      styles={joyrideStyles}
+      locale={locale}
+      callback={onCallback}
+      floaterProps={{
+        styles: {
+          arrow: {
+            length: 16,
+            spread: 20,
+          },
         },
-      },
-    }}
-  />
+      }}
+    />
+  </Suspense>
 );
 
 export default Walkthrough;
