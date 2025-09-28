@@ -31,14 +31,9 @@ export default defineConfig({
           if (normalized.includes('react-joyride')) {
             return 'walkthrough';
           }
-          if (
-            normalized.includes('/react/') ||
-            normalized.includes('/react-dom/') ||
-            normalized.includes('/scheduler/') ||
-            normalized.includes('react/jsx-runtime')
-          ) {
-            return 'react';
-          }
+          // Let React and its helpers live with the rest of the vendor chunk to
+          // prevent chunk loading order issues at runtime (e.g., React depending on
+          // other vendor utilities that in turn depend on React).
           if (normalized.includes('@radix-ui') || normalized.includes('lucide-react')) {
             return 'ui';
           }
