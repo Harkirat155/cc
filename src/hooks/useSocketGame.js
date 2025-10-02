@@ -116,7 +116,7 @@ export default function useSocketGame() {
     if (socketRef.current) return socketRef.current;
     const url =
       import.meta.env.VITE_SOCKET_SERVER ||
-      window.location.origin.replace(/:\d+$/, ":5123");
+      window.location.origin.replace(/:\d+$/, ":8081");
     const s = io(url, {
       transports: ["websocket", "polling"],
       autoConnect: true,

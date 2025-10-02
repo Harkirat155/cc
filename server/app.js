@@ -1,4 +1,4 @@
-// Express and Socket.IO setup
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -139,5 +139,6 @@ registerSocketHandlers(io);
 startRoomGC();
 
 server.listen(PORT, () => {
-  console.log(`Realtime server listening on ${PORT}`);
+  console.log(`Realtime server listening on ${PORT} (${process.env.PORT} from env) and PID ${process.pid}`);
+  console.log(`CORS allowed origins: ${CORS_ORIGIN}`);
 });
