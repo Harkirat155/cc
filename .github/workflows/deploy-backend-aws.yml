@@ -35,9 +35,6 @@ jobs:
                     sudo chown -R ec2-user:ec2-user ${{ secrets.EC2_APP_PATH }}
                     sudo chown -R ec2-user:ec2-user ~/.npm || true
 
-                    
-                    git config --global --add safe.directory ${{ secrets.EC2_APP_PATH }}
-
                     # Safely rebuild the .env file
                     rm -f .env
                     cat << 'EOF' > .env
@@ -55,7 +52,8 @@ jobs:
                     # Pull and rebuild
                     echo "🔹 Fixing Git safe directory..."
                     git config --global --add safe.directory ${{ secrets.EC2_APP_PATH }}
-                    git pull origin main
+                    git fetch origin main
+                    git reset --hard origin/main
                     echo "🔹 Installing dependencies..."
                     npm ci
                     echo "🔹 Building app..."
