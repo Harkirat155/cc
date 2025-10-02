@@ -12,7 +12,7 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-              
+
             - name: Deploy via SSH
               uses: appleboy/ssh-action@v0.1.10
               env:
@@ -35,28 +35,29 @@ jobs:
                     sudo chown -R ec2-user:ec2-user ${{ secrets.EC2_APP_PATH }}
                     sudo chown -R ec2-user:ec2-user ~/.npm || true
 
+                    # Safely rebuild the .env file
+                    rm -f .env
+                    cat << 'EOF' > .env
+                    NODE_ENV=${{ secrets.NODE_ENV }}
+                    PORT=${{ secrets.PORT }}
+                    CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+                    GOOGLE_SERVICE_ACCOUNT_EMAIL=${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+                    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+                    GOOGLE_SHEETS_SPREADSHEET_ID=${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+                    EOF
+
+                    # Adjust permissions
+                    chmod 600 .env
+
+                    # Pull and rebuild
                     echo "🔹 Fixing Git safe directory..."
                     git config --global --add safe.directory ${{ secrets.EC2_APP_PATH }}
-
-                    echo "🔹 Pulling latest code..."
                     git fetch origin main
                     git reset --hard origin/main
-
                     echo "🔹 Installing dependencies..."
-                    npm ci --omit=dev
-
+                    npm ci
                     echo "🔹 Building app..."
                     npm run build
-
-                    echo "🔹 Writing environment variables..."
-                    cat > .env <<EOF
-                    NODE_ENV=${NODE_ENV}
-                    PORT=${PORT}
-                    CORS_ORIGIN=${CORS_ORIGIN}
-                    GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
-                    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}
-                    GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID}
-                    EOF
 
                     echo "🔹 Restarting app with PM2..."
                     pm2 restart ecosystem.config.cjs || pm2 start ecosystem.config.cjs
