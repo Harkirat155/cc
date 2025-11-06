@@ -68,6 +68,12 @@ export default function useSocketGame() {
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null); // socket.id of requester
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
+  
+  // Lobby state
+  const [lobbyQueue, setLobbyQueue] = useState([]); // [{socketId, displayName, joinedAt}]
+  const [isInLobby, setIsInLobby] = useState(false);
+  const [lobbyError, setLobbyError] = useState(null);
+  
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
   // Stable clientId per browser tab/session for seat restoration across reconnects
@@ -241,6 +247,19 @@ export default function useSocketGame() {
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
       setShowModal(false);
+    });
+    
+    // Lobby event listeners
+    s.on("lobbyUpdate", ({ queue }) => {
+      setLobbyQueue(queue || []);
+    });
+
+    s.on("matchFound", ({ roomId: matchedRoomId, player: assignedPlayer, opponent }) => {
+      setIsInLobby(false);
+      setRoomId(matchedRoomId);
+      setPlayer(assignedPlayer);
+      safeSetPersistedRoom(matchedRoomId);
+      setMessage(`Matched with ${opponent}! You are ${assignedPlayer}`);
     });
     s.on("startGame", () => setMessage("Game started"));
 
@@ -605,6 +624,47 @@ export default function useSocketGame() {
     });
   }, [isMultiplayer, roomId, finalizeCurrentGameIfFinished]);
 
+  // Join matchmaking lobby
+  const joinLobby = useCallback((displayName) => {
+    return new Promise((resolve, reject) => {
+      const s = ensureSocket();
+      if (!s) {
+        reject(new Error('Socket not available'));
+        return;
+      }
+
+      setLobbyError(null);
+      
+      s.emit('joinLobby', { displayName }, (response) => {
+        if (response?.success) {
+          setIsInLobby(true);
+          resolve(response);
+        } else {
+          const error = response?.error || 'Failed to join lobby';
+          setLobbyError(error);
+          reject(new Error(error));
+        }
+      });
+    });
+  }, [ensureSocket]);
+
+  // Leave matchmaking lobby
+  const leaveLobby = useCallback(() => {
+    return new Promise((resolve) => {
+      const s = socketRef.current;
+      if (!s) {
+        resolve();
+        return;
+      }
+
+      s.emit('leaveLobby', (response) => {
+        setIsInLobby(false);
+        setLobbyError(null);
+        resolve(response);
+      });
+    });
+  }, []);
+
   // Cleanup socket on unmount
   useEffect(
     () => () => {
@@ -643,8 +703,8 @@ export default function useSocketGame() {
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
     },
-  socketId: socketRef.current?.id || null,
-  socket: socketRef.current || null,
+    socketId: socketRef.current?.id || null,
+    socket: socketRef.current || null,
     newGameRequestedAt,
     createRoom,
     joinRoom,
@@ -657,5 +717,11 @@ export default function useSocketGame() {
       setViewIndex(idx);
     },
     resumeLatest: () => setViewIndex(moveHistory.length - 1),
+    // Lobby methods
+    lobbyQueue,
+    isInLobby,
+    lobbyError,
+    joinLobby,
+    leaveLobby,
   };
 }

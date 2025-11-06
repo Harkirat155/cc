@@ -7,6 +7,7 @@ import {
   enforceLRU,
   publish,
 } from "./roomManager.js";
+import { lobbyManager, broadcastLobbyState } from "./lobbyManager.js";
 
 export function registerSocketHandlers(io) {
   io.on("connection", (socket) => {
@@ -21,7 +22,14 @@ export function registerSocketHandlers(io) {
       }
       const clientId = (payload && payload.clientId) || null;
       let roomId = genCode();
-      while (rooms.has(roomId)) roomId = genCode();
+      let attempts = 0;
+      while (rooms.has(roomId) && attempts < 10) {
+        roomId = genCode();
+        attempts++;
+      }
+      if (rooms.has(roomId)) {
+        throw new Error("Unable to generate unique room code after 10 attempts");
+      }
       rooms.set(roomId, {
         players: { X: socket.id, O: null },
         spectators: new Set(),
@@ -281,6 +289,13 @@ export function registerSocketHandlers(io) {
     });
 
     socket.on("disconnect", () => {
+      // Remove from lobby if present
+      const wasInLobby = lobbyManager.removePlayer(socket.id);
+      if (wasInLobby) {
+        broadcastLobbyState(io);
+      }
+
+      // Existing room cleanup
       const set = socketRooms.get(socket.id);
       if (!set) {
         return;
@@ -356,6 +371,125 @@ export function registerSocketHandlers(io) {
       socket
         .to(targetId)
         .emit("voice:signal", { from: socket.id, data, roomId });
+    });
+
+    // ========== Lobby / Matchmaking Events ==========
+
+    /**
+     * Join the matchmaking lobby
+     * Client provides: { displayName }
+     * Response: { success, error?, position? }
+     */
+    socket.on("joinLobby", ({ displayName }, ack) => {
+      const result = lobbyManager.addPlayer(socket.id, displayName);
+      
+      if (!result.success) {
+        return ack?.({ success: false, error: result.error });
+      }
+
+      // Broadcast updated lobby state to all clients
+      broadcastLobbyState(io);
+
+      // Acknowledge successful join
+      ack?.({ success: true, position: result.position });
+
+      // Attempt to match players if queue has 2+
+      const matchResult = lobbyManager.matchPlayers();
+      if (matchResult.matched) {
+        const [player1, player2] = matchResult.players;
+        
+        // Create a new room for matched players
+        let roomId = genCode();
+        while (rooms.has(roomId)) roomId = genCode();
+
+        // Initialize room with both players
+        rooms.set(roomId, {
+          players: { X: player1.socketId, O: player2.socketId },
+          spectators: new Set(),
+          state: initialState(),
+          voice: {},
+          seatByClient: {},
+          lastTouched: Date.now(),
+          matchedPlayers: {
+            X: { displayName: player1.displayName },
+            O: { displayName: player2.displayName },
+          },
+        });
+
+        // Add both sockets to the room
+        const socket1 = io.sockets.sockets.get(player1.socketId);
+        const socket2 = io.sockets.sockets.get(player2.socketId);
+
+        if (socket1) {
+          socket1.join(roomId);
+          let set1 = socketRooms.get(player1.socketId);
+          if (!set1) {
+            set1 = new Set();
+            socketRooms.set(player1.socketId, set1);
+          }
+          set1.add(roomId);
+        }
+
+        if (socket2) {
+          socket2.join(roomId);
+          let set2 = socketRooms.get(player2.socketId);
+          if (!set2) {
+            set2 = new Set();
+            socketRooms.set(player2.socketId, set2);
+          }
+          set2.add(roomId);
+        }
+
+        enforceLRU();
+
+        // Notify both players about the match
+        io.to(player1.socketId).emit("matchFound", {
+          roomId,
+          player: "X",
+          opponent: player2.displayName,
+        });
+        io.to(player2.socketId).emit("matchFound", {
+          roomId,
+          player: "O",
+          opponent: player1.displayName,
+        });
+
+        // Sanitize and truncate display names for logging
+        const safeDisplayName = (name) =>
+          String(name).replace(/[\r\n]/g, "").slice(0, 32);
+        console.debug(
+          `[matchmaking] matched ${safeDisplayName(player1.displayName)} vs ${safeDisplayName(player2.displayName)} in room ${roomId}`
+        );
+
+        // Broadcast updated lobby state (both players removed)
+        broadcastLobbyState(io);
+
+        console.debug(
+          `[matchmaking] matched ${player1.displayName} vs ${player2.displayName} in room ${roomId}`
+        );
+      }
+    });
+
+    /**
+     * Leave the matchmaking lobby
+     */
+    socket.on("leaveLobby", (ack) => {
+      const removed = lobbyManager.removePlayer(socket.id);
+      
+      if (removed) {
+        broadcastLobbyState(io);
+        ack?.({ success: true });
+      } else {
+        ack?.({ success: false, error: "Not in lobby" });
+      }
+    });
+
+    /**
+     * Get current lobby state
+     */
+    socket.on("getLobbyState", (ack) => {
+      const state = lobbyManager.getQueueState();
+      ack?.({ queue: state });
     });
   });
 }

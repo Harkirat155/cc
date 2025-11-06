@@ -348,6 +348,7 @@ const Game = () => {
               hasMoves={history.length > 1}
               canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
               createRoom={createRoom}
+              onFindMatch={() => navigate('/lobby')}
               leaveRoom={async () => {
                 setSuppressAutoJoin(true);
                 await leaveRoom();

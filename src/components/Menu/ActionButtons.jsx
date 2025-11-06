@@ -15,6 +15,7 @@ export default function ActionButtons({
   onNewGame,
   onReset,
   onCreateRoom,
+  onFindMatch,
   onShare,
   onLeave,
   copied,
@@ -56,6 +57,15 @@ export default function ActionButtons({
       tooltip: "Create a multiplayer room",
       onClick: onCreateRoom,
       label: "Create",
+    },
+    {
+      key: "findmatch",
+      show: flags.showFindMatch,
+      variant: "indigo",
+      tooltip: "Find a random opponent in matchmaking lobby",
+      onClick: onFindMatch,
+      label: "Find Match",
+      children: <span className="px-2 whitespace-nowrap">Find Match</span>,
     },
     {
       key: "share",

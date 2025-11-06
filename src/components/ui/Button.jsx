@@ -14,6 +14,8 @@ const variants = {
     "bg-gray-700 text-white border-gray-700/30 dark:border-gray-500/20 hover:bg-gray-800 hover:border-gray-900/40 active:bg-gray-700 focus:ring-gray-400/40",
   purple:
     "bg-purple-600 text-white border-purple-700/20 dark:border-purple-400/20 hover:bg-purple-700 hover:border-purple-800/30 active:bg-purple-600 focus:ring-purple-400/40",
+  indigo:
+    "bg-indigo-600 text-white border-indigo-700/20 dark:border-indigo-400/20 hover:bg-indigo-700 hover:border-indigo-800/30 active:bg-indigo-600 focus:ring-indigo-400/40",
 };
 
 const Button = forwardRef(function Button(
