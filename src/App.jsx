@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AppTooltipProvider } from './components/ui/Tooltip';
 
 const Game = lazy(() => import('./Game'));
+const Lobby = lazy(() => import('./Lobby'));
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Game />} />
           <Route path="/room/:roomId" element={<Game />} />
+          <Route path="/lobby" element={<Lobby />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>

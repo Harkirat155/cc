@@ -84,38 +84,38 @@ export default function useWalkthrough() {
     () => [
       {
         target: '[data-tour="navbar"]',
-        title: "Top controls",
+        title: "Welcome to CrissCross! 👋",
         disableBeacon: true,
         content:
-          "Use the header to toggle the players list, review the move history, switch the theme, or control voice chat in multiplayer.",
+          "Let's take a quick tour! The navbar gives you access to player lists, move history, theme switching, and voice chat controls in multiplayer mode.",
         placement: "bottom",
       },
       {
         target: '[data-tour="status"]',
-        title: "Match status",
+        title: "Game Status",
         content:
-          "Keep an eye on the current mode, room code, scoreboard, and whose turn it is. These update live as the game progresses.",
+          "Track your current game mode (local vs multiplayer), room code, live scoreboard, and whose turn it is. Everything updates in real-time.",
         placement: "right",
       },
       {
         target: '[data-tour="board"]',
-        title: "Game board",
+        title: "The Game Board",
         content:
-          "Play Tic Tac Toe here. Click a square to place your mark. Winning lines are highlighted automatically.",
+          "Click any empty square to place your mark. Win by getting three in a row—horizontally, vertically, or diagonally. Winning lines highlight automatically.",
         placement: "top",
       },
       {
         target: '[data-tour="menu"]',
-        title: "Quick actions",
+        title: "Quick Actions Menu",
         content:
-          "The floating menu lets you start a new game, reset scores, create or share rooms, and leave multiplayer rooms.",
+          "Use the floating menu to start new games, reset scores, find random opponents, create/share rooms, or leave multiplayer sessions. Click 'Find Match' to join the matchmaking queue!",
         placement: "top",
       },
       {
         target: '[data-tour="panels"]',
-        title: "People & history panels",
+        title: "Side Panels",
         content:
-          "Open the player list or move history from here. Panels slide in so you can review details without leaving the board.",
+          "View connected players and spectators, or dive into move history for time-travel debugging. Panels slide in from the sides and won't disrupt your game.",
         placement: "bottom",
       },
     ],

@@ -2,6 +2,33 @@
 
 A minimalist, modern Tic Tac Toe game built with React and Tailwind CSS.
 
+## TL;DR
+
+**CrissCross** is a feature-rich Tic Tac Toe web app with:
+
+- 🎮 **Single & Multiplayer** modes (local + realtime via Socket.IO)
+- 🎯 **Matchmaking** — find random opponents instantly
+- 🎤 **Voice Chat** — talk during multiplayer games
+- 📱 **Responsive** — works beautifully on all devices
+- 🌓 **Dark/Light** themes
+- 🕹️ **History & Time Travel** — review and replay moves
+- 🏆 **Score Tracking** — persistent scores across games
+
+**Quick Start:**
+
+```bash
+nvm use --lts
+npm install
+npm run dev:all  # Starts both frontend (Vite) & backend (Socket.IO server)
+```
+
+Then open `http://localhost:5173` and click **"Find Match"** to play!
+
+## Roadmap
+
+- sound effects and haptics
+- styles taken out to reusable components
+
 ## Features
 
 - Responsive 3×3 board with smooth animations and winning-line highlight
@@ -19,6 +46,7 @@ A minimalist, modern Tic Tac Toe game built with React and Tailwind CSS.
 
 - `/` — main game
 - `/room/:roomId` — opens the game and automatically attempts to join `roomId`
+- `/lobby` — matchmaking lobby for finding random opponents
 
 ## Usage
 
@@ -26,6 +54,15 @@ A minimalist, modern Tic Tac Toe game built with React and Tailwind CSS.
 - Use the menu to start a new game or reset scores
 - Toggle the History panel from the navbar; time‑travel through moves
 - Result modal appears at the end of the game
+- Click "Find Match" to join the matchmaking queue and play against random opponents
+
+## Matchmaking
+
+1. Click **"Find Match"** from the main menu
+2. Enter your display name (2-20 characters)
+3. Wait in the lobby—you'll be automatically matched with another waiting player
+4. Once matched, both players are redirected to a new game room
+5. Play begins immediately with automatic role assignment (X/O)
 
 ## Multiplayer
 

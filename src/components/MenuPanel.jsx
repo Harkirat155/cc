@@ -14,6 +14,7 @@ const MenuPanel = ({
   leaveRoom,
   isMultiplayer,
   roomId,
+  onFindMatch,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(true);
@@ -64,6 +65,7 @@ const MenuPanel = ({
   const showNewGame = Boolean(hasMoves);
   const showResetScore = Boolean(canResetScore);
   const showCreateRoom = Boolean(!isMultiplayer);
+  const showFindMatch = Boolean(!isMultiplayer);
   const showShare = Boolean(isMultiplayer && roomId);
   const showLeave = Boolean(isMultiplayer);
 
@@ -75,6 +77,7 @@ const MenuPanel = ({
         showNewGame,
         showResetScore,
         showCreateRoom,
+        showFindMatch,
         showShare,
         showLeave,
         shareUrl,
@@ -82,6 +85,7 @@ const MenuPanel = ({
       onNewGame={() => handleButtonClick(onNewGame)}
       onReset={() => handleButtonClick(onReset)}
       onCreateRoom={() => handleButtonClick(createRoom)}
+      onFindMatch={() => handleButtonClick(onFindMatch)}
       onShare={handleShare}
       onLeave={() => handleButtonClick(leaveRoom)}
       copied={copied}
@@ -93,11 +97,12 @@ const MenuPanel = ({
     const list = [];
     if (showResetScore) list.push("bg-rose-500"); // Reset
     if (showCreateRoom) list.push("bg-emerald-600"); // Create
+    if (showFindMatch) list.push("bg-indigo-600"); // Find Match
     if (showNewGame) list.push("bg-blue-600"); // New
     if (showShare) list.push("bg-purple-600"); // Share
     if (showLeave) list.push("bg-gray-700"); // Leave
     return list;
-  }, [showResetScore, showCreateRoom, showNewGame, showShare, showLeave]);
+  }, [showResetScore, showCreateRoom, showFindMatch, showNewGame, showShare, showLeave]);
 
   // Dynamically size the cylinder to comfortably fit the indicators
   const DOT = 28; // px diameter
