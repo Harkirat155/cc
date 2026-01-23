@@ -743,7 +743,7 @@ export default function useSocketGame() {
     displayName,
     updateDisplayName: (newName) => {
       const trimmed = String(newName || '').trim();
-      if (trimmed.length < 1 || trimmed.length > 20) return false;
+      if (trimmed.length < 2 || trimmed.length > 20) return false;
       saveDisplayName(trimmed);
       setDisplayNameState(trimmed);
       // Notify server if in a room
