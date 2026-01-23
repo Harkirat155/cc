@@ -399,6 +399,8 @@ export default function useSocketGame() {
       setMessage("Left room");
       setPersistedRoom(null);
       resetHistory("Left room", "system");
+      setShowModal(false);
+      setNewGameRequester(null);
       resolve();
     });
   }, [isMultiplayer, roomId, finalizeCurrentGame, gameState.winner, resetHistory]);

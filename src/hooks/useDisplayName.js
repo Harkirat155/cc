@@ -18,8 +18,8 @@ export default function useDisplayName() {
   const updateDisplayName = useCallback((newName, options = {}) => {
     const trimmed = String(newName || "").trim();
     
-    // Validate length (1-20 characters)
-    if (trimmed.length < 1 || trimmed.length > 20) {
+    // Validate length (2-20 characters)
+    if (trimmed.length < 2 || trimmed.length > 20) {
       return false;
     }
     
