@@ -332,13 +332,11 @@ describe('broadcastLobbyState', () => {
       client.on('lobbyUpdate', (data) => {
         received = data;
         if (timeoutHandle) {
-          // eslint-disable-next-line no-undef
           clearTimeout(timeoutHandle);
         }
         resolve();
       });
 
-      // eslint-disable-next-line no-undef
       timeoutHandle = setTimeout(() => {
         reject(new Error('Timeout waiting for lobbyUpdate'));
       }, 2000);

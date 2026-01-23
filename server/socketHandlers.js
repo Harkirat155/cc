@@ -16,7 +16,7 @@ import { lobbyManager, broadcastLobbyState } from './lobbyManager.js';
 import { socketLog as log } from './logger.js';
 import { createRateLimitMiddleware, clearRateLimit, startRateLimitCleanup } from './rateLimiter.js';
 import { incCounter } from './metrics.js';
-import config from './config.js';
+import _config from './config.js';
 
 // Input validation helpers
 const validateRoomId = (roomId) => {

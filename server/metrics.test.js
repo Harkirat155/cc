@@ -1,5 +1,5 @@
 // Tests for metrics module
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, expect } from '@jest/globals';
 import { getMetrics, getHealthStatus, incCounter } from './metrics.js';
 
 describe('metrics', () => {
