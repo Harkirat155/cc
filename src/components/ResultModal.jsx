@@ -77,6 +77,17 @@ const ResultModal = ({
   ]);
   // Determine if this is a win (not draw)
   const isWin = result && !result.toLowerCase().includes('draw');
+  const celebrationParticles = useMemo(() => {
+    if (!isWin) return [];
+    return [...Array(12)].map((_, i) => ({
+      id: i,
+      left: `${10 + Math.random() * 80}%`,
+      top: `${20 + Math.random() * 40}%`,
+      color: ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][i % 5],
+      delay: `${i * 0.1}s`,
+      opacity: 0.7,
+    }));
+  }, [isWin, result]);
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -89,16 +100,16 @@ const ResultModal = ({
       {/* Celebration particles for wins */}
       {isWin && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-          {[...Array(12)].map((_, i) => (
+          {celebrationParticles.map((particle) => (
             <span
-              key={i}
+              key={particle.id}
               className="absolute w-2 h-2 rounded-full animate-celebrate"
               style={{
-                left: `${10 + Math.random() * 80}%`,
-                top: `${20 + Math.random() * 40}%`,
-                backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][i % 5],
-                animationDelay: `${i * 0.1}s`,
-                opacity: 0.7,
+                left: particle.left,
+                top: particle.top,
+                backgroundColor: particle.color,
+                animationDelay: particle.delay,
+                opacity: particle.opacity,
               }}
             />
           ))}

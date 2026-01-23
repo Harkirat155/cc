@@ -1,9 +1,14 @@
-// Optimized Room Manager with efficient data structures and cleanup
-// Uses Map for O(1) operations, proper LRU eviction, and batched broadcasts
+// Room Manager - Core room state and socket tracking
+// Uses Map for O(1) operations and proper LRU eviction
 
 import config from './config.js';
 import { roomLog as log } from './logger.js';
 import { incCounter } from './metrics.js';
+import { clearPendingPublish } from './roomPublisher.js';
+
+// Re-export from extracted modules for backward compatibility
+export { publish, publishImmediate, clearPendingPublish } from './roomPublisher.js';
+export { startRoomGC, stopRoomGC } from './roomGC.js';
 
 // Room storage: roomId -> RoomData
 // Using Map maintains insertion order for LRU
@@ -11,10 +16,6 @@ export const rooms = new Map();
 
 // Socket to rooms mapping: socketId -> Set<roomId>
 export const socketRooms = new Map();
-
-// Pending updates for batching: roomId -> timestamp
-const pendingPublish = new Map();
-let publishScheduled = false;
 
 /**
  * Update last activity timestamp and maintain LRU order
@@ -47,104 +48,19 @@ export function enforceLRU() {
 }
 
 /**
- * Get display name for a player seat
- * @param {Object} room - Room data
- * @param {'X' | 'O'} seat - Player seat
- * @returns {string | null}
+ * Create initial game state
  */
-function getDisplayName(room, seat) {
-  const socketId = room.players[seat];
-  if (!socketId) return null;
-  
-  // Prefer matched player display name
-  if (room.matchedPlayers?.[seat]?.displayName) {
-    return room.matchedPlayers[seat].displayName;
-  }
-  
-  // Fallback: truncated socket ID
-  return socketId.length > 8 ? `${socketId.slice(0, 5)}…` : socketId;
-}
-
-/**
- * Build game state payload for broadcasting
- * @param {string} roomId 
- * @param {Object} room 
- * @returns {Object}
- */
-function buildGameState(roomId, room) {
-  const roster = {
-    X: room.players.X,
-    O: room.players.O,
-    XName: getDisplayName(room, 'X'),
-    OName: getDisplayName(room, 'O'),
-    spectators: room.spectators ? Array.from(room.spectators) : [],
-  };
-
-  // Build voice roster
-  const voiceRoster = {};
-  if (room.voice) {
-    for (const [sid, v] of Object.entries(room.voice)) {
-      voiceRoster[sid] = { muted: Boolean(v?.muted) };
-    }
-  }
-
+export function createInitialGameState() {
   return {
-    ...room.state,
-    roomId,
-    roster,
-    voiceRoster,
+    board: Array(9).fill(''),
+    turn: 'X',
+    winner: null,
+    winningLine: [],
+    xScore: 0,
+    oScore: 0,
+    newGameRequester: null,
+    newGameRequestedAt: null,
   };
-}
-
-/**
- * Schedule a batched publish for a room
- * Batches multiple updates within the same tick
- * @param {Server} io - Socket.IO server
- * @param {string} roomId 
- */
-export function publish(io, roomId) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-
-  pendingPublish.set(roomId, Date.now());
-  
-  if (!publishScheduled) {
-    publishScheduled = true;
-    // Use setImmediate for next tick batching (with setTimeout fallback for non-Node environments)
-    const scheduleFlush = typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
-    scheduleFlush(() => flushPublish(io));
-  }
-}
-
-/**
- * Flush all pending publishes
- * @param {Server} io 
- */
-function flushPublish(io) {
-  publishScheduled = false;
-  
-  for (const [roomId] of pendingPublish) {
-    const room = rooms.get(roomId);
-    if (room) {
-      const state = buildGameState(roomId, room);
-      io.to(roomId).emit('gameUpdate', state);
-    }
-  }
-  
-  pendingPublish.clear();
-}
-
-/**
- * Publish immediately without batching (for critical updates)
- * @param {Server} io 
- * @param {string} roomId 
- */
-export function publishImmediate(io, roomId) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-  
-  const state = buildGameState(roomId, room);
-  io.to(roomId).emit('gameUpdate', state);
 }
 
 /**
@@ -181,22 +97,6 @@ export function createRoom(roomId, options = {}) {
   log.debug('Room created', { roomId, creator: creatorSocketId });
   
   return room;
-}
-
-/**
- * Create initial game state
- */
-export function createInitialGameState() {
-  return {
-    board: Array(9).fill(''),
-    turn: 'X',
-    winner: null,
-    winningLine: [],
-    xScore: 0,
-    oScore: 0,
-    newGameRequester: null,
-    newGameRequestedAt: null,
-  };
 }
 
 /**
@@ -271,66 +171,11 @@ export function cleanupSocket(socketId) {
   return affectedRooms;
 }
 
-// GC interval reference for cleanup
-let gcInterval = null;
-
-/**
- * Start the room garbage collector
- * Removes empty rooms after TTL expires
- */
-export function startRoomGC() {
-  if (gcInterval) return;
-
-  gcInterval = setInterval(() => {
-    const now = Date.now();
-    let cleaned = 0;
-    
-    for (const [roomId, room] of rooms.entries()) {
-      const hasOccupants = !!(
-        room.players?.X || 
-        room.players?.O || 
-        (room.spectators && room.spectators.size > 0)
-      );
-      
-      if (hasOccupants) continue;
-      
-      const lastActivity = room.lastTouched || 0;
-      if (now - lastActivity > config.roomTtlMs) {
-        rooms.delete(roomId);
-        cleaned++;
-      }
-    }
-    
-    if (cleaned > 0) {
-      log.debug('GC cleaned rooms', { cleaned, remaining: rooms.size });
-    }
-  }, config.roomGcIntervalMs);
-
-  // Don't prevent process exit
-  gcInterval.unref?.();
-  
-  log.info('Room GC started', { 
-    intervalMs: config.roomGcIntervalMs, 
-    ttlMs: config.roomTtlMs 
-  });
-}
-
-/**
- * Stop the room garbage collector
- */
-export function stopRoomGC() {
-  if (gcInterval) {
-    clearInterval(gcInterval);
-    gcInterval = null;
-    log.info('Room GC stopped');
-  }
-}
-
 /**
  * Clear all rooms (for testing)
  */
 export function clearRooms() {
   rooms.clear();
   socketRooms.clear();
-  pendingPublish.clear();
+  clearPendingPublish();
 }

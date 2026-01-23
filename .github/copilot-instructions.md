@@ -54,7 +54,7 @@ All handlers in `socketHandlers.js` validate with helpers: `validateRoomId()`, `
 - `RATE_LIMIT_*` — socket event rate limiting
 
 **Frontend** (Vite):
-- `VITE_SOCKET_SERVER` — backend URL (defaults to port 8081 of current origin)
+- `VITE_SOCKET_SERVER` — backend URL (defaults to port 10000 of current origin)
 - `VITE_API_BASE` — REST API base (for feedback endpoint)
 
 ## Testing
