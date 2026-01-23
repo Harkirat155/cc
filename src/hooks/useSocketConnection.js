@@ -36,7 +36,7 @@ export default function useSocketConnection({
 
     const url =
       import.meta.env.VITE_SOCKET_SERVER ||
-      window.location.origin.replace(/:\d+$/, ":10000");
+      window.location.origin.replace(/:\d+$/, ":8081");
 
     const socket = io(url, {
       transports: ["websocket", "polling"],

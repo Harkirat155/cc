@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ValueMark from "./marks/ValueMark";
 import { Tooltip } from "./ui/Tooltip";
 
 const BoardSquare = ({ value, onClick, isWinning, index }) => {
   const [isPressed, setIsPressed] = useState(false);
+  const pressTimeoutRef = useRef(null);
   const row = typeof index === "number" ? Math.floor(index / 3) + 1 : null;
   const col = typeof index === "number" ? (index % 3) + 1 : null;
   const positionText = row && col ? `row ${row}, column ${col}` : "this square";
@@ -19,8 +20,19 @@ const BoardSquare = ({ value, onClick, isWinning, index }) => {
       navigator.vibrate(10);
     }
     onClick();
-    setTimeout(() => setIsPressed(false), 150);
+    if (pressTimeoutRef.current) {
+      clearTimeout(pressTimeoutRef.current);
+    }
+    pressTimeoutRef.current = setTimeout(() => setIsPressed(false), 150);
   };
+
+  useEffect(() => {
+    return () => {
+      if (pressTimeoutRef.current) {
+        clearTimeout(pressTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Tooltip content={tooltipMessage}>

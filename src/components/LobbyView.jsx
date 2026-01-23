@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Button from './ui/Button';
 
 // Fun tips to show while waiting
@@ -24,14 +23,12 @@ const LobbyView = ({
   isInLobby = false, 
   onLeaveLobby,
   socketId,
-  displayName = ''
+  displayName = '',
+  connectionState = 'disconnected'
 }) => {
-  const navigate = useNavigate();
-
   const handleLeaveLobby = useCallback(() => {
     onLeaveLobby();
-    navigate('/');
-  }, [onLeaveLobby, navigate]);
+  }, [onLeaveLobby]);
 
   // Calculate user's position in queue
   const userPosition = lobbyQueue.findIndex(p => p.socketId === socketId);
@@ -71,9 +68,26 @@ const LobbyView = ({
       <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 px-8 py-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Matchmaking Lobby</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-white mb-2">Matchmaking Lobby</h1>
+            {/* Connection indicator */}
+            <div className="flex items-center gap-2">
+              <span 
+                className={`w-2.5 h-2.5 rounded-full ${
+                  connectionState === 'connected' 
+                    ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]' 
+                    : connectionState === 'connecting'
+                    ? 'bg-yellow-400 animate-pulse'
+                    : 'bg-red-400'
+                }`} 
+              />
+              <span className="text-sm text-blue-100">
+                {connectionState === 'connected' ? 'Connected' : connectionState === 'connecting' ? 'Connecting...' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
           <p className="text-blue-100 dark:text-blue-200">
-            Finding an opponent for you...
+            {connectionState === 'connected' ? 'Finding an opponent for you...' : connectionState === 'connecting' ? 'Establishing connection...' : 'Connection lost, reconnecting...'}
           </p>
         </div>
 

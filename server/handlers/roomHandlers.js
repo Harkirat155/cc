@@ -83,7 +83,7 @@ export function registerRoomHandlers(socket, io) {
     let role = null;
 
     // 1) Rebind seat by clientId
-    if (!role && clientId && room.seatByClient[clientId]) {
+    if (clientId && room.seatByClient[clientId]) {
       const seat = room.seatByClient[clientId];
       if (
         (seat === 'X' || seat === 'O') &&

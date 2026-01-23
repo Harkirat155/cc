@@ -5,10 +5,11 @@ import { useState, useCallback } from "react";
  * Manages lobby queue, error state, and join/leave operations.
  * 
  * @param {object} options
- * @param {Function} options.getSocket - Function to get or create socket instance
+ * @param {Function} options.getSocket - Function to get existing socket instance
+ * @param {Function} [options.ensureSocket] - Function to ensure socket is initialized
  * @returns {object} Lobby state and actions
  */
-export default function useLobby({ getSocket }) {
+export default function useLobby({ getSocket, ensureSocket }) {
   const [lobbyQueue, setLobbyQueue] = useState([]);
   const [isInLobby, setIsInLobby] = useState(false);
   const [lobbyError, setLobbyError] = useState(null);
@@ -20,7 +21,7 @@ export default function useLobby({ getSocket }) {
    */
   const joinLobby = useCallback((displayName) => {
     return new Promise((resolve, reject) => {
-      const socket = getSocket?.();
+      const socket = ensureSocket?.() || getSocket?.();
       if (!socket) {
         reject(new Error("Socket not available"));
         return;
@@ -39,7 +40,7 @@ export default function useLobby({ getSocket }) {
         }
       });
     });
-  }, [getSocket]);
+  }, [getSocket, ensureSocket]);
 
   /**
    * Leave the matchmaking lobby
