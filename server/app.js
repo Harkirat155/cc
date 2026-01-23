@@ -202,9 +202,17 @@ onShutdown('socket.io', async () => {
   // Notify connected clients
   io.emit('server:shutdown', { message: 'Server is restarting' });
   
-  // Close all connections
+  // Close all connections with timeout
   await new Promise((resolve) => {
-    io.close(() => resolve());
+    const timeout = setTimeout(() => {
+      log.warn('Socket.IO close timed out, forcing resolution');
+      resolve();
+    }, 5000);
+    
+    io.close(() => {
+      clearTimeout(timeout);
+      resolve();
+    });
   });
   log.info('Socket.IO connections closed');
 });

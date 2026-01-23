@@ -256,6 +256,10 @@ export default function useSocketGame() {
     try {
       const socket = await waitForConnection();
       socket.emit("createRoom", { clientId: clientIdRef.current, displayName: currentDisplayName }, (resp) => {
+        if (resp?.error) {
+          setMessage(resp.error);
+          return;
+        }
         setRoomId(resp.roomId);
         setPlayer(resp.player);
         setIsRoomCreator(true);
@@ -284,6 +288,8 @@ export default function useSocketGame() {
           }
           if (resp?.player) setPlayer(resp.player);
           setRoomId(code);
+          setPersistedRoom(code);
+          setMessage(`Joined room ${code} as ${resp?.player || 'spectator'}`);
         }
       );
     } catch (err) {
@@ -346,7 +352,7 @@ export default function useSocketGame() {
 
     const socket = getSocket();
     if (isMultiplayer && socket?.connected) {
-      socket.emit("newGame", { roomId });
+      socket.emit("resetGame", { roomId });
     } else {
       setGameState((prev) => ({
         ...initialLocalState,

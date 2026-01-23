@@ -29,10 +29,10 @@ server/                 # Node.js backend
 ## Key Patterns
 
 ### Socket Event Names (keep client+server in sync)
-- **Room**: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `newGame`, `requestNewGame`
+- **Room**: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `requestNewGame`, `cancelNewGameRequest`
 - **Lobby**: `joinLobby`, `leaveLobby` → broadcasts `lobbyUpdate`, `matchFound`
-- **Voice**: `voiceOffer`, `voiceAnswer`, `voiceCandidate`
-- **State**: server emits `gameUpdate` (room) or `lobbyUpdate` (lobby)
+- **Voice**: `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal` → broadcasts `voice:user-joined`, `voice:user-left`
+- **State**: server emits `gameUpdate` (room), `gameReset`, or `lobbyUpdate` (lobby)
 
 ### State Centralization
 All socket and game state lives in `useSocketGame.js`. Components call actions from this hook. Never create parallel socket connections.

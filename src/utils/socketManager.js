@@ -7,8 +7,8 @@
 import { io } from "socket.io-client";
 
 let socket = null;
-let connectionPromise = null;
 const listeners = new Set();
+const CONNECTION_TIMEOUT = 15000; // 15 seconds
 
 /**
  * Get the socket server URL
@@ -39,15 +39,6 @@ export function getSocket() {
       timeout: 20000,
     });
 
-    // Create connection promise for waitForConnection
-    connectionPromise = new Promise((resolve) => {
-      if (socket.connected) {
-        resolve(socket);
-      } else {
-        socket.once("connect", () => resolve(socket));
-      }
-    });
-
     // Log connection events
     socket.on("connect", () => {
       console.log("[SocketManager] Connected:", socket.id);
@@ -62,11 +53,6 @@ export function getSocket() {
     socket.on("disconnect", (reason) => {
       console.log("[SocketManager] Disconnected:", reason);
       notifyListeners("disconnect", reason);
-      
-      // Reset connection promise for reconnection
-      connectionPromise = new Promise((resolve) => {
-        socket.once("connect", () => resolve(socket));
-      });
     });
 
     socket.io.on("reconnect_attempt", (attempt) => {
@@ -91,14 +77,49 @@ export function getSocket() {
 /**
  * Wait for the socket to be connected.
  * Returns immediately if already connected.
+ * Rejects on timeout or connection failures.
+ * @param {number} timeout - Connection timeout in ms (default: 15000)
  * @returns {Promise<Socket>}
  */
-export async function waitForConnection() {
+export async function waitForConnection(timeout = CONNECTION_TIMEOUT) {
   const s = getSocket();
   if (s.connected) {
     return s;
   }
-  return connectionPromise;
+
+  // Create a fresh promise for each attempt
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error("Connection timeout"));
+    }, timeout);
+
+    const onConnect = () => {
+      cleanup();
+      resolve(s);
+    };
+
+    const onConnectError = (error) => {
+      cleanup();
+      reject(new Error(`Connection error: ${error.message}`));
+    };
+
+    const onReconnectFailed = () => {
+      cleanup();
+      reject(new Error("Reconnection failed"));
+    };
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      s.off("connect", onConnect);
+      s.off("connect_error", onConnectError);
+      s.io.off("reconnect_failed", onReconnectFailed);
+    };
+
+    s.once("connect", onConnect);
+    s.once("connect_error", onConnectError);
+    s.io.once("reconnect_failed", onReconnectFailed);
+  });
 }
 
 /**
@@ -147,7 +168,6 @@ export function disconnectSocket() {
     console.log("[SocketManager] Disconnecting socket");
     socket.disconnect();
     socket = null;
-    connectionPromise = null;
   }
 }
 

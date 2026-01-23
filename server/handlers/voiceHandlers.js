@@ -60,12 +60,13 @@ export function registerVoiceHandlers(socket, io) {
   });
 
   socket.on('voice:signal', ({ roomId, targetId, data }) => {
-    if (!validateRoomId(roomId) || !targetId || !data) return;
+    const normalizedRoomId = validateRoomId(roomId);
+    if (!normalizedRoomId || !targetId || !data) return;
 
     socket.to(targetId).emit('voice:signal', {
       from: socket.id,
       data,
-      roomId,
+      roomId: normalizedRoomId,
     });
   });
 }
