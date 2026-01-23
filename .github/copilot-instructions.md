@@ -13,8 +13,8 @@ This is **CrissCross**, a modern Tic Tac Toe web app with multiplayer support.
 ## Environment & Commands
 
 **Node Version:**
-- Always run `nvm use --lts` before any `npm` or `node` commands.
-- Use `npm` only (not `yarn` or `pnpm`).
+- This project uses Node LTS (specified in `.nvmrc`)
+- Use `npm` only (not `yarn` or `pnpm`)
 
 **Common Tasks:**
 - Start frontend dev server: `npm run dev` (Vite on port 5173)
