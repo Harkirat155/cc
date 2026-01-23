@@ -13,11 +13,13 @@ Features:
 ## Run
 
 ```bash
-node server/server.js
+node server/app.js
 ```
 
-Env vars:
+Env vars (see `config.js` for full list):
 
-- PORT (default 5123)
-- ROOM_LIMIT (max simultaneous rooms)
-- CORS_ORIGIN (allowed origin, default *)
+- `PORT` (default 10000)
+- `ROOM_LIMIT` (default 500, max simultaneous rooms)
+- `ROOM_TTL_MS` (default 120000, empty room cleanup)
+- `CORS_ORIGIN` (default `*`)
+- `RATE_LIMIT_*` — rate limiting settings

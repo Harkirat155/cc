@@ -75,18 +75,44 @@ const ResultModal = ({
     requestNewGame,
     cancelNewGameRequest,
   ]);
+  // Determine if this is a win (not draw)
+  const isWin = result && !result.toLowerCase().includes('draw');
+  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      {/* Dimmed, softly blurred backdrop */}
+      {/* Dimmed, softly blurred backdrop with fade-in */}
       <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-fadeIn"
         aria-hidden
       ></div>
 
-      {/* Card with glassmorphism */}
-      <div className="relative max-w-sm w-full">
-        <div className="group rounded-2xl border border-white/15 dark:border-white/10 bg-white/25 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform">
+      {/* Celebration particles for wins */}
+      {isWin && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+          {[...Array(12)].map((_, i) => (
+            <span
+              key={i}
+              className="absolute w-2 h-2 rounded-full animate-celebrate"
+              style={{
+                left: `${10 + Math.random() * 80}%`,
+                top: `${20 + Math.random() * 40}%`,
+                backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][i % 5],
+                animationDelay: `${i * 0.1}s`,
+                opacity: 0.7,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Card with glassmorphism and entrance animation */}
+      <div className="relative max-w-sm w-full animate-modal-enter">
+        <div className={`group rounded-2xl border border-white/15 dark:border-white/10 bg-white/25 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
           <div className="flex flex-col items-center text-center gap-4">
+            {/* Result icon */}
+            <div className={`text-4xl mb-1 ${isWin ? 'animate-gentle-bounce' : ''}`}>
+              {result?.toLowerCase().includes('draw') ? '🤝' : '🎉'}
+            </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
               {result}
             </h2>

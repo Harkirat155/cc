@@ -1,26 +1,32 @@
-// Matchmaking lobby management
-// Single Responsibility: Manage lobby queue, match players, broadcast state
+// Optimized Lobby Manager with efficient matching and queue management
+
+import config from './config.js';
+import { lobbyLog as log } from './logger.js';
+import { incCounter } from './metrics.js';
+
+// Debounce timer for broadcasting
+let broadcastTimeout = null;
 
 class LobbyManager {
   constructor() {
-    // Queue of waiting players: [{socketId, displayName, joinedAt}]
+    // Queue of waiting players: Array<{socketId, displayName, joinedAt}>
     this.queue = [];
-    // Map socketId -> {displayName, joinedAt}
-    this.playerMetadata = new Map();
+    // Fast lookup: socketId -> queue index (for O(1) removal)
+    this.playerIndex = new Map();
   }
 
   /**
    * Add a player to the matchmaking queue
-   * @param {string} socketId - Socket.IO socket ID
-   * @param {string} displayName - Player's chosen display name
-   * @returns {{success: boolean, error?: string, position?: number}}
+   * @param {string} socketId 
+   * @param {string} displayName 
+   * @returns {{ success: boolean, error?: string, position?: number }}
    */
   addPlayer(socketId, displayName) {
     // Validation
     if (!socketId || typeof socketId !== 'string') {
       return { success: false, error: 'Invalid socket ID' };
     }
-    
+
     const trimmedName = String(displayName || '').trim();
     if (trimmedName.length < 2) {
       return { success: false, error: 'Display name must be at least 2 characters' };
@@ -29,8 +35,13 @@ class LobbyManager {
       return { success: false, error: 'Display name must be 20 characters or less' };
     }
 
+    // Check queue size limit
+    if (this.queue.length >= config.lobbyMaxQueueSize) {
+      return { success: false, error: 'Matchmaking queue is full, please try again later' };
+    }
+
     // Check if already in queue
-    if (this.playerMetadata.has(socketId)) {
+    if (this.playerIndex.has(socketId)) {
       return { success: false, error: 'Already in lobby' };
     }
 
@@ -40,58 +51,89 @@ class LobbyManager {
       joinedAt: Date.now(),
     };
 
+    const position = this.queue.length;
     this.queue.push(player);
-    this.playerMetadata.set(socketId, player);
+    this.playerIndex.set(socketId, position);
 
-    return {
-      success: true,
-      position: this.queue.length - 1,
-    };
+    log.debug('Player joined lobby', { socketId, displayName: trimmedName, position });
+
+    return { success: true, position };
   }
 
   /**
    * Remove a player from the queue
-   * @param {string} socketId
-   * @returns {boolean} true if player was removed
+   * Uses swap-and-pop for O(1) removal when order doesn't matter for removal
+   * @param {string} socketId 
+   * @returns {boolean}
    */
   removePlayer(socketId) {
-    if (!this.playerMetadata.has(socketId)) {
-      return false;
-    }
+    const index = this.playerIndex.get(socketId);
+    if (index === undefined) return false;
 
-    this.queue = this.queue.filter(p => p.socketId !== socketId);
-    this.playerMetadata.delete(socketId);
+    // Remove from index
+    this.playerIndex.delete(socketId);
+
+    // Swap with last element and pop (O(1) removal)
+    const lastIndex = this.queue.length - 1;
+    if (index !== lastIndex) {
+      // Move last element to this position
+      const lastPlayer = this.queue[lastIndex];
+      this.queue[index] = lastPlayer;
+      this.playerIndex.set(lastPlayer.socketId, index);
+    }
+    this.queue.pop();
+
+    log.debug('Player left lobby', { socketId });
     return true;
   }
 
   /**
-   * Get the current queue state for broadcasting
-   * @returns {Array} Array of {socketId, displayName, joinedAt}
+   * Get current queue state for broadcasting
+   * Returns sorted by join time for consistent display
    */
   getQueueState() {
-    return this.queue.map(p => ({
-      socketId: p.socketId,
-      displayName: p.displayName,
-      joinedAt: p.joinedAt,
-    }));
+    // Sort by joinedAt for consistent FIFO display
+    return [...this.queue]
+      .sort((a, b) => a.joinedAt - b.joinedAt)
+      .map(p => ({
+        socketId: p.socketId,
+        displayName: p.displayName,
+        joinedAt: p.joinedAt,
+      }));
   }
 
   /**
-   * Attempt to match two players from the queue (FIFO)
-   * @returns {{matched: boolean, players?: Array}} Match result
+   * Attempt to match players from the queue (FIFO by joinedAt)
+   * @returns {{ matched: boolean, players?: [Player, Player] }}
    */
   matchPlayers() {
     if (this.queue.length < 2) {
       return { matched: false };
     }
 
-    // FIFO matching: take first two players
+    // Sort by joinedAt to ensure FIFO matching
+    this.queue.sort((a, b) => a.joinedAt - b.joinedAt);
+    
+    // Rebuild index after sort
+    this.playerIndex.clear();
+    this.queue.forEach((p, i) => this.playerIndex.set(p.socketId, i));
+
+    // Take first two players
     const player1 = this.queue.shift();
     const player2 = this.queue.shift();
 
-    // Clean up metadata
-    this.playerMetadata.delete(player1.socketId);
-    this.playerMetadata.delete(player2.socketId);
+    // Update indices for remaining players
+    this.playerIndex.delete(player1.socketId);
+    this.playerIndex.delete(player2.socketId);
+    
+    // Rebuild remaining indices
+    this.queue.forEach((p, i) => this.playerIndex.set(p.socketId, i));
+
+    incCounter('matchesMade');
+    log.info('Players matched', {
+      player1: player1.displayName,
+      player2: player2.displayName,
+    });
 
     return {
       matched: true,
@@ -100,48 +142,69 @@ class LobbyManager {
   }
 
   /**
-   * Check if a socket is in the queue
-   * @param {string} socketId
-   * @returns {boolean}
+   * Check if socket is in queue
    */
   isInQueue(socketId) {
-    return this.playerMetadata.has(socketId);
+    return this.playerIndex.has(socketId);
   }
 
   /**
-   * Get player info by socketId
-   * @param {string} socketId
-   * @returns {Object|null}
+   * Get player info
    */
   getPlayer(socketId) {
-    return this.playerMetadata.get(socketId) || null;
+    const index = this.playerIndex.get(socketId);
+    if (index === undefined) return null;
+    return this.queue[index] || null;
   }
 
   /**
-   * Get current queue size
-   * @returns {number}
+   * Get queue size
    */
   getQueueSize() {
     return this.queue.length;
   }
 
   /**
-   * Clear entire queue (for testing or admin purposes)
+   * Clear the queue (for testing)
    */
   clearQueue() {
     this.queue = [];
-    this.playerMetadata.clear();
+    this.playerIndex.clear();
   }
 }
 
-// Singleton instance
+// Singleton
 export const lobbyManager = new LobbyManager();
 
 /**
- * Broadcast current lobby state to all sockets in the lobby
- * @param {Server} io - Socket.IO server instance
+ * Broadcast lobby state with debouncing to prevent spam
+ * @param {Server} io 
  */
 export function broadcastLobbyState(io) {
+  // Debounce rapid updates
+  if (broadcastTimeout) {
+    clearTimeout(broadcastTimeout);
+  }
+
+  broadcastTimeout = setTimeout(() => {
+    broadcastTimeout = null;
+    const state = lobbyManager.getQueueState();
+    io.emit('lobbyUpdate', {
+      queue: state,
+      timestamp: Date.now(),
+    });
+  }, config.lobbyMatchDebounceMs);
+}
+
+/**
+ * Broadcast immediately without debouncing
+ */
+export function broadcastLobbyStateImmediate(io) {
+  if (broadcastTimeout) {
+    clearTimeout(broadcastTimeout);
+    broadcastTimeout = null;
+  }
+  
   const state = lobbyManager.getQueueState();
   io.emit('lobbyUpdate', {
     queue: state,

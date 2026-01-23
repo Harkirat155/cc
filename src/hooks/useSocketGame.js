@@ -6,6 +6,7 @@ import {
   detectChangedIndex,
 } from "../utils/history";
 import { shouldArchiveCompletedGame } from "../utils/completedGames";
+import { getDisplayName, setDisplayName as saveDisplayName } from "../utils/randomName";
 
 // Local game helpers (fallback when not in a multiplayer room)
 const emptyBoard = () => Array(9).fill("");
@@ -74,6 +75,12 @@ export default function useSocketGame() {
   const [isInLobby, setIsInLobby] = useState(false);
   const [lobbyError, setLobbyError] = useState(null);
   
+  // Display name state
+  const [displayName, setDisplayNameState] = useState(() => getDisplayName());
+  
+  // Connection state for UI indicator
+  const [connectionState, setConnectionState] = useState('disconnected'); // 'connected' | 'connecting' | 'disconnected'
+  
   const socketRef = useRef(null);
   const pendingJoinRef = useRef(null); // store room code if join called before socket ready
   // Stable clientId per browser tab/session for seat restoration across reconnects
@@ -130,11 +137,13 @@ export default function useSocketGame() {
 
     s.on("connect_error", (error) => {
       console.error("Connection error:", error);
+      setConnectionState('disconnected');
     });
 
     socketRef.current = s;
 
     s.on("connect", () => {
+      setConnectionState('connected');
       setMessage((_prev) =>
         roomId ? `Connected as ${player || ""}` : "Connected"
       );
@@ -142,7 +151,7 @@ export default function useSocketGame() {
       if (pendingJoinRef.current) {
         const code = pendingJoinRef.current;
         pendingJoinRef.current = null;
-        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current }, (resp) => {
+        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current, displayName: getDisplayName() }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
             return;
@@ -155,7 +164,7 @@ export default function useSocketGame() {
         const saved = safeGetPersistedRoom();
         const toJoin = roomId || saved;
         if (toJoin) {
-          s.emit("joinRoom", { roomId: toJoin, clientId: clientIdRef.current }, (resp) => {
+          s.emit("joinRoom", { roomId: toJoin, clientId: clientIdRef.current, displayName: getDisplayName() }, (resp) => {
             if (resp?.error) {
               setMessage(resp.error);
               if (resp.error === "Room not found") safeSetPersistedRoom(null);
@@ -167,7 +176,10 @@ export default function useSocketGame() {
         }
       } catch {/* ignore */}
     });
-    s.on("disconnect", () => setMessage("Disconnected"));
+    s.on("disconnect", () => {
+      setConnectionState('disconnected');
+      setMessage("Disconnected");
+    });
 
     s.on("gameUpdate", (payload) => {
       const effectiveRoomId = payload.roomId || roomId;
@@ -268,7 +280,8 @@ export default function useSocketGame() {
 
   const createRoom = useCallback(() => {
     const s = ensureSocket();
-    s.emit("createRoom", { clientId: clientIdRef.current }, (resp) => {
+    const currentDisplayName = getDisplayName();
+    s.emit("createRoom", { clientId: clientIdRef.current, displayName: currentDisplayName }, (resp) => {
       setRoomId(resp.roomId);
       setPlayer(resp.player);
       setIsRoomCreator(true);
@@ -281,8 +294,9 @@ export default function useSocketGame() {
     (code) => {
       try {
       const s = ensureSocket();
+      const currentDisplayName = getDisplayName();
       const emitJoin = () => {
-        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current }, (resp) => {
+        s.emit("joinRoom", { roomId: code, clientId: clientIdRef.current, displayName: currentDisplayName }, (resp) => {
           if (resp?.error) {
             setMessage(resp.error);
             if (resp.error === "Room not found") safeSetPersistedRoom(null);
@@ -717,11 +731,26 @@ export default function useSocketGame() {
       setViewIndex(idx);
     },
     resumeLatest: () => setViewIndex(moveHistory.length - 1),
+    // Connection state
+    connectionState,
     // Lobby methods
     lobbyQueue,
     isInLobby,
     lobbyError,
     joinLobby,
     leaveLobby,
+    // Display name
+    displayName,
+    updateDisplayName: (newName) => {
+      const trimmed = String(newName || '').trim();
+      if (trimmed.length < 1 || trimmed.length > 20) return false;
+      saveDisplayName(trimmed);
+      setDisplayNameState(trimmed);
+      // Notify server if in a room
+      if (socketRef.current && roomId) {
+        socketRef.current.emit("updateDisplayName", { roomId, displayName: trimmed });
+      }
+      return true;
+    },
   };
 }
