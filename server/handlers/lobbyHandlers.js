@@ -1,14 +1,16 @@
 // Lobby-related socket event handlers
+// Follows Single Responsibility Principle - each function has one clear purpose
 
-import { genCode } from '../gameLogic.js';
 import {
-  rooms,
   publish,
   trackSocketRoom,
   createRoom,
+  rooms,
 } from '../roomManager.js';
 import { lobbyManager, broadcastLobbyState } from '../lobbyManager.js';
 import { socketLog as log } from '../logger.js';
+import { generateUniqueRoomId } from '../utils/roomIdGenerator.js';
+import { notifyPlayersOfMatch, notifyPlayersOfMatchFailure } from '../utils/matchNotifier.js';
 
 /**
  * Register lobby-related event handlers
@@ -51,68 +53,70 @@ export function registerLobbyHandlers(socket, io) {
 }
 
 /**
+ * Setup room for matched players
+ * Single Responsibility: Configure room with both players
+ * @param {string} roomId - Room ID
+ * @param {Object} player1 - First player details
+ * @param {Object} player2 - Second player details
+ */
+function setupMatchedRoom(roomId, player1, player2) {
+  // Create room with first player
+  createRoom(roomId, {
+    creatorSocketId: player1.socketId,
+    creatorDisplayName: player1.displayName,
+  });
+
+  // Add second player to room
+  const room = rooms.get(roomId);
+  room.players.O = player2.socketId;
+  room.matchedPlayers.O = { displayName: player2.displayName };
+}
+
+/**
+ * Add players to Socket.IO room
+ * Single Responsibility: Join socket connections to room
+ * @param {Server} io - Socket.IO server instance
+ * @param {string} roomId - Room ID
+ * @param {Array} players - Array of player objects
+ */
+function addPlayersToSocketRoom(io, roomId, players) {
+  players.forEach(player => {
+    const socket = io.sockets.sockets.get(player.socketId);
+    if (socket) {
+      socket.join(roomId);
+      trackSocketRoom(player.socketId, roomId);
+    }
+  });
+}
+
+/**
  * Handle a successful match between two players
- * Uses createRoom() helper to ensure metrics are tracked
+ * Follows Single Responsibility - orchestrates match creation by delegating to specialized functions
  * @param {Server} io - Socket.IO server instance
  * @param {Array} players - Array of matched players
  */
 export function handleMatch(io, players) {
   const [player1, player2] = players;
 
-  // Generate unique room code with collision retry
-  let roomId = genCode();
-  let attempts = 0;
-  while (rooms.has(roomId) && attempts < 10) {
-    roomId = genCode();
-    attempts++;
-  }
-
-  // Final check: if room still exists after max attempts, log error and return
-  if (rooms.has(roomId)) {
-    console.error('[Lobby] Failed to generate unique room code after 10 attempts');
-    // Notify players of matchmaking failure
-    io.to(player1.socketId).emit('matchFound', { error: 'Failed to create room' });
-    io.to(player2.socketId).emit('matchFound', { error: 'Failed to create room' });
+  // Generate unique room ID
+  const roomIdResult = generateUniqueRoomId();
+  
+  if (!roomIdResult.success) {
+    console.error('[Lobby]', roomIdResult.error);
+    notifyPlayersOfMatchFailure(io, players, 'Failed to create room');
     return;
   }
 
-  // Create room using shared helper (handles metrics + LRU enforcement)
-  createRoom(roomId, {
-    creatorSocketId: player1.socketId,
-    creatorDisplayName: player1.displayName,
-  });
+  const roomId = roomIdResult.roomId;
 
-  // Get room and add second player
-  const room = rooms.get(roomId);
-  room.players.O = player2.socketId;
-  room.matchedPlayers.O = { displayName: player2.displayName };
+  // Setup room and add players
+  setupMatchedRoom(roomId, player1, player2);
+  addPlayersToSocketRoom(io, roomId, [player1, player2]);
 
-  // Add sockets to room
-  const socket1 = io.sockets.sockets.get(player1.socketId);
-  const socket2 = io.sockets.sockets.get(player2.socketId);
+  // Notify players of successful match
+  notifyPlayersOfMatch(io, roomId, player1, player2);
 
-  if (socket1) {
-    socket1.join(roomId);
-    trackSocketRoom(player1.socketId, roomId);
-  }
-
-  if (socket2) {
-    socket2.join(roomId);
-    trackSocketRoom(player2.socketId, roomId);
-  }
-
-  // Notify players
-  io.to(player1.socketId).emit('matchFound', {
-    roomId,
-    player: 'X',
-    opponent: player2.displayName,
-  });
-  io.to(player2.socketId).emit('matchFound', {
-    roomId,
-    player: 'O',
-    opponent: player1.displayName,
-  });
-
+  // Log match creation
   log.info('Match created', {
     roomId,
     player1: player1.displayName,
