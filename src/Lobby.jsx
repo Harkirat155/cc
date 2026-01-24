@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import LobbyView from './components/LobbyView';
 import useSocketGame from './hooks/useSocketGame';
 
+// Lobby retry configuration
+const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 5000;
+const MAX_RETRY_ATTEMPTS = 3;
+
 /**
  * Lobby Page - Matchmaking lobby container
  * Single Responsibility: Connect LobbyView to game hooks and handle routing
@@ -38,9 +43,9 @@ const Lobby = () => {
   }, []);
 
   // Auto-join lobby on mount with generated name
-  // Retries on failure with exponential backoff (up to 3 attempts)
+  // Retries on failure with exponential backoff (up to MAX_RETRY_ATTEMPTS)
   useEffect(() => {
-    if (!hasJoinedRef.current && !isInLobby && displayName && retryCount < 3) {
+    if (!hasJoinedRef.current && !isInLobby && displayName && retryCount < MAX_RETRY_ATTEMPTS) {
       hasJoinedRef.current = true;
       
       joinLobby(displayName)
@@ -56,8 +61,8 @@ const Lobby = () => {
             console.error(`Failed to join lobby (attempt ${retryCount + 1}):`, err);
             
             // Retry with exponential backoff if under max attempts
-            if (retryCount < 2) {
-              const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+            if (retryCount < MAX_RETRY_ATTEMPTS - 1) {
+              const delay = Math.min(BASE_RETRY_DELAY_MS * Math.pow(2, retryCount), MAX_RETRY_DELAY_MS);
               console.log(`Retrying in ${delay}ms...`);
               retryTimeoutRef.current = setTimeout(() => {
                 setRetryCount(prev => prev + 1);

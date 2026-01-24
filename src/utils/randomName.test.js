@@ -1,5 +1,8 @@
 import { generateRandomName, getDisplayName, setDisplayName } from './randomName';
 
+// Character set size: uppercase (26) + lowercase (26) + numbers (10) + special (7)
+const CHAR_SET_SIZE = 69;
+
 describe('generateRandomName', () => {
   it('should generate a 5-character name', () => {
     const name = generateRandomName();
@@ -22,7 +25,7 @@ describe('generateRandomName', () => {
     let callCount = 0;
     Math.random = jest.fn(() => {
       // Return different values to ensure unique names
-      return (callCount++ % 69) / 69;
+      return (callCount++ % CHAR_SET_SIZE) / CHAR_SET_SIZE;
     });
     
     const names = new Set();

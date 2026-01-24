@@ -81,20 +81,10 @@ export default function useSocketGame() {
 
   const isMultiplayer = !!roomId;
 
-  // Lazy socket getter - only creates socket when needed for multiplayer
-  const ensureSocket = useCallback(() => {
-    if (!socketRef.current) {
-      socketRef.current = getSocket();
-    }
-    return socketRef.current;
-  }, []);
-
-  // Set up socket event handlers only when socket is created
-  useEffect(() => {
-    if (handlersRegisteredRef.current || !socketRef.current) return;
+  // Register socket event handlers
+  const registerHandlers = useCallback((socket) => {
+    if (handlersRegisteredRef.current) return;
     handlersRegisteredRef.current = true;
-
-    const socket = socketRef.current;
 
     // Game events
     const handleGameUpdate = (payload) => {
@@ -169,9 +159,6 @@ export default function useSocketGame() {
     }
 
     return () => {
-      // Clean up event handlers when component unmounts
-      if (!socketRef.current) return;
-      const socket = socketRef.current;
       socket.off("gameUpdate", handleGameUpdate);
       socket.off("gameReset", handleGameReset);
       socket.off("lobbyUpdate", handleLobbyUpdate);
@@ -181,6 +168,15 @@ export default function useSocketGame() {
       handlersRegisteredRef.current = false;
     };
   }, []);
+
+  // Lazy socket getter - only creates socket when needed for multiplayer
+  const ensureSocket = useCallback(() => {
+    if (!socketRef.current) {
+      socketRef.current = getSocket();
+      registerHandlers(socketRef.current);
+    }
+    return socketRef.current;
+  }, [registerHandlers]);
 
   // Track gameUpdate for history recording (separate effect to handle recordMove dependency)
   useEffect(() => {
@@ -221,9 +217,6 @@ export default function useSocketGame() {
       // Ensure socket exists and wait for connection
       ensureSocket();
       const socket = await waitForConnection();
-      
-      // Update connection state after successful connection
-      setConnectionState("connected");
       
       console.log("[Lobby] Socket connected, emitting joinLobby with name:", displayNameArg);
       
