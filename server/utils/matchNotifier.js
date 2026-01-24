@@ -32,6 +32,6 @@ export function notifyPlayersOfMatch(io, roomId, player1, player2) {
  */
 export function notifyPlayersOfMatchFailure(io, players, error) {
   players.forEach(player => {
-    io.to(player.socketId).emit('matchFound', { error });
+    io.to(player.socketId).emit('matchError', { error });
   });
 }

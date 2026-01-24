@@ -21,25 +21,26 @@ describe('generateRandomName', () => {
 
   it('should generate different names on each call', () => {
     // Mock Math.random to test uniqueness deterministically
-    const originalRandom = Math.random;
     let callCount = 0;
-    Math.random = jest.fn(() => {
+    const mockRandom = jest.spyOn(Math, 'random').mockImplementation(() => {
       // Return different values to ensure unique names
       return (callCount++ % CHAR_SET_SIZE) / CHAR_SET_SIZE;
     });
     
-    const names = new Set();
-    
-    // Generate 50 names
-    for (let i = 0; i < 50; i++) {
-      names.add(generateRandomName());
+    try {
+      const names = new Set();
+      
+      // Generate 50 names
+      for (let i = 0; i < 50; i++) {
+        names.add(generateRandomName());
+      }
+      
+      // All should be unique with deterministic random
+      expect(names.size).toBe(50);
+    } finally {
+      // Always restore Math.random, even if assertions fail
+      mockRandom.mockRestore();
     }
-    
-    // All should be unique with deterministic random
-    expect(names.size).toBe(50);
-    
-    // Restore original Math.random
-    Math.random = originalRandom;
   });
 });
 

@@ -30,7 +30,7 @@ server/                 # Node.js backend
 
 ### Socket Event Names (keep client+server in sync)
 - **Room**: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `requestNewGame`, `cancelNewGameRequest`
-- **Lobby**: `joinLobby`, `leaveLobby` → broadcasts `lobbyUpdate`, `matchFound`
+- **Lobby**: `joinLobby`, `leaveLobby` → broadcasts `lobbyUpdate`, `matchFound`, `matchError`
 - **Voice**: `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal` → broadcasts `voice:user-joined`, `voice:user-left`
 - **State**: server emits `gameUpdate` (room), `gameReset`, or `lobbyUpdate` (lobby)
 

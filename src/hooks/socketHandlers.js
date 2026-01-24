@@ -84,6 +84,12 @@ export function createLobbyEventHandlers(stateSetters) {
       setMessage(`Matched with ${opponent}! You are ${assignedPlayer}`);
     },
 
+    handleMatchError: ({ error }) => {
+      console.log("[Socket] matchError:", error);
+      setIsInLobby(false);
+      setLobbyError(error);
+    },
+
     handleStartGame: (setMessage) => () => setMessage("Game started"),
   };
 }
@@ -126,6 +132,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     handleGameReset,
     handleLobbyUpdate,
     handleMatchFound,
+    handleMatchError,
     handleStartGame,
     handleConnection,
   } = handlers;
@@ -135,6 +142,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
   socket.on("gameReset", handleGameReset);
   socket.on("lobbyUpdate", handleLobbyUpdate);
   socket.on("matchFound", handleMatchFound);
+  socket.on("matchError", handleMatchError);
   socket.on("startGame", handleStartGame);
 
   // Subscribe to connection state changes
@@ -151,6 +159,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     socket.off("gameReset", handleGameReset);
     socket.off("lobbyUpdate", handleLobbyUpdate);
     socket.off("matchFound", handleMatchFound);
+    socket.off("matchError", handleMatchError);
     socket.off("startGame", handleStartGame);
     unsubscribe();
   };
