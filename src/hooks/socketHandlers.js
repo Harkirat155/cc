@@ -5,13 +5,15 @@
  */
 
 import { setPersistedRoom } from "../utils/clientId";
+import { emptyBoard } from "../utils/board";
 
 /**
  * Create game event handlers
  * @param {Object} stateSetters - Object containing state setter functions
+ * @param {Object} refs - Object containing refs for callbacks that may change
  * @returns {Object} Event handler functions
  */
-export function createGameEventHandlers(stateSetters) {
+export function createGameEventHandlers(stateSetters, refs = {}) {
   const {
     setRoomId,
     setGameState,
@@ -21,6 +23,8 @@ export function createGameEventHandlers(stateSetters) {
     setNewGameRequestedAt,
     setShowModal,
   } = stateSetters;
+
+  const { recordMoveRef } = refs;
 
   return {
     handleGameUpdate: (payload) => {
@@ -42,6 +46,27 @@ export function createGameEventHandlers(stateSetters) {
       } else if (payload.winner) {
         setNewGameRequester(null);
         setNewGameRequestedAt(null);
+      }
+
+      // Record move in history (using ref to get latest recordMove function)
+      if (recordMoveRef?.current) {
+        const resultText = payload.winner
+          ? payload.winner === "draw"
+            ? "Draw"
+            : `${payload.winner} wins`
+          : `${payload.turn}'s turn`;
+        const boardSnapshot = Array.isArray(payload.board) ? payload.board.slice() : emptyBoard();
+        const entryType = payload.winner
+          ? payload.winner === "draw"
+            ? "draw"
+            : "win"
+          : "move";
+        recordMoveRef.current(boardSnapshot, resultText, entryType);
+      }
+
+      // Show modal on game end
+      if (payload.winner) {
+        setShowModal(true);
       }
     },
 

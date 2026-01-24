@@ -5,8 +5,7 @@ import {
   detectChangedIndex,
 } from "../utils/history";
 import { shouldArchiveCompletedGame } from "../utils/completedGames";
-
-const emptyBoard = () => Array(9).fill("");
+import { emptyBoard } from "../utils/board";
 
 /**
  * Hook for managing game move history and completed game archives.
