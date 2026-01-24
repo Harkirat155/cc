@@ -76,7 +76,7 @@ const ScoreCard = ({
         {isTurn && (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 animate-pulse-ring">
             <Dot size={16} className="animate-gentle-bounce" />
-            Your turn
+            Turn
           </span>
         )}
       </div>
@@ -106,6 +106,7 @@ const ScoreCard = ({
               onClick={onEditSave}
               className="p-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
               title="Save"
+              aria-label="Save name"
             >
               <Check size={16} />
             </button>
@@ -113,6 +114,7 @@ const ScoreCard = ({
               onClick={onEditCancel}
               className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
               title="Cancel"
+              aria-label="Cancel editing"
             >
               <X size={16} />
             </button>
@@ -131,6 +133,7 @@ const ScoreCard = ({
                 onClick={onEditName}
                 className="p-1 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
                 title="Edit name"
+                aria-label="Edit name"
               >
                 <Pencil size={14} />
               </button>

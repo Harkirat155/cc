@@ -102,7 +102,7 @@ export function handleMatch(io, players) {
   const roomIdResult = generateUniqueRoomId();
   
   if (!roomIdResult.success) {
-    console.error('[Lobby]', roomIdResult.error);
+    log.error('[Lobby]', roomIdResult.error);
     notifyPlayersOfMatchFailure(io, players, 'Failed to create room');
     return;
   }

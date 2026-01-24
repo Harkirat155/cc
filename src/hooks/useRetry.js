@@ -114,6 +114,6 @@ export function useRetry(operation, config = {}) {
     attemptCount,
     isRetrying,
     error,
-    hasReachedMaxAttempts: attemptCount >= maxAttempts,
+    hasReachedMaxAttempts: attemptCount >= maxAttempts - 1,
   };
 }
