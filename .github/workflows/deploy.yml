@@ -12,6 +12,8 @@ on:
       - 'vite.config.js'
       - 'tailwind.config.js'
       - 'postcss.config.cjs'
+      - 'eslint.config.js'
+      - 'jest.config.js'
   workflow_dispatch:
 
 permissions:
