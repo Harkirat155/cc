@@ -5,8 +5,7 @@
  */
 
 import { setPersistedRoom } from "../utils/clientId";
-
-const emptyBoard = () => Array(9).fill("");
+import { emptyBoard } from "../utils/board";
 
 /**
  * Create game event handlers

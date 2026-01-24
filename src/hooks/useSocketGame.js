@@ -16,9 +16,9 @@ import {
   createConnectionHandler,
   registerSocketHandlers,
 } from "./socketHandlers";
+import { emptyBoard } from "../utils/board";
 
 // Local game helpers (fallback when not in a multiplayer room)
-const emptyBoard = () => Array(9).fill("");
 const LINES = [
   [0, 1, 2],
   [3, 4, 5],
