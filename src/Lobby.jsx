@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LobbyView from './components/LobbyView';
 import useSocketGame from './hooks/useSocketGame';
@@ -23,35 +23,50 @@ const Lobby = () => {
 
   const hasJoinedRef = useRef(false);
   const isMountedRef = useRef(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = useRef(null);
 
   // Track mount state to prevent state updates on unmounted component
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, []);
 
   // Auto-join lobby on mount with generated name
-  // The joinLobby function now handles waiting for connection internally
+  // Retries on failure with exponential backoff (up to 3 attempts)
   useEffect(() => {
-    if (!hasJoinedRef.current && !isInLobby && displayName) {
+    if (!hasJoinedRef.current && !isInLobby && displayName && retryCount < 3) {
       hasJoinedRef.current = true;
       
       joinLobby(displayName)
         .then(() => {
           if (isMountedRef.current) {
             console.log('[Lobby] Successfully joined lobby');
+            setRetryCount(0); // Reset retry count on success
           }
         })
         .catch((err) => {
           if (isMountedRef.current) {
             hasJoinedRef.current = false;
-            console.error('Failed to join lobby:', err);
+            console.error(`Failed to join lobby (attempt ${retryCount + 1}):`, err);
+            
+            // Retry with exponential backoff if under max attempts
+            if (retryCount < 2) {
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+              console.log(`Retrying in ${delay}ms...`);
+              retryTimeoutRef.current = setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+              }, delay);
+            }
           }
         });
     }
-  }, [displayName, isInLobby, joinLobby]);
+  }, [displayName, isInLobby, joinLobby, retryCount]);
 
   // Leave lobby on unmount
   useEffect(() => {

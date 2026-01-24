@@ -17,15 +17,26 @@ describe('generateRandomName', () => {
   });
 
   it('should generate different names on each call', () => {
+    // Mock Math.random to test uniqueness deterministically
+    const originalRandom = Math.random;
+    let callCount = 0;
+    Math.random = jest.fn(() => {
+      // Return different values to ensure unique names
+      return (callCount++ % 69) / 69;
+    });
+    
     const names = new Set();
     
-    // Generate 50 names - they should mostly be unique
+    // Generate 50 names
     for (let i = 0; i < 50; i++) {
       names.add(generateRandomName());
     }
     
-    // With 69 possible characters, collisions are very unlikely
-    expect(names.size).toBeGreaterThan(40);
+    // All should be unique with deterministic random
+    expect(names.size).toBe(50);
+    
+    // Restore original Math.random
+    Math.random = originalRandom;
   });
 });
 

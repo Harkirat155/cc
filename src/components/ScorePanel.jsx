@@ -300,7 +300,7 @@ const ScorePanel = ({
               onEditChange={setEditValue}
               onEditSave={handleSaveEdit}
               onEditCancel={handleCancelEdit}
-              onEditName={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, card.occupant) : null}
+              onEditName={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : null}
             />
           ))}
         </div>

@@ -59,12 +59,21 @@ export function registerLobbyHandlers(socket, io) {
 export function handleMatch(io, players) {
   const [player1, player2] = players;
 
-  // Generate unique room code
+  // Generate unique room code with collision retry
   let roomId = genCode();
   let attempts = 0;
   while (rooms.has(roomId) && attempts < 10) {
     roomId = genCode();
     attempts++;
+  }
+
+  // Final check: if room still exists after max attempts, log error and return
+  if (rooms.has(roomId)) {
+    console.error('[Lobby] Failed to generate unique room code after 10 attempts');
+    // Notify players of matchmaking failure
+    io.to(player1.socketId).emit('matchFound', { error: 'Failed to create room' });
+    io.to(player2.socketId).emit('matchFound', { error: 'Failed to create room' });
+    return;
   }
 
   // Create room using shared helper (handles metrics + LRU enforcement)
