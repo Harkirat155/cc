@@ -41,10 +41,12 @@ export function useRetry(operation, config = {}) {
   }, []);
 
   /**
-   * Calculate exponential backoff delay
+   * Calculate exponential backoff delay with overflow protection
    */
   const calculateDelay = useCallback((attempt) => {
-    return Math.min(baseDelayMs * (1 << attempt), maxDelayMs);
+    // Limit attempt to prevent overflow (2^10 = 1024ms, safe for bit shift)
+    const safeAttempt = Math.min(attempt, 10);
+    return Math.min(baseDelayMs * (1 << safeAttempt), maxDelayMs);
   }, [baseDelayMs, maxDelayMs]);
 
   /**

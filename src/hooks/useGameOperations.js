@@ -20,7 +20,7 @@ const LINES = [
 
 function calcWinner(board) {
   for (const [a, b, c] of LINES) {
-    if (board[a] && board[a] === board[a] && board[a] === board[c])
+    if (board[a] && board[a] === board[b] && board[a] === board[c])
       return { winner: board[a], line: [a, b, c] };
   }
   if (board.every((c) => c !== "")) return { winner: "draw", line: [] };
