@@ -16,7 +16,7 @@ const CONNECTION_TIMEOUT = 15000; // 15 seconds
 function getSocketUrl() {
   return (
     import.meta.env.VITE_SOCKET_SERVER ||
-    window.location.origin.replace(/:\d+$/, ":8081")
+    window.location.origin.replace(/:\d+$/, ":10000")
   );
 }
 

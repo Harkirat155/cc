@@ -63,6 +63,7 @@ export default function useSocketGame() {
   // Track if event handlers are registered to avoid duplicates
   const handlersRegisteredRef = useRef(false);
   const clientIdRef = useRef(getClientId());
+  const socketRef = useRef(null); // Lazy socket reference
 
   // Use extracted hooks
   const { displayName, updateDisplayName: baseUpdateDisplayName } = useDisplayName();
@@ -80,12 +81,20 @@ export default function useSocketGame() {
 
   const isMultiplayer = !!roomId;
 
-  // Set up socket event handlers (runs once on mount)
+  // Lazy socket getter - only creates socket when needed for multiplayer
+  const ensureSocket = useCallback(() => {
+    if (!socketRef.current) {
+      socketRef.current = getSocket();
+    }
+    return socketRef.current;
+  }, []);
+
+  // Set up socket event handlers only when socket is created
   useEffect(() => {
-    if (handlersRegisteredRef.current) return;
+    if (handlersRegisteredRef.current || !socketRef.current) return;
     handlersRegisteredRef.current = true;
 
-    const socket = getSocket();
+    const socket = socketRef.current;
 
     // Game events
     const handleGameUpdate = (payload) => {
@@ -161,6 +170,8 @@ export default function useSocketGame() {
 
     return () => {
       // Clean up event handlers when component unmounts
+      if (!socketRef.current) return;
+      const socket = socketRef.current;
       socket.off("gameUpdate", handleGameUpdate);
       socket.off("gameReset", handleGameReset);
       socket.off("lobbyUpdate", handleLobbyUpdate);
@@ -173,7 +184,8 @@ export default function useSocketGame() {
 
   // Track gameUpdate for history recording (separate effect to handle recordMove dependency)
   useEffect(() => {
-    const socket = getSocket();
+    if (!socketRef.current) return;
+    const socket = socketRef.current;
 
     const handleGameUpdateForHistory = (payload) => {
       // Record move in history
@@ -206,8 +218,12 @@ export default function useSocketGame() {
     setConnectionState("connecting");
 
     try {
-      // Wait for socket to be connected before joining
+      // Ensure socket exists and wait for connection
+      ensureSocket();
       const socket = await waitForConnection();
+      
+      // Update connection state after successful connection
+      setConnectionState("connected");
       
       console.log("[Lobby] Socket connected, emitting joinLobby with name:", displayNameArg);
       
@@ -226,16 +242,23 @@ export default function useSocketGame() {
       });
     } catch (err) {
       console.error("[Lobby] Failed to connect:", err);
+      setConnectionState("disconnected");
       setLobbyError("Connection failed");
       throw err;
     }
-  }, []);
+  }, [ensureSocket]);
 
   // Leave lobby
   const leaveLobby = useCallback(() => {
     return new Promise((resolve) => {
-      const socket = getSocket();
-      if (!socket || !socket.connected) {
+      if (!socketRef.current) {
+        setIsInLobby(false);
+        resolve();
+        return;
+      }
+
+      const socket = socketRef.current;
+      if (!socket.connected) {
         setIsInLobby(false);
         resolve();
         return;
@@ -254,6 +277,7 @@ export default function useSocketGame() {
     const currentDisplayName = getDisplayName();
     
     try {
+      ensureSocket();
       const socket = await waitForConnection();
       socket.emit("createRoom", { clientId: clientIdRef.current, displayName: currentDisplayName }, (resp) => {
         if (resp?.error) {
@@ -270,12 +294,13 @@ export default function useSocketGame() {
       console.error("[Room] Failed to create room:", err);
       setMessage("Connection failed");
     }
-  }, []);
+  }, [ensureSocket]);
 
   const joinRoom = useCallback(async (code) => {
     const currentDisplayName = getDisplayName();
     
     try {
+      ensureSocket();
       const socket = await waitForConnection();
       socket.emit(
         "joinRoom",
@@ -296,7 +321,7 @@ export default function useSocketGame() {
       console.error("[Room] Failed to join room:", err);
       setMessage("Connection failed");
     }
-  }, []);
+  }, [ensureSocket]);
 
   const handleSquareClick = useCallback(
     (index) => {
@@ -305,8 +330,8 @@ export default function useSocketGame() {
 
       // Multiplayer path
       if (isMultiplayer) {
-        const socket = getSocket();
-        if (!socket || !socket.connected) return;
+        if (!socketRef.current || !socketRef.current.connected) return;
+        const socket = socketRef.current;
         if (gameState.winner) return;
         if (gameState.turn !== player) return;
         if (gameState.board[index] !== "") return;
@@ -350,9 +375,8 @@ export default function useSocketGame() {
   const resetGame = useCallback(() => {
     finalizeCurrentGame(gameState.winner);
 
-    const socket = getSocket();
-    if (isMultiplayer && socket?.connected) {
-      socket.emit("resetGame", { roomId });
+    if (isMultiplayer && socketRef.current?.connected) {
+      socketRef.current.emit("resetGame", { roomId });
     } else {
       setGameState((prev) => ({
         ...initialLocalState,
@@ -367,12 +391,15 @@ export default function useSocketGame() {
   }, [finalizeCurrentGame, gameState.winner, isMultiplayer, roomId, resetHistory]);
 
   const resetScores = useCallback(() => {
-    const socket = getSocket();
-    if (isMultiplayer && socket?.connected) {
-      socket.emit("resetScores", { roomId });
+    if (isMultiplayer && socketRef.current?.connected) {
+      // In multiplayer, only emit to server - don't reset local state
+      // Server will broadcast gameUpdate with zeroed scores
+      socketRef.current.emit("resetScores", { roomId });
+    } else {
+      // Local game: reset everything
+      setGameState(() => ({ ...initialLocalState }));
+      resetHistory("Scores reset • X to move", "system");
     }
-    setGameState(() => ({ ...initialLocalState }));
-    resetHistory("Scores reset • X to move", "system");
     setShowModal(false);
     setNewGameRequester(null);
   }, [isMultiplayer, roomId, resetHistory]);
@@ -386,9 +413,8 @@ export default function useSocketGame() {
 
       finalizeCurrentGame(gameState.winner);
 
-      const socket = getSocket();
-      if (socket?.connected) {
-        socket.emit("leaveRoom", { roomId, clientId: clientIdRef.current });
+      if (socketRef.current?.connected) {
+        socketRef.current.emit("leaveRoom", { roomId, clientId: clientIdRef.current });
       }
 
       setRoomId(null);
@@ -410,18 +436,14 @@ export default function useSocketGame() {
     (newName) => {
       return baseUpdateDisplayName(newName, {
         onServerNotify: (trimmed) => {
-          const socket = getSocket();
-          if (socket?.connected && roomId) {
-            socket.emit("updateDisplayName", { roomId, displayName: trimmed });
+          if (socketRef.current?.connected && roomId) {
+            socketRef.current.emit("updateDisplayName", { roomId, displayName: trimmed });
           }
         },
       });
     },
     [baseUpdateDisplayName, roomId]
   );
-
-  // Get current socket for return value
-  const currentSocket = getSocket();
 
   return {
     gameState,
@@ -440,21 +462,19 @@ export default function useSocketGame() {
     setShowModal,
     newGameRequester,
     requestNewGame: () => {
-      const socket = getSocket();
-      if (!isMultiplayer || !socket?.connected) return;
-      setNewGameRequester(socket.id);
+      if (!isMultiplayer || !socketRef.current?.connected) return;
+      setNewGameRequester(socketRef.current.id);
       setNewGameRequestedAt(Date.now());
-      socket.emit("requestNewGame", { roomId });
+      socketRef.current.emit("requestNewGame", { roomId });
     },
     cancelNewGameRequest: () => {
-      const socket = getSocket();
-      if (!isMultiplayer || !socket?.connected) return;
-      socket.emit("cancelNewGameRequest", { roomId });
+      if (!isMultiplayer || !socketRef.current?.connected) return;
+      socketRef.current.emit("cancelNewGameRequest", { roomId });
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
     },
     socketId: getSocketId(),
-    socket: currentSocket,
+    socket: socketRef.current,
     newGameRequestedAt,
     createRoom,
     joinRoom,
