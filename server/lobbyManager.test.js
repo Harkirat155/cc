@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
-import { lobbyManager, broadcastLobbyState } from './lobbyManager.js';
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
+import { lobbyManager, broadcastLobbyState, broadcastLobbyStateImmediate } from './lobbyManager.js';
 
 describe('LobbyManager', () => {
   beforeEach(() => {
@@ -279,7 +279,8 @@ describe('broadcastLobbyState', () => {
     };
     
     const beforeBroadcast = Date.now();
-    broadcastLobbyState(mockIo);
+    // Use immediate broadcast for testing (bypasses debounce)
+    broadcastLobbyStateImmediate(mockIo);
     const afterBroadcast = Date.now();
     
     expect(mockIo.emit).toHaveBeenCalledWith('lobbyUpdate', expect.objectContaining({
@@ -331,13 +332,11 @@ describe('broadcastLobbyState', () => {
       client.on('lobbyUpdate', (data) => {
         received = data;
         if (timeoutHandle) {
-          // eslint-disable-next-line no-undef
           clearTimeout(timeoutHandle);
         }
         resolve();
       });
 
-      // eslint-disable-next-line no-undef
       timeoutHandle = setTimeout(() => {
         reject(new Error('Timeout waiting for lobbyUpdate'));
       }, 2000);

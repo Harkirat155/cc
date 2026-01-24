@@ -7,7 +7,8 @@ const ResultModal = ({
   // onJoinNewGame, // opponent joins after initiator resets (handled by onStartNewLocal)
   onLeaveRoom,
   isMultiplayer,
-  // player,
+  player, // 'X' or 'O'
+  roster, // { X: socketId|null, O: socketId|null, XName, OName, spectators }
   newGameRequester,
   requestNewGame,
   socketId,
@@ -25,6 +26,12 @@ const ResultModal = ({
     newGameRequester === socketId;
   const someoneRequested = isMultiplayer && !!newGameRequester;
   const [now, setNow] = useState(Date.now());
+
+  // Determine opponent presence
+  const opponentSeat = player === 'X' ? 'O' : 'X';
+  const opponentSocketId = roster?.[opponentSeat];
+  const opponentName = roster?.[`${opponentSeat}Name`];
+  const isOpponentPresent = isMultiplayer && !!opponentSocketId;
 
   // Countdown logic only when someone has requested
   const deadline = useMemo(() => {
@@ -75,21 +82,88 @@ const ResultModal = ({
     requestNewGame,
     cancelNewGameRequest,
   ]);
+  // Determine if this is a win (not draw)
+  const isWin = result && !result.toLowerCase().includes('draw');
+  const celebrationParticles = useMemo(() => {
+    if (!isWin) return [];
+    return [...Array(12)].map((_, i) => ({
+      id: i,
+      left: `${10 + Math.random() * 80}%`,
+      top: `${20 + Math.random() * 40}%`,
+      color: ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][i % 5],
+      delay: `${i * 0.1}s`,
+      opacity: 0.7,
+    }));
+  }, [isWin, result]);
+  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      {/* Dimmed, softly blurred backdrop */}
+      {/* Dimmed, softly blurred backdrop with fade-in */}
       <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-fadeIn"
         aria-hidden
       ></div>
 
-      {/* Card with glassmorphism */}
-      <div className="relative max-w-sm w-full">
-        <div className="group rounded-2xl border border-white/15 dark:border-white/10 bg-white/25 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform">
+      {/* Celebration particles for wins */}
+      {isWin && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+          {celebrationParticles.map((particle) => (
+            <span
+              key={particle.id}
+              className="absolute w-2 h-2 rounded-full animate-celebrate"
+              style={{
+                left: particle.left,
+                top: particle.top,
+                backgroundColor: particle.color,
+                animationDelay: particle.delay,
+                opacity: particle.opacity,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Card with glassmorphism and entrance animation */}
+      <div className="relative max-w-sm w-full animate-modal-enter">
+        <div className={`group rounded-2xl border border-white/15 dark:border-white/10 bg-white/25 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
           <div className="flex flex-col items-center text-center gap-4">
+            {/* Result icon */}
+            <div className={`text-4xl mb-1 ${isWin ? 'animate-gentle-bounce' : ''}`}>
+              {result?.toLowerCase().includes('draw') ? '🤝' : '🎉'}
+            </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
               {result}
             </h2>
+
+            {/* Opponent presence indicator for multiplayer */}
+            {isMultiplayer && (
+              <div className="w-full">
+                <div
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+                    isOpponentPresent
+                      ? 'bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-700/40'
+                      : 'bg-amber-100/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/40'
+                  }`}
+                >
+                  {/* Animated presence dot */}
+                  <span className="relative flex h-2 w-2">
+                    {isOpponentPresent ? (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </>
+                    ) : (
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    )}
+                  </span>
+                  <span>
+                    {isOpponentPresent
+                      ? `${opponentName || 'Opponent'} is still here`
+                      : 'Opponent left the room'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Multiplayer state messaging */}
             {isMultiplayer && someoneRequested && (
@@ -122,10 +196,19 @@ const ResultModal = ({
 
               {isMultiplayer && !someoneRequested && (
                 <>
-                  <Tooltip content="Ask your opponent to play again" side="top">
+                  <Tooltip 
+                    content={isOpponentPresent ? "Ask your opponent to play again" : "Opponent has left the room"} 
+                    side="top"
+                  >
                     <button
-                      className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors"
-                      onClick={requestNewGame}
+                      className={`inline-flex items-center justify-center rounded-lg h-11 px-4 transition-colors ${
+                        isOpponentPresent
+                          ? 'bg-blue-600/90 hover:bg-blue-600 text-white'
+                          : 'bg-gray-400/60 text-gray-500 dark:bg-gray-600/40 dark:text-gray-400 cursor-not-allowed'
+                      }`}
+                      onClick={isOpponentPresent ? requestNewGame : undefined}
+                      disabled={!isOpponentPresent}
+                      aria-disabled={!isOpponentPresent}
                     >
                       Request rematch
                     </button>

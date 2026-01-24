@@ -8,6 +8,8 @@ function createIo() {
   const io = {
     on: (event, cb) => { listeners.set(event, cb); },
     to: () => ({ emit: () => {} }),
+    use: () => {}, // Middleware registration (no-op for testing)
+    sockets: { sockets: new Map() },
     __listeners: listeners,
   };
   return io;

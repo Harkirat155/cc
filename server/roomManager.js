@@ -1,56 +1,181 @@
-// Room and socket management
+// Room Manager - Core room state and socket tracking
+// Uses Map for O(1) operations and proper LRU eviction
 
-const ROOM_LIMIT = parseInt(process.env.ROOM_LIMIT || "500", 10);
-const ROOM_TTL_MS = parseInt(process.env.ROOM_TTL_MS || "120000", 10); // 120s inactivity TTL for empty rooms
-export const rooms = new Map(); // roomId -> { players, spectators, state, voice, lastTouched }
-export const socketRooms = new Map(); // socketId -> Set(roomId)
+import config from './config.js';
+import { roomLog as log } from './logger.js';
+import { incCounter } from './metrics.js';
+import { clearPendingPublish } from './roomPublisher.js';
 
+// Re-export from extracted modules for backward compatibility
+export { publish, publishImmediate, clearPendingPublish } from './roomPublisher.js';
+export { startRoomGC, stopRoomGC } from './roomGC.js';
+
+// Room storage: roomId -> RoomData
+// Using Map maintains insertion order for LRU
+export const rooms = new Map();
+
+// Socket to rooms mapping: socketId -> Set<roomId>
+export const socketRooms = new Map();
+
+/**
+ * Update last activity timestamp and maintain LRU order
+ * @param {string} id - Room ID
+ */
 export function touch(id) {
-  const r = rooms.get(id);
-  if (!r) return;
-  // update last activity timestamp and move to the end for LRU ordering
-  r.lastTouched = Date.now();
-  rooms.delete(id);
-  rooms.set(id, r);
-}
-
-export function enforceLRU() {
-  while (rooms.size > ROOM_LIMIT) {
-    const oldest = rooms.keys().next().value;
-    rooms.delete(oldest);
-  }
-}
-
-export function publish(io, roomId) {
-  const room = rooms.get(roomId);
+  const room = rooms.get(id);
   if (!room) return;
-  const roster = {
-    X: room.players.X,
-    O: room.players.O,
-    spectators: Array.from(room.spectators || []),
-  };
-  // voiceRoster: { [socketId]: { muted: boolean } }
-  const voiceRoster = {};
-  if (room.voice) {
-    for (const [sid, v] of Object.entries(room.voice)) {
-      voiceRoster[sid] = { muted: !!(v && v.muted) };
-    }
-  }
-  io.to(roomId).emit("gameUpdate", { ...room.state, roomId, roster, voiceRoster });
+  
+  // Update timestamp
+  room.lastTouched = Date.now();
+  
+  // Move to end for LRU ordering (delete and re-set)
+  rooms.delete(id);
+  rooms.set(id, room);
 }
 
-// Start a lightweight GC loop that removes rooms which have been empty and inactive beyond TTL
-export function startRoomGC() {
-  // Start periodic GC for inactive rooms
-  globalThis.setInterval(() => {
-    const now = Date.now();
-    for (const [roomId, room] of rooms.entries()) {
-      const hasOccupants = !!(room.players?.X || room.players?.O || (room.spectators && room.spectators.size > 0));
-      if (hasOccupants) continue;
-      const last = room.lastTouched || 0;
-      if (now - last > ROOM_TTL_MS) {
-        rooms.delete(roomId);
-      }
+/**
+ * Enforce room limit using LRU eviction
+ * Removes oldest rooms when over limit
+ */
+export function enforceLRU() {
+  while (rooms.size > config.roomLimit) {
+    const oldest = rooms.keys().next().value;
+    if (oldest) {
+      log.debug('LRU eviction', { roomId: oldest });
+      rooms.delete(oldest);
     }
-  }, 10_000); // check every 10s
+  }
+}
+
+/**
+ * Create initial game state
+ */
+export function createInitialGameState() {
+  return {
+    board: Array(9).fill(''),
+    turn: 'X',
+    winner: null,
+    winningLine: [],
+    xScore: 0,
+    oScore: 0,
+    newGameRequester: null,
+    newGameRequestedAt: null,
+  };
+}
+
+/**
+ * Create a new room with initial state
+ * @param {string} roomId 
+ * @param {Object} options 
+ * @returns {Object} Created room
+ */
+export function createRoom(roomId, options = {}) {
+  const { 
+    creatorSocketId, 
+    creatorClientId, 
+    creatorDisplayName,
+    initialState,
+  } = options;
+
+  const room = {
+    players: { X: creatorSocketId || null, O: null },
+    spectators: new Set(),
+    state: initialState || createInitialGameState(),
+    voice: {},
+    seatByClient: creatorClientId ? { [creatorClientId]: 'X' } : {},
+    lastTouched: Date.now(),
+    matchedPlayers: {
+      X: { displayName: creatorDisplayName || null },
+      O: { displayName: null },
+    },
+  };
+
+  rooms.set(roomId, room);
+  enforceLRU();
+  incCounter('roomsCreated');
+  
+  log.debug('Room created', { roomId, creator: creatorSocketId });
+  
+  return room;
+}
+
+/**
+ * Add a socket to room tracking
+ * @param {string} socketId 
+ * @param {string} roomId 
+ */
+export function trackSocketRoom(socketId, roomId) {
+  let set = socketRooms.get(socketId);
+  if (!set) {
+    set = new Set();
+    socketRooms.set(socketId, set);
+  }
+  set.add(roomId);
+}
+
+/**
+ * Remove a socket from room tracking
+ * @param {string} socketId 
+ * @param {string} roomId 
+ */
+export function untrackSocketRoom(socketId, roomId) {
+  const set = socketRooms.get(socketId);
+  if (set) {
+    set.delete(roomId);
+    if (set.size === 0) {
+      socketRooms.delete(socketId);
+    }
+  }
+}
+
+/**
+ * Clean up a socket from all rooms
+ * @param {string} socketId 
+ * @returns {Set<string>} Affected room IDs
+ */
+export function cleanupSocket(socketId) {
+  const affectedRooms = new Set();
+  const roomSet = socketRooms.get(socketId);
+  
+  if (!roomSet) return affectedRooms;
+
+  for (const roomId of roomSet) {
+    const room = rooms.get(roomId);
+    if (!room) continue;
+
+    let changed = false;
+    
+    if (room.players.X === socketId) {
+      room.players.X = null;
+      changed = true;
+    }
+    if (room.players.O === socketId) {
+      room.players.O = null;
+      changed = true;
+    }
+    if (room.spectators?.delete(socketId)) {
+      changed = true;
+    }
+    if (room.voice?.[socketId]) {
+      delete room.voice[socketId];
+      changed = true;
+    }
+
+    if (changed) {
+      touch(roomId);
+      affectedRooms.add(roomId);
+    }
+  }
+
+  socketRooms.delete(socketId);
+  return affectedRooms;
+}
+
+/**
+ * Clear all rooms (for testing)
+ */
+export function clearRooms() {
+  rooms.clear();
+  socketRooms.clear();
+  clearPendingPublish();
 }

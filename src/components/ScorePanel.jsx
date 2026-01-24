@@ -1,5 +1,5 @@
-import React from "react";
-import { Crown, Dot } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { Crown, Dot, Pencil, Check, X } from "lucide-react";
 import ValueMark from "./marks/ValueMark";
 
 const formatOccupant = (id, fallback) => {
@@ -35,6 +35,12 @@ const ScoreCard = ({
   accent,
   fallbackLabel,
   isMirrored = false,
+  onEditName,
+  isEditing,
+  editValue,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
 }) => {
   const occupantLabel = formatOccupant(occupant, fallbackLabel);
 
@@ -68,8 +74,8 @@ const ScoreCard = ({
           </div>
         </div>
         {isTurn && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-            <Dot size={16} />
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 animate-pulse-ring">
+            <Dot size={16} className="animate-gentle-bounce" />
             Turn
           </span>
         )}
@@ -82,13 +88,58 @@ const ScoreCard = ({
         <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
           Occupied
         </span>
-        <span
-          className={`text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base ${
-            isYou ? "text-indigo-600 dark:text-indigo-300" : ""
-          }`}
-        >
-          {occupantLabel}
-        </span>
+        {isEditing ? (
+          <div className={`flex items-center gap-2 ${isMirrored ? "flex-row-reverse" : ""}`}>
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => onEditChange(e.target.value)}
+              maxLength={20}
+              autoFocus
+              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onEditSave();
+                if (e.key === 'Escape') onEditCancel();
+              }}
+            />
+            <button
+              onClick={onEditSave}
+              className="p-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+              title="Save"
+              aria-label="Save name"
+            >
+              <Check size={16} />
+            </button>
+            <button
+              onClick={onEditCancel}
+              className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
+              title="Cancel"
+              aria-label="Cancel editing"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <div className={`flex items-center gap-2 ${isMirrored ? "flex-row-reverse" : ""}`}>
+            <span
+              className={`text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base ${
+                isYou ? "text-indigo-600 dark:text-indigo-300" : ""
+              }`}
+            >
+              {occupantLabel}
+            </span>
+            {isYou && onEditName && (
+              <button
+                onClick={onEditName}
+                className="p-1 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Edit name"
+                aria-label="Edit name"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -107,12 +158,35 @@ const ScorePanel = ({
   socketId,
   isMultiplayer,
   roomId,
+  displayName: _displayName, // Used for initial edit value fallback
+  onUpdateDisplayName,
 }) => {
+  const [editingMark, setEditingMark] = useState(null); // 'X' | 'O' | null
+  const [editValue, setEditValue] = useState('');
+
+  const handleStartEdit = useCallback((mark, currentName) => {
+    setEditingMark(mark);
+    setEditValue(currentName || '');
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (editValue.trim() && onUpdateDisplayName) {
+      onUpdateDisplayName(editValue.trim());
+    }
+    setEditingMark(null);
+    setEditValue('');
+  }, [editValue, onUpdateDisplayName]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMark(null);
+    setEditValue('');
+  }, []);
+
   const cards = [
     {
       mark: "X",
       score: gameState?.xScore ?? 0,
-      occupant: roster?.X,
+      occupant: roster?.XName || roster?.X,
       isTurn: gameState?.turn === "X",
       isYou: roster?.X && socketId && roster.X === socketId,
       accent: "bg-gradient-to-br from-indigo-500 via-indigo-600 to-sky-500",
@@ -121,7 +195,7 @@ const ScorePanel = ({
     {
       mark: "O",
       score: gameState?.oScore ?? 0,
-      occupant: roster?.O,
+      occupant: roster?.OName || roster?.O,
       isTurn: gameState?.turn === "O",
       isYou: roster?.O && socketId && roster.O === socketId,
       accent: "bg-gradient-to-br from-rose-500 via-rose-600 to-orange-500",
@@ -220,7 +294,17 @@ const ScorePanel = ({
         <CompactScoreSummary />
         <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
           {cards.map((card) => (
-            <ScoreCard key={card.mark} {...card} isMirrored={card.mark === "O"} />
+            <ScoreCard 
+              key={card.mark} 
+              {...card} 
+              isMirrored={card.mark === "O"}
+              isEditing={editingMark === card.mark}
+              editValue={editValue}
+              onEditChange={setEditValue}
+              onEditSave={handleSaveEdit}
+              onEditCancel={handleCancelEdit}
+              onEditName={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : null}
+            />
           ))}
         </div>
         {!!chips.length && (

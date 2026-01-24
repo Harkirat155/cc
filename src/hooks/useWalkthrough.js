@@ -94,14 +94,14 @@ export default function useWalkthrough() {
         target: '[data-tour="status"]',
         title: "Game Status",
         content:
-          "Track your current game mode (local vs multiplayer), room code, live scoreboard, and whose turn it is. Everything updates in real-time.",
+          "Track your current game mode (local vs multiplayer), room code, live scoreboard, and whose turn it is. The pulsing indicator shows whose turn it is!",
         placement: "right",
       },
       {
         target: '[data-tour="board"]',
         title: "The Game Board",
         content:
-          "Click any empty square to place your mark. Win by getting three in a row—horizontally, vertically, or diagonally. Winning lines highlight automatically.",
+          "Click any empty square to place your mark. Win by getting three in a row—horizontally, vertically, or diagonally. Winning lines celebrate with animations!",
         placement: "top",
       },
       {
@@ -113,9 +113,9 @@ export default function useWalkthrough() {
       },
       {
         target: '[data-tour="panels"]',
-        title: "Side Panels",
+        title: "Side Panels & Shortcuts",
         content:
-          "View connected players and spectators, or dive into move history for time-travel debugging. Panels slide in from the sides and won't disrupt your game.",
+          "View connected players and spectators, or dive into move history for time-travel debugging. Pro tip: Press ESC to close modals, Enter to confirm actions!",
         placement: "bottom",
       },
     ],

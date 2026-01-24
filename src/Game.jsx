@@ -51,6 +51,9 @@ const Game = () => {
     voiceRoster,
     newGameRequestedAt,
     socket,
+    connectionState,
+    displayName,
+    updateDisplayName,
   } = useSocketGame();
   // Voice chat hook
   const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
@@ -309,6 +312,7 @@ const Game = () => {
         voiceEnabled={micEnabled}
         micMuted={muted}
         onToggleMic={handleToggleMic}
+        connectionState={connectionState}
         menuPanel={
           isMultiplayer ? (
             <PeoplePanel
@@ -335,6 +339,8 @@ const Game = () => {
             socketId={socketId}
             isMultiplayer={isMultiplayer}
             roomId={roomId}
+            displayName={displayName}
+            onUpdateDisplayName={updateDisplayName}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
             <GameBoard
@@ -400,6 +406,7 @@ const Game = () => {
           }}
           isMultiplayer={isMultiplayer}
           player={player}
+          roster={roster}
           newGameRequester={newGameRequester}
           requestNewGame={requestNewGame}
           cancelNewGameRequest={() => {

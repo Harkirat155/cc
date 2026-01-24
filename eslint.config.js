@@ -40,6 +40,8 @@ export default [
         document: 'readonly',
         navigator: 'readonly',
         console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     settings: {
@@ -70,6 +72,11 @@ export default [
         process: 'readonly',
         console: 'readonly',
         URL: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        setImmediate: 'readonly',
       },
     },
     rules: {

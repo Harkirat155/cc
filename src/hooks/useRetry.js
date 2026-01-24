@@ -1,0 +1,119 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+/**
+ * Configuration for retry behavior
+ */
+const DEFAULT_CONFIG = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 5000,
+};
+
+/**
+ * Custom hook for retry logic with exponential backoff
+ * Follows Open/Closed Principle - extensible through configuration
+ * 
+ * @param {Function} operation - Async operation to retry
+ * @param {Object} config - Retry configuration
+ * @param {number} config.maxAttempts - Maximum number of retry attempts
+ * @param {number} config.baseDelayMs - Base delay in milliseconds
+ * @param {number} config.maxDelayMs - Maximum delay in milliseconds
+ * @returns {Object} Retry state and control functions
+ */
+export function useRetry(operation, config = {}) {
+  const { maxAttempts, baseDelayMs, maxDelayMs } = { ...DEFAULT_CONFIG, ...config };
+  
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [error, setError] = useState(null);
+  const retryTimeoutRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const attemptCountRef = useRef(0);
+
+  // Sync ref with state
+  useEffect(() => {
+    attemptCountRef.current = attemptCount;
+  }, [attemptCount]);
+
+  // Track mount state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * Calculate exponential backoff delay with overflow protection
+   */
+  const calculateDelay = useCallback((attempt) => {
+    // Limit attempt to prevent overflow (2^10 = 1024ms, safe for bit shift)
+    const safeAttempt = Math.min(attempt, 10);
+    return Math.min(baseDelayMs * (1 << safeAttempt), maxDelayMs);
+  }, [baseDelayMs, maxDelayMs]);
+
+  /**
+   * Execute the operation with retry logic
+   */
+  const execute = useCallback(async (...args) => {
+    if (!isMountedRef.current) return;
+
+    setIsRetrying(true);
+    setError(null);
+
+    try {
+      const result = await operation(...args);
+      if (isMountedRef.current) {
+        setAttemptCount(0);
+        setIsRetrying(false);
+      }
+      return result;
+    } catch (err) {
+      if (!isMountedRef.current) return;
+
+      setError(err);
+      
+      const currentAttempt = attemptCountRef.current;
+      if (currentAttempt < maxAttempts - 1) {
+        const delay = calculateDelay(currentAttempt);
+        console.log(`Retry attempt ${currentAttempt + 1}/${maxAttempts} in ${delay}ms`);
+        
+        retryTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            setAttemptCount(prev => prev + 1);
+            // Re-execute on next tick
+            setTimeout(() => execute(...args), 0);
+          }
+        }, delay);
+      } else {
+        setIsRetrying(false);
+        throw err;
+      }
+    }
+  }, [operation, maxAttempts, calculateDelay]);
+
+  /**
+   * Reset retry state
+   */
+  const reset = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+    attemptCountRef.current = 0;
+    setAttemptCount(0);
+    setIsRetrying(false);
+    setError(null);
+  }, []);
+
+  return {
+    execute,
+    reset,
+    attemptCount,
+    isRetrying,
+    error,
+    hasReachedMaxAttempts: attemptCount >= maxAttempts - 1,
+  };
+}

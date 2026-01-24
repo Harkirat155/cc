@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { History, Mic, MicOff } from "lucide-react";
+import { History, Mic, MicOff, Wifi, WifiOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
 
@@ -13,6 +13,7 @@ const Navbar = ({
   voiceEnabled = false,
   micMuted = true,
   onToggleMic,
+  connectionState = 'disconnected',
   menuPanel = null,
   menuItems = [],
 }) => {
@@ -47,8 +48,43 @@ const Navbar = ({
             </Link>
           </Tooltip>
 
-          {/* Actions: History + Theme */}
+          {/* Actions: Connection Status + History + Theme */}
           <div className="flex items-center gap-2" data-tour="panels">
+            {/* Connection Status Indicator (only in multiplayer) */}
+            {isMultiplayer && (
+              <Tooltip
+                content={
+                  connectionState === 'connected'
+                    ? 'Connected to server'
+                    : connectionState === 'connecting'
+                    ? 'Connecting...'
+                    : 'Disconnected - trying to reconnect'
+                }
+              >
+                <div
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
+                    connectionState === 'connected'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                      : connectionState === 'connecting'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 animate-pulse'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-connection-pulse'
+                  }`}
+                >
+                  {connectionState === 'connected' ? (
+                    <Wifi size={12} />
+                  ) : (
+                    <WifiOff size={12} />
+                  )}
+                  <span className="hidden sm:inline">
+                    {connectionState === 'connected'
+                      ? 'Live'
+                      : connectionState === 'connecting'
+                      ? 'Connecting'
+                      : 'Offline'}
+                  </span>
+                </div>
+              </Tooltip>
+            )}
             {showVoiceControl && (
               <Tooltip
                 content={micIsOn ? "Mute microphone" : "Enable microphone"}

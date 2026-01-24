@@ -81,9 +81,13 @@ VITE_SOCKET_SERVER=https://your-backend.example.com
 
 ### Server environment variables
 
-- `PORT` (default `5123`)
+See `server/config.js` for full list with validation.
+
+- `PORT` (default `10000`)
 - `CORS_ORIGIN` (default `*`)
 - `ROOM_LIMIT` (default `500`)
+- `ROOM_TTL_MS` (default `120000`) — empty room cleanup delay
+- `RATE_LIMIT_*` — socket event rate limiting settings
 
 ## Tech Stack
 
