@@ -9,6 +9,7 @@ on:
             - 'package.json'
             - 'package-lock.json'
             - 'ecosystem.config.cjs'
+            - '.github/workflows/deploy-backend-aws.yml'
 
 jobs:
     deploy:
