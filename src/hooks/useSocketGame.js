@@ -10,6 +10,12 @@ import {
   getSocketId,
   addListener,
 } from "../utils/socketManager";
+import {
+  createGameEventHandlers,
+  createLobbyEventHandlers,
+  createConnectionHandler,
+  registerSocketHandlers,
+} from "./socketHandlers";
 
 // Local game helpers (fallback when not in a multiplayer room)
 const emptyBoard = () => Array(9).fill("");
@@ -81,92 +87,47 @@ export default function useSocketGame() {
 
   const isMultiplayer = !!roomId;
 
-  // Register socket event handlers
+  // Register socket event handlers (using extracted handler creators - Dependency Inversion)
   const registerHandlers = useCallback((socket) => {
     if (handlersRegisteredRef.current) return;
     handlersRegisteredRef.current = true;
 
-    // Game events
-    const handleGameUpdate = (payload) => {
-      console.log("[Socket] gameUpdate received");
-      const effectiveRoomId = payload.roomId;
-      if (effectiveRoomId) setPersistedRoom(effectiveRoomId);
-      setRoomId(effectiveRoomId);
-      setGameState((prev) => ({ ...prev, ...payload }));
-      if (payload.roster) setRoster(payload.roster);
-      if (payload.voiceRoster) setVoiceRoster(payload.voiceRoster || {});
-
-      if (payload.newGameRequester !== undefined) {
-        setNewGameRequester(payload.newGameRequester);
-        if (payload.newGameRequester) {
-          setNewGameRequestedAt(payload.newGameRequestedAt || Date.now());
-        } else {
-          setNewGameRequestedAt(null);
-        }
-      } else if (payload.winner) {
-        setNewGameRequester(null);
-        setNewGameRequestedAt(null);
-      }
-    };
-
-    const handleGameReset = () => {
-      setNewGameRequester(null);
-      setNewGameRequestedAt(null);
-      setShowModal(false);
-    };
-
-    const handleLobbyUpdate = ({ queue }) => {
-      console.log("[Socket] lobbyUpdate received, queue size:", queue?.length);
-      setLobbyQueue(queue || []);
-    };
-
-    const handleMatchFound = ({ roomId: matchedRoomId, player: assignedPlayer, opponent }) => {
-      console.log("[Socket] matchFound:", matchedRoomId, assignedPlayer);
-      setIsInLobby(false);
-      setLobbyError(null);
-      setRoomId(matchedRoomId);
-      setPlayer(assignedPlayer);
-      setPersistedRoom(matchedRoomId);
-      setMessage(`Matched with ${opponent}! You are ${assignedPlayer}`);
-    };
-
-    const handleStartGame = () => setMessage("Game started");
-
-    socket.on("gameUpdate", handleGameUpdate);
-    socket.on("gameReset", handleGameReset);
-    socket.on("lobbyUpdate", handleLobbyUpdate);
-    socket.on("matchFound", handleMatchFound);
-    socket.on("startGame", handleStartGame);
-
-    // Subscribe to socket manager events for connection state
-    const unsubscribe = addListener((event) => {
-      if (event === "connect") {
-        setConnectionState("connected");
-        setMessage("Connected");
-      } else if (event === "disconnect") {
-        setConnectionState("disconnected");
-        setMessage("Disconnected");
-      } else if (event === "reconnect_attempt") {
-        setConnectionState("connecting");
-      } else if (event === "connect_error" || event === "reconnect_failed") {
-        setConnectionState("disconnected");
-      }
+    // Create handlers using extracted functions (Single Responsibility)
+    const gameHandlers = createGameEventHandlers({
+      setRoomId,
+      setGameState,
+      setRoster,
+      setVoiceRoster,
+      setNewGameRequester,
+      setNewGameRequestedAt,
+      setShowModal,
     });
 
-    // Update initial connection state
-    if (socket.connected) {
-      setConnectionState("connected");
-    }
+    const lobbyHandlers = createLobbyEventHandlers({
+      setLobbyQueue,
+      setIsInLobby,
+      setLobbyError,
+      setRoomId,
+      setPlayer,
+      setMessage,
+    });
 
-    return () => {
-      socket.off("gameUpdate", handleGameUpdate);
-      socket.off("gameReset", handleGameReset);
-      socket.off("lobbyUpdate", handleLobbyUpdate);
-      socket.off("matchFound", handleMatchFound);
-      socket.off("startGame", handleStartGame);
-      unsubscribe();
-      handlersRegisteredRef.current = false;
+    const connectionHandler = createConnectionHandler({
+      setConnectionState,
+      setMessage,
+    });
+
+    // Register all handlers
+    const handlers = {
+      ...gameHandlers,
+      ...lobbyHandlers,
+      handleStartGame: () => setMessage("Game started"),
+      handleConnection: connectionHandler,
+      onInitialConnect: () => socket.connected && setConnectionState("connected"),
     };
+
+    const cleanup = registerSocketHandlers(socket, handlers, addListener);
+    return cleanup;
   }, []);
 
   // Lazy socket getter - only creates socket when needed for multiplayer
