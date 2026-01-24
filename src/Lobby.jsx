@@ -7,6 +7,7 @@ import useSocketGame from './hooks/useSocketGame';
  * Lobby Page - Matchmaking lobby container
  * Single Responsibility: Connect LobbyView to game hooks and handle routing
  * Uses the centralized display name from useSocketGame
+ * Follows Dependency Inversion - depends on abstractions (hooks) not concrete implementations
  */
 const Lobby = () => {
   const navigate = useNavigate();
@@ -22,33 +23,19 @@ const Lobby = () => {
   } = useSocketGame();
 
   const hasJoinedRef = useRef(false);
-  const isMountedRef = useRef(true);
-
-  // Track mount state to prevent state updates on unmounted component
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Auto-join lobby on mount with generated name
-  // The joinLobby function now handles waiting for connection internally
   useEffect(() => {
     if (!hasJoinedRef.current && !isInLobby && displayName) {
       hasJoinedRef.current = true;
       
       joinLobby(displayName)
         .then(() => {
-          if (isMountedRef.current) {
-            console.log('[Lobby] Successfully joined lobby');
-          }
+          console.log('[Lobby] Successfully joined lobby');
         })
         .catch((err) => {
-          if (isMountedRef.current) {
-            hasJoinedRef.current = false;
-            console.error('Failed to join lobby:', err);
-          }
+          hasJoinedRef.current = false;
+          console.error('Failed to join lobby:', err);
         });
     }
   }, [displayName, isInLobby, joinLobby]);

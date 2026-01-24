@@ -15,7 +15,7 @@ const parseBoolEnv = (name, defaultValue) => {
 
 export const config = Object.freeze({
   // Server
-  port: parseIntEnv('PORT', 8081, 1, 65535),
+  port: parseIntEnv('PORT', 10000, 1, 65535),
   nodeEnv: process.env.NODE_ENV || 'development',
   isDev: (process.env.NODE_ENV || 'development') === 'development',
   isTest: process.env.NODE_ENV === 'test',
