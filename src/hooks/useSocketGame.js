@@ -70,6 +70,7 @@ export default function useSocketGame() {
   const handlersRegisteredRef = useRef(false);
   const clientIdRef = useRef(getClientId());
   const socketRef = useRef(null); // Lazy socket reference
+  const recordMoveRef = useRef(null); // Ref to latest recordMove function
 
   // Use extracted hooks
   const { displayName, updateDisplayName: baseUpdateDisplayName } = useDisplayName();
@@ -84,6 +85,11 @@ export default function useSocketGame() {
     jumpTo,
     resumeLatest,
   } = useGameHistory();
+
+  // Keep recordMoveRef updated with latest function
+  useEffect(() => {
+    recordMoveRef.current = recordMove;
+  }, [recordMove]);
 
   const isMultiplayer = !!roomId;
 
@@ -101,7 +107,7 @@ export default function useSocketGame() {
       setNewGameRequester,
       setNewGameRequestedAt,
       setShowModal,
-    });
+    }, { recordMoveRef });
 
     const lobbyHandlers = createLobbyEventHandlers({
       setLobbyQueue,
@@ -140,36 +146,6 @@ export default function useSocketGame() {
     }
     return socketRef.current;
   }, [registerHandlers]);
-
-  // Track gameUpdate for history recording (separate effect to handle recordMove dependency)
-  useEffect(() => {
-    if (!socketRef.current) return;
-    const socket = socketRef.current;
-
-    const handleGameUpdateForHistory = (payload) => {
-      // Record move in history
-      const resultText = payload.winner
-        ? payload.winner === "draw"
-          ? "Draw"
-          : `${payload.winner} wins`
-        : `${payload.turn}'s turn`;
-      const boardSnapshot = Array.isArray(payload.board) ? payload.board.slice() : emptyBoard();
-      const entryType = payload.winner
-        ? payload.winner === "draw"
-          ? "draw"
-          : "win"
-        : "move";
-
-      recordMove(boardSnapshot, resultText, entryType);
-      if (payload.winner) setShowModal(true);
-    };
-
-    socket.on("gameUpdate", handleGameUpdateForHistory);
-
-    return () => {
-      socket.off("gameUpdate", handleGameUpdateForHistory);
-    };
-  }, [recordMove]);
 
   // Join lobby - uses singleton socket, properly waits for connection
   const joinLobby = useCallback(async (displayNameArg) => {
