@@ -70,6 +70,7 @@ export default function useSocketGame() {
   const handlersRegisteredRef = useRef(false);
   const clientIdRef = useRef(getClientId());
   const socketRef = useRef(null); // Lazy socket reference
+  const cleanupHandlersRef = useRef(null); // Store cleanup function
 
   // Use extracted hooks
   const { displayName, updateDisplayName: baseUpdateDisplayName } = useDisplayName();
@@ -121,18 +122,23 @@ export default function useSocketGame() {
     const handlers = {
       ...gameHandlers,
       ...lobbyHandlers,
-      handleStartGame: () => setMessage("Game started"),
       handleConnection: connectionHandler,
       onInitialConnect: () => socket.connected && setConnectionState("connected"),
     };
 
     const cleanup = registerSocketHandlers(socket, handlers, addListener);
+    cleanupHandlersRef.current = cleanup;
     return cleanup;
   }, []);
 
   // Lazy socket getter - only creates socket when needed for multiplayer
   const ensureSocket = useCallback(() => {
     if (!socketRef.current) {
+      // Cleanup old handlers if replacing socket
+      if (cleanupHandlersRef.current) {
+        cleanupHandlersRef.current();
+        cleanupHandlersRef.current = null;
+      }
       socketRef.current = getSocket();
       // Reset flag in case this is a new socket instance
       handlersRegisteredRef.current = false;
@@ -140,6 +146,18 @@ export default function useSocketGame() {
     }
     return socketRef.current;
   }, [registerHandlers]);
+  
+  // Cleanup handlers on unmount
+  useEffect(() => {
+    return () => {
+      if (cleanupHandlersRef.current) {
+        cleanupHandlersRef.current();
+        cleanupHandlersRef.current = null;
+      }
+      // Reset the flag so handlers can be re-registered on remount
+      handlersRegisteredRef.current = false;
+    };
+  }, []);
 
   // Track gameUpdate for history recording (separate effect to handle recordMove dependency)
   useEffect(() => {

@@ -84,7 +84,7 @@ export function createLobbyEventHandlers(stateSetters) {
       setMessage(`Matched with ${opponent}! You are ${assignedPlayer}`);
     },
 
-    handleStartGame: (setMessage) => () => setMessage("Game started"),
+    handleStartGame: () => setMessage("Game started"),
   };
 }
 

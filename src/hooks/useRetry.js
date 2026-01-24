@@ -28,6 +28,12 @@ export function useRetry(operation, config = {}) {
   const [error, setError] = useState(null);
   const retryTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
+  const attemptCountRef = useRef(0);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    attemptCountRef.current = attemptCount;
+  }, [attemptCount]);
 
   // Track mount state
   useEffect(() => {
@@ -70,14 +76,16 @@ export function useRetry(operation, config = {}) {
 
       setError(err);
       
-      if (attemptCount < maxAttempts - 1) {
-        const delay = calculateDelay(attemptCount);
-        console.log(`Retry attempt ${attemptCount + 1}/${maxAttempts} in ${delay}ms`);
+      const currentAttempt = attemptCountRef.current;
+      if (currentAttempt < maxAttempts - 1) {
+        const delay = calculateDelay(currentAttempt);
+        console.log(`Retry attempt ${currentAttempt + 1}/${maxAttempts} in ${delay}ms`);
         
         retryTimeoutRef.current = setTimeout(() => {
           if (isMountedRef.current) {
-            setAttemptCount(prev => prev + 1);
-            // Re-execute on next tick
+            const nextAttempt = currentAttempt + 1;
+            setAttemptCount(nextAttempt);
+            // Re-execute on next tick with fresh closure
             setTimeout(() => execute(...args), 0);
           }
         }, delay);
@@ -86,7 +94,7 @@ export function useRetry(operation, config = {}) {
         throw err;
       }
     }
-  }, [operation, attemptCount, maxAttempts, calculateDelay]);
+  }, [operation, maxAttempts, calculateDelay]);
 
   /**
    * Reset retry state
