@@ -4,6 +4,11 @@ on:
     push:
         branches:
             - main
+        paths:
+            - 'server/**'
+            - 'package.json'
+            - 'package-lock.json'
+            - 'ecosystem.config.cjs'
 
 jobs:
     deploy:
