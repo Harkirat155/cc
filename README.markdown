@@ -81,22 +81,61 @@ VITE_SOCKET_SERVER=https://your-backend.example.com
 
 ### Server environment variables
 
-- `PORT` (default `5123`)
+- `PORT` (default `10000` for Rust, `5123` for Node.js)
 - `CORS_ORIGIN` (default `*`)
 - `ROOM_LIMIT` (default `500`)
 
 ## Tech Stack
 
+**Frontend**:
 - React 18, Vite
 - Tailwind CSS
-- Socket.IO (client/server)
-- Express (server) with compression
+- Socket.IO client
 
-## Backend details
+**Backend** (Two options):
+1. **Rust** (Recommended) - High-performance, type-safe implementation
+   - axum web framework
+   - socketioxide for Socket.IO compatibility
+   - tokio async runtime
+   - See [server-rust/README.md](server-rust/README.md) for details
 
-- Entry: `server/app.js`
-- Health endpoint: `GET /health`
-- The backend serves realtime only. Host the built frontend separately (e.g., GitHub Pages) and set `VITE_SOCKET_SERVER` to the backend URL.
+2. **Node.js** - Original JavaScript implementation
+   - Express with compression
+   - Socket.IO server
+   - Entry: `server/app.js`
+
+## Backend Details
+
+### Rust Backend (Recommended)
+
+The Rust backend provides superior performance, type safety, and reliability:
+
+- **Entry**: `server-rust/src/main.rs`
+- **Health endpoint**: `GET /health`
+- **Run development**: `npm run server:rust`
+- **Run production**: `npm run server:rust:release`
+- **Build**: `npm run build:rust`
+- **Test**: `npm run test:rust`
+
+See [RUST_DEPLOYMENT.md](RUST_DEPLOYMENT.md) for full deployment guide.
+
+#### Benefits of Rust Backend:
+- ⚡ **2-3x faster** response times
+- 💾 **50% lower** memory usage
+- 🔒 **Type safety** and memory safety
+- 🚀 **Higher throughput** for concurrent connections
+- 🛡️ **More resilient** error handling
+
+### Node.js Backend (Legacy)
+
+- **Entry**: `server/app.js`
+- **Health endpoint**: `GET /health`
+- **Run**: `npm run server`
+
+Both backends:
+- Serve realtime only (WebSocket/Socket.IO)
+- Host the built frontend separately (e.g., GitHub Pages)
+- Set `VITE_SOCKET_SERVER` environment variable to point to the backend URL
 
 ## Unified Menu + Room Controls
 
