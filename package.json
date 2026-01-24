@@ -10,13 +10,18 @@
     "build": "vite build",
     "serve": "vite preview",
     "server": "node server/app.js",
+    "server:rust": "cd server-rust && cargo run",
+    "server:rust:release": "cd server-rust && cargo run --release",
+    "build:rust": "cd server-rust && cargo build --release",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev:all:rust": "concurrently \"npm run server:rust\" \"npm run dev\"",
     "lint": "eslint . --cache",
     "lint:fix": "eslint . --fix",
     "lint:frontend": "eslint src --ext .js,.jsx",
     "lint:backend": "eslint server --ext .js",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
+    "test:rust": "cd server-rust && cargo test",
     "check": "npm run lint && npm run build && node --check server/app.js"
   },
   "dependencies": {
