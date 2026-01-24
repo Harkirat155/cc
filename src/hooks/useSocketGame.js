@@ -173,6 +173,8 @@ export default function useSocketGame() {
   const ensureSocket = useCallback(() => {
     if (!socketRef.current) {
       socketRef.current = getSocket();
+      // Reset flag in case this is a new socket instance
+      handlersRegisteredRef.current = false;
       registerHandlers(socketRef.current);
     }
     return socketRef.current;

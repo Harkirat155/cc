@@ -62,7 +62,7 @@ const Lobby = () => {
             
             // Retry with exponential backoff if under max attempts
             if (retryCount < MAX_RETRY_ATTEMPTS - 1) {
-              const delay = Math.min(BASE_RETRY_DELAY_MS * Math.pow(2, retryCount), MAX_RETRY_DELAY_MS);
+              const delay = Math.min(BASE_RETRY_DELAY_MS * (1 << retryCount), MAX_RETRY_DELAY_MS);
               console.log(`Retrying in ${delay}ms...`);
               retryTimeoutRef.current = setTimeout(() => {
                 setRetryCount(prev => prev + 1);
