@@ -406,6 +406,7 @@ const Game = () => {
           }}
           isMultiplayer={isMultiplayer}
           player={player}
+          roster={roster}
           newGameRequester={newGameRequester}
           requestNewGame={requestNewGame}
           cancelNewGameRequest={() => {
