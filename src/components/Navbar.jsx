@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { History, Mic, MicOff, Wifi, WifiOff } from "lucide-react";
+import { Mic, MicOff, Wifi, WifiOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
 
@@ -19,6 +19,15 @@ const Navbar = ({
 }) => {
   const menuActions = [...menuItems];
 
+  if (typeof onToggleHistory === "function") {
+    menuActions.push({
+      key: "history",
+      label: isHistoryOpen ? "Close History" : "Open History",
+      description: "View move history for this game",
+      onSelect: onToggleHistory,
+    });
+  }
+
   if (typeof onShowWalkthrough === "function") {
     menuActions.push({
       key: "tour",
@@ -32,7 +41,7 @@ const Navbar = ({
 
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800"
+      className="fixed top-0 left-0 right-0 z-50 bg-stone-50/80 dark:bg-gray-900/70 backdrop-blur border-b border-stone-200 dark:border-gray-800"
       data-tour="navbar"
     >
       <div className="mx-auto max-w-6xl px-4">
@@ -71,17 +80,10 @@ const Navbar = ({
                   }`}
                 >
                   {connectionState === 'connected' ? (
-                    <Wifi size={12} />
+                    <Wifi size={16} />
                   ) : (
-                    <WifiOff size={12} />
+                    <WifiOff size={16} />
                   )}
-                  <span className="hidden sm:inline">
-                    {connectionState === 'connected'
-                      ? 'Live'
-                      : connectionState === 'connecting'
-                      ? 'Connecting'
-                      : 'Offline'}
-                  </span>
                 </div>
               </Tooltip>
             )}
@@ -92,7 +94,7 @@ const Navbar = ({
                 <button
                   type="button"
                   onClick={onToggleMic}
-                  className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
+                  className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-stone-200 dark:border-gray-700 bg-stone-50/80 dark:bg-gray-800/70 hover:bg-stone-100 dark:hover:bg-gray-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
                     micIsOn ? "ring-2 ring-emerald-500/50 dark:ring-emerald-500/60" : ""
                   }`}
                   aria-label={micIsOn ? "Mute microphone" : "Enable microphone"}
@@ -105,28 +107,6 @@ const Navbar = ({
                 </button>
               </Tooltip>
             )}
-            <Tooltip
-              content={
-                isHistoryOpen ? "Close move history" : "Open move history"
-              }
-            >
-              <button
-                type="button"
-                onClick={onToggleHistory}
-                className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 hover:bg-white dark:hover:bg-gray-800 transition ${
-                  isHistoryOpen ? "ring-2 ring-purple-500/50" : ""
-                }`}
-                aria-label={isHistoryOpen ? "Close history" : "Open history"}
-              >
-                {/* History icon */}
-                <History
-                  size={16}
-                  strokeWidth={2}
-                  className="text-gray-700 dark:text-gray-200"
-                />
-              </button>
-            </Tooltip>
-
             <ThemeToggle />
             <NavMenu actions={menuActions} panel={menuPanel} />
           </div>

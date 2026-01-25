@@ -369,7 +369,7 @@ const Game = () => {
       {/* Slide-over panels */}
       {/* History Panel (right slide-over) */}
       <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-slate-200/70 bg-white/80 backdrop-blur-xl shadow-xl transition-transform duration-300 dark:border-slate-700/70 dark:bg-slate-950/70 ${
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-stone-200/80 bg-stone-50/90 backdrop-blur-xl shadow-xl transition-transform duration-300 dark:border-slate-700/70 dark:bg-slate-950/70 ${
           isHistoryOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

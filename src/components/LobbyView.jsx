@@ -64,8 +64,8 @@ const LobbyView = ({
   }, [userPosition, lobbyQueue.length]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-stone-100 to-indigo-100/80 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl bg-stone-50 dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 px-8 py-6">
           <div className="flex items-center justify-between">
@@ -119,14 +119,14 @@ const LobbyView = ({
                 {/* Pulsing ring */}
                 <span className="absolute inset-0 rounded-full bg-blue-400/30 animate-ping" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+              <h2 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">
                 Searching for opponent...
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              <p className="text-sm text-stone-500 dark:text-gray-400 mb-2">
                 Playing as: <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{displayName}</span>
               </p>
               <div className="flex flex-col items-center gap-1">
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-stone-600 dark:text-gray-400">
                   {userPosition >= 0 && `Position in queue: ${userPosition + 1}`}
                 </p>
                 {estimatedWait && (
@@ -145,8 +145,8 @@ const LobbyView = ({
             </div>
 
             {/* Waiting Players List */}
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <div className="bg-stone-100 dark:bg-gray-700 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-stone-700 dark:text-gray-300 mb-3">
                 Waiting Players ({lobbyQueue.length})
               </h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -160,15 +160,15 @@ const LobbyView = ({
                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
                         isCurrentUser
                           ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500'
-                          : 'bg-white dark:bg-gray-800'
+                          : 'bg-stone-50 dark:bg-gray-800'
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <span className="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <span className="flex-shrink-0 w-8 h-8 bg-stone-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-stone-700 dark:text-gray-300">
                           {index + 1}
                         </span>
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white font-mono">
+                          <p className="font-medium text-stone-800 dark:text-white font-mono">
                             {player.displayName}
                             {isCurrentUser && (
                               <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 font-semibold font-sans">
@@ -197,8 +197,8 @@ const LobbyView = ({
         </div>
 
         {/* Info Footer */}
-        <div className="bg-gray-50 dark:bg-gray-900 px-8 py-4 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+        <div className="bg-stone-100 dark:bg-gray-900 px-8 py-4 border-t border-stone-200 dark:border-gray-700">
+          <p className="text-xs text-stone-600 dark:text-gray-400 text-center">
             Players are matched automatically on a first-come, first-served basis
           </p>
         </div>

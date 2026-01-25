@@ -134,7 +134,7 @@ const MenuPanel = ({
           ref={menuRef}
           className={`fixed right-4 z-30 transform transition-all duration-200 origin-bottom-right ${
             expanded ? "opacity-100 scale-100" : "opacity-0 pointer-events-none scale-50"
-          } rounded-2xl border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35 p-3 shadow-2xl w-fit`}
+          } rounded-2xl border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35 p-3 shadow-2xl w-fit`}
           style={{ bottom: `${cylHeight + 24}px` }}
           onClick={handleExpand}
           id="menu-panel-popover"
@@ -152,13 +152,13 @@ const MenuPanel = ({
     <Tooltip content={menuTooltip} sideOffset={14} side="top">
       <div
         ref={menuRef}
-        className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-2xl shadow-2xl transition-all duration-300 ${expanded ? "p-2" : "p-1"} z-30 border border-white/20 dark:border-gray-700/50 backdrop-blur-xl bg-white/30 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-white/35 supports-[backdrop-filter]:dark:bg-gray-800/35`}
+        className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-2xl shadow-2xl transition-all duration-300 ${expanded ? "p-2" : "p-1"} z-30 border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35`}
         onClick={handleExpand}
         data-tour="menu"
       >
         {collapsed && !expanded ? (
           <div className="flex items-center justify-center cursor-pointer">
-            <span className="text-base font-semibold text-gray-800 dark:text-gray-100">Menu</span>
+            <span className="text-base font-semibold text-stone-700 dark:text-gray-100">Menu</span>
             <span className="ml-2 text-xs text-blue-500">▲</span>
           </div>
         ) : (

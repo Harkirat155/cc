@@ -93,13 +93,13 @@ const HistoryPanel = ({
   };
 
   return (
-    <div className="flex h-full flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
-      <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+    <div className="flex h-full flex-col bg-stone-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
+      <header className="flex items-center justify-between border-b border-stone-200 px-4 py-3 dark:border-slate-700">
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-100">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-slate-100">
             Game Timeline
           </h3>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="text-[11px] text-stone-500 dark:text-slate-400">
             Viewing move {safeIndex} of {totalMoves}
           </p>
         </div>
@@ -107,7 +107,7 @@ const HistoryPanel = ({
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+            className="rounded-full border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600 transition hover:border-stone-300 hover:text-stone-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
           >
             Close
           </button>
@@ -115,8 +115,8 @@ const HistoryPanel = ({
       </header>
 
       <div className="px-4 pt-4">
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/90 to-white/30 p-4 shadow-sm dark:border-slate-700 dark:from-slate-800/70 dark:to-slate-900/30">
-          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-100/90 to-stone-50/50 p-4 shadow-sm dark:border-slate-700 dark:from-slate-800/70 dark:to-slate-900/30">
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-stone-500 dark:text-slate-400">
             <span className="flex items-center gap-1">
               <Users size={12} />
               {isLiveView ? "Live view" : "Time travel"}
@@ -134,10 +134,10 @@ const HistoryPanel = ({
               </div>
             )}
             <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <p className="text-sm font-semibold text-stone-700 dark:text-slate-100">
                 {statusLine}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-stone-500 dark:text-slate-400">
                 {activeEntry?.result || (winner ? "Awaiting rematch" : "Follow each move in order")}
               </p>
             </div>
@@ -203,7 +203,7 @@ const HistoryPanel = ({
                     key={game.id}
                     className="rounded-xl border border-slate-200 bg-white/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
                   >
-                    <div className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-100">
+                    <div className="flex items-center justify-between text-sm font-semibold text-stone-700 dark:text-slate-100">
                       <span className="flex items-center gap-2">
                         {game.draw ? (
                           <RefreshCcw size={14} className="text-amber-500" />

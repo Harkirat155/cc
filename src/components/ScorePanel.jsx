@@ -9,10 +9,10 @@ const formatOccupant = (id, fallback) => {
   return `${id.slice(0, 5)}…${id.slice(-3)}`;
 };
 
-const YouBadge = ({ variant = "default", className = "" }) => {
+const YouBadge = ({ variant = "default", showText = true, className = "" }) => {
   const sizeClasses =
     variant === "compact"
-      ? "px-2.5 py-0.5 text-[9px]"
+      ? showText ? "px-2.5 py-0.5 text-[9px]" : "p-1.5"
       : "px-3 py-1 text-[10px]";
   const iconSize = variant === "compact" ? 12 : 14;
 
@@ -21,7 +21,7 @@ const YouBadge = ({ variant = "default", className = "" }) => {
       className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 font-semibold uppercase tracking-[0.32em] text-white shadow-sm ${sizeClasses} ${className}`}
     >
       <Crown size={iconSize} className="drop-shadow-sm" />
-      You
+      {showText && "You"}
     </span>
   );
 };
@@ -46,7 +46,7 @@ const ScoreCard = ({
 
   return (
     <div
-      className={`group relative flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-slate-900 shadow-[0_15px_45px_-30px_rgba(15,23,42,0.65)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:p-5 ${
+      className={`group relative flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:p-5 ${
         isTurn ? "ring-2 ring-emerald-400/80 dark:ring-emerald-500/60" : ""
       } ${isMirrored ? "text-right" : ""}`}
     >
@@ -96,7 +96,7 @@ const ScoreCard = ({
               onChange={(e) => onEditChange(e.target.value)}
               maxLength={20}
               autoFocus
-              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onEditSave();
                 if (e.key === 'Escape') onEditCancel();
@@ -122,7 +122,7 @@ const ScoreCard = ({
         ) : (
           <div className={`flex items-center gap-2 ${isMirrored ? "flex-row-reverse" : ""}`}>
             <span
-              className={`text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base ${
+              className={`text-sm font-semibold text-stone-700 dark:text-slate-200 sm:text-base ${
                 isYou ? "text-indigo-600 dark:text-indigo-300" : ""
               }`}
             >
@@ -146,9 +146,9 @@ const ScoreCard = ({
 };
 
 const StatChip = ({ label, value }) => (
-  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/65 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
+  <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-stone-100/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
     <span className="text-slate-400 dark:text-slate-500">{label}</span>
-    <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    <span className="text-stone-700 dark:text-slate-100">{value}</span>
   </div>
 );
 
@@ -211,73 +211,121 @@ const ScorePanel = ({
   const CompactScoreSummary = () => {
     const [xCard, oCard] = cards;
 
-    const renderOccupant = (card, align) => (
-      <div
-        className={`flex flex-col gap-1 normal-case text-slate-500 dark:text-slate-300 ${
-          align === "end" ? "items-end text-right" : "items-start text-left"
-        }`}
-      >
-        <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
-          Occupied
-        </span>
-        <span
-          className={`text-sm font-medium text-slate-700 dark:text-slate-200 ${
-            card.isYou ? "text-indigo-600 dark:text-indigo-300" : ""
+    const renderOccupant = (card, align) => {
+      const isEditing = editingMark === card.mark;
+
+      return (
+        <div
+          className={`flex flex-col gap-1 normal-case text-slate-500 dark:text-slate-300 ${
+            align === "end" ? "items-end text-right" : "items-start text-left"
           }`}
         >
-          {formatOccupant(card.occupant, card.fallbackLabel)}
-        </span>
-      </div>
-    );
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+            Occupied
+          </span>
+          {isEditing ? (
+            <div className={`flex items-center gap-1.5 ${align === "end" ? "flex-row-reverse" : ""}`}>
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                maxLength={20}
+                autoFocus
+                className="w-20 px-2 py-0.5 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveEdit();
+                  if (e.key === 'Escape') handleCancelEdit();
+                }}
+              />
+              <button
+                onClick={handleSaveEdit}
+                className="p-0.5 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+                title="Save"
+                aria-label="Save name"
+              >
+                <Check size={14} />
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
+                title="Cancel"
+                aria-label="Cancel editing"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <span
+              className={`text-sm font-medium text-stone-600 dark:text-slate-200 ${
+                card.isYou ? "text-indigo-600 dark:text-indigo-300 cursor-pointer hover:underline" : ""
+              }`}
+              onClick={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : undefined}
+              role={card.isYou && onUpdateDisplayName ? "button" : undefined}
+              tabIndex={card.isYou && onUpdateDisplayName ? 0 : undefined}
+              onKeyDown={card.isYou && onUpdateDisplayName ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleStartEdit(card.mark, _displayName || '');
+                }
+              } : undefined}
+            >
+              {formatOccupant(card.occupant, card.fallbackLabel)}
+            </span>
+          )}
+        </div>
+      );
+    };
 
     const renderPlayerPill = (card, align) => {
       const icon = (
         <span
           className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl text-white shadow-lg ${
-            card.isTurn ? "ring-2 ring-emerald-400/80 dark:ring-emerald-500/60" : ""
+            card.isTurn ? "ring-[3px] ring-emerald-400 dark:ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 animate-pulse-ring" : ""
           } ${card.accent}`}
         >
           <ValueMark value={card.mark} />
         </span>
       );
 
+      const badge = card.isYou ? (
+        <YouBadge variant="compact" showText={false} className="shrink-0" />
+      ) : (
+        <div className="w-[24px] shrink-0" />
+      );
+
       if (align === "start") {
         return (
-          <div className="flex items-center gap-2">
-            {card.isYou ? (
-              <YouBadge variant="compact" className="shrink-0" />
-            ) : null}
+          <div className="flex items-center gap-2 justify-end min-w-[90px]">
+            {badge}
             {icon}
           </div>
         );
       }
 
       return (
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-2 justify-start min-w-[90px]">
           {icon}
-          {card.isYou ? (
-            <YouBadge variant="compact" className="shrink-0" />
-          ) : null}
+          {badge}
         </div>
       );
     };
 
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-slate-900 shadow-[0_15px_45px_-30px_rgba(15,23,42,0.65)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
+      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
         <div className="flex items-center justify-center gap-4">
           {renderPlayerPill(xCard, "start")}
           <span className="text-2xl font-semibold">{xCard.score}</span>
-          <span className="text-base font-semibold text-slate-400 dark:text-slate-500">-</span>
+          <span className="text-base font-semibold text-stone-400 dark:text-slate-500">-</span>
           <span className="text-2xl font-semibold">{oCard.score}</span>
           {renderPlayerPill(oCard, "end")}
         </div>
-        <div className="flex items-start justify-between gap-3 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        <div className="flex items-start justify-between gap-3 text-xs uppercase tracking-wide text-stone-400 dark:text-slate-500">
           {renderOccupant(xCard, "start")}
-          <div className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-300">
-            <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+          <div className="flex flex-col items-center gap-1 text-stone-500 dark:text-slate-300">
+            <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-stone-400/70 dark:text-slate-500/70">
               Turn
             </span>
-            <span className="text-base font-semibold text-slate-700 dark:text-slate-200">
+            <span className="text-base font-semibold text-stone-700 dark:text-slate-200">
               {gameState?.turn ? <ValueMark value={gameState.turn} /> : "--"}
             </span>
           </div>
@@ -289,8 +337,8 @@ const ScorePanel = ({
 
   return (
     <section className="relative w-full" data-tour="status">
-      <div className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-emerald-400/20 blur-3xl" />
-      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-5 rounded-[28px] border border-slate-200/70 bg-white/60 p-4 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:gap-6 sm:p-6">
+      <div className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/8 to-emerald-400/15 blur-3xl" />
+      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-5 rounded-[28px] border border-stone-200/80 bg-stone-50/70 p-4 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:gap-6 sm:p-6">
         <CompactScoreSummary />
         <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
           {cards.map((card) => (
