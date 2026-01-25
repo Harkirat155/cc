@@ -9,10 +9,10 @@ const formatOccupant = (id, fallback) => {
   return `${id.slice(0, 5)}…${id.slice(-3)}`;
 };
 
-const YouBadge = ({ variant = "default", className = "" }) => {
+const YouBadge = ({ variant = "default", showText = true, className = "" }) => {
   const sizeClasses =
     variant === "compact"
-      ? "px-2.5 py-0.5 text-[9px]"
+      ? showText ? "px-2.5 py-0.5 text-[9px]" : "p-1.5"
       : "px-3 py-1 text-[10px]";
   const iconSize = variant === "compact" ? 12 : 14;
 
@@ -21,7 +21,7 @@ const YouBadge = ({ variant = "default", className = "" }) => {
       className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 font-semibold uppercase tracking-[0.32em] text-white shadow-sm ${sizeClasses} ${className}`}
     >
       <Crown size={iconSize} className="drop-shadow-sm" />
-      You
+      {showText && "You"}
     </span>
   );
 };
@@ -211,53 +211,101 @@ const ScorePanel = ({
   const CompactScoreSummary = () => {
     const [xCard, oCard] = cards;
 
-    const renderOccupant = (card, align) => (
-      <div
-        className={`flex flex-col gap-1 normal-case text-slate-500 dark:text-slate-300 ${
-          align === "end" ? "items-end text-right" : "items-start text-left"
-        }`}
-      >
-        <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
-          Occupied
-        </span>
-        <span
-          className={`text-sm font-medium text-slate-700 dark:text-slate-200 ${
-            card.isYou ? "text-indigo-600 dark:text-indigo-300" : ""
+    const renderOccupant = (card, align) => {
+      const isEditing = editingMark === card.mark;
+
+      return (
+        <div
+          className={`flex flex-col gap-1 normal-case text-slate-500 dark:text-slate-300 ${
+            align === "end" ? "items-end text-right" : "items-start text-left"
           }`}
         >
-          {formatOccupant(card.occupant, card.fallbackLabel)}
-        </span>
-      </div>
-    );
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+            Occupied
+          </span>
+          {isEditing ? (
+            <div className={`flex items-center gap-1.5 ${align === "end" ? "flex-row-reverse" : ""}`}>
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                maxLength={20}
+                autoFocus
+                className="w-20 px-2 py-0.5 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveEdit();
+                  if (e.key === 'Escape') handleCancelEdit();
+                }}
+              />
+              <button
+                onClick={handleSaveEdit}
+                className="p-0.5 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+                title="Save"
+                aria-label="Save name"
+              >
+                <Check size={14} />
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
+                title="Cancel"
+                aria-label="Cancel editing"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <span
+              className={`text-sm font-medium text-slate-700 dark:text-slate-200 ${
+                card.isYou ? "text-indigo-600 dark:text-indigo-300 cursor-pointer hover:underline" : ""
+              }`}
+              onClick={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : undefined}
+              role={card.isYou && onUpdateDisplayName ? "button" : undefined}
+              tabIndex={card.isYou && onUpdateDisplayName ? 0 : undefined}
+              onKeyDown={card.isYou && onUpdateDisplayName ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleStartEdit(card.mark, _displayName || '');
+                }
+              } : undefined}
+            >
+              {formatOccupant(card.occupant, card.fallbackLabel)}
+            </span>
+          )}
+        </div>
+      );
+    };
 
     const renderPlayerPill = (card, align) => {
       const icon = (
         <span
           className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl text-white shadow-lg ${
-            card.isTurn ? "ring-2 ring-emerald-400/80 dark:ring-emerald-500/60" : ""
+            card.isTurn ? "ring-[3px] ring-emerald-400 dark:ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 animate-pulse-ring" : ""
           } ${card.accent}`}
         >
           <ValueMark value={card.mark} />
         </span>
       );
 
+      const badge = card.isYou ? (
+        <YouBadge variant="compact" showText={false} className="shrink-0" />
+      ) : (
+        <div className="w-[24px] shrink-0" />
+      );
+
       if (align === "start") {
         return (
-          <div className="flex items-center gap-2">
-            {card.isYou ? (
-              <YouBadge variant="compact" className="shrink-0" />
-            ) : null}
+          <div className="flex items-center gap-2 justify-end min-w-[90px]">
+            {badge}
             {icon}
           </div>
         );
       }
 
       return (
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-2 justify-start min-w-[90px]">
           {icon}
-          {card.isYou ? (
-            <YouBadge variant="compact" className="shrink-0" />
-          ) : null}
+          {badge}
         </div>
       );
     };
