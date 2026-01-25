@@ -125,13 +125,13 @@ const ResultModal = ({
 
       {/* Card with glassmorphism and entrance animation */}
       <div className="relative max-w-sm w-full animate-modal-enter">
-        <div className={`group rounded-2xl border border-white/15 dark:border-white/10 bg-white/25 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
+        <div className={`group rounded-2xl border border-stone-200/30 dark:border-white/10 bg-stone-100/40 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
           <div className="flex flex-col items-center text-center gap-4">
             {/* Result icon */}
             <div className={`text-4xl mb-1 ${isWin ? 'animate-gentle-bounce' : ''}`}>
               {result?.toLowerCase().includes('draw') ? '🤝' : '🎉'}
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+            <h2 className="text-2xl font-semibold tracking-tight text-stone-800 dark:text-gray-100">
               {result}
             </h2>
 

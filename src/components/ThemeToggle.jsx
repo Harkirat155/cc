@@ -76,7 +76,7 @@ const ThemeToggle = ({ className = '' }) => {
     try {
       window.localStorage.setItem('theme', theme);
       const meta = document.querySelector("meta[name='theme-color']");
-      if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#ffffff');
+      if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#f5f5f4');
     } catch {
       console.warn('Could not save theme preference');
     }

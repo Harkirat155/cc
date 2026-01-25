@@ -72,11 +72,11 @@ const ToastStack = ({ messages = [], onDismiss }) => {
                 zIndex: depth,
               }}
             >
-              <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 px-4 py-3 text-slate-800 shadow-[0_25px_60px_-28px_rgba(15,23,42,0.35)] ring-1 ring-white/70 backdrop-blur-xl transition-transform duration-300 hover:-translate-y-1 dark:border-slate-700/50 dark:bg-slate-950/90 dark:text-slate-100 dark:ring-slate-700/50">
+              <div className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-stone-50/95 px-4 py-3 text-stone-700 shadow-[0_25px_60px_-28px_rgba(28,25,23,0.25)] ring-1 ring-stone-100/70 backdrop-blur-xl transition-transform duration-300 hover:-translate-y-1 dark:border-slate-700/50 dark:bg-slate-950/90 dark:text-slate-100 dark:ring-slate-700/50">
                 <button
                   type="button"
                   onClick={() => handleDismiss(toast.id)}
-                  className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-white/50 text-slate-500 transition-colors duration-200 hover:bg-white/80 hover:text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-400 dark:hover:bg-slate-900/80"
+                  className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200/60 bg-stone-100/60 text-stone-500 transition-colors duration-200 hover:bg-stone-200/80 hover:text-stone-700 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-400 dark:hover:bg-slate-900/80"
                   aria-label="Dismiss message"
                 >
                   <X size={14} />

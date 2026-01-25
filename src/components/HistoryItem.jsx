@@ -39,11 +39,11 @@ const HistoryItem = ({ entry, index, onSelect, active, actor, isLast }) => {
           className={`w-full rounded-xl border px-3 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-500 ${
             active
               ? "border-blue-300 bg-blue-50/90 shadow-sm dark:border-blue-700 dark:bg-blue-900/20"
-              : "border-transparent bg-white/20 hover:border-slate-200 hover:bg-slate-100/60 dark:border-slate-800/40 dark:bg-slate-800/30 dark:hover:border-slate-700 dark:hover:bg-slate-800/60"
+              : "border-transparent bg-stone-100/40 hover:border-stone-200 hover:bg-stone-100/70 dark:border-slate-800/40 dark:bg-slate-800/30 dark:hover:border-slate-700 dark:hover:bg-slate-800/60"
           }`}
           aria-label={tooltipContent}
         >
-          <div className="absolute left-0 top-3 flex h-8 w-8 items-center justify-center rounded-full border bg-white text-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="absolute left-0 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-sm dark:border-slate-700 dark:bg-slate-900">
             {entry?.mark ? (
               <ValueMark value={entry.mark} />
             ) : (
@@ -65,7 +65,7 @@ const HistoryItem = ({ entry, index, onSelect, active, actor, isLast }) => {
                   className={`text-sm font-semibold ${
                     actor?.isYou
                       ? "text-blue-700 dark:text-blue-300"
-                      : "text-slate-800 dark:text-slate-100"
+                      : "text-stone-700 dark:text-slate-100"
                   }`}
                 >
                   {actor?.label || "System"}

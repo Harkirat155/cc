@@ -46,7 +46,7 @@ const ScoreCard = ({
 
   return (
     <div
-      className={`group relative flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-slate-900 shadow-[0_15px_45px_-30px_rgba(15,23,42,0.65)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:p-5 ${
+      className={`group relative flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:p-5 ${
         isTurn ? "ring-2 ring-emerald-400/80 dark:ring-emerald-500/60" : ""
       } ${isMirrored ? "text-right" : ""}`}
     >
@@ -96,7 +96,7 @@ const ScoreCard = ({
               onChange={(e) => onEditChange(e.target.value)}
               maxLength={20}
               autoFocus
-              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onEditSave();
                 if (e.key === 'Escape') onEditCancel();
@@ -122,7 +122,7 @@ const ScoreCard = ({
         ) : (
           <div className={`flex items-center gap-2 ${isMirrored ? "flex-row-reverse" : ""}`}>
             <span
-              className={`text-sm font-semibold text-slate-700 dark:text-slate-200 sm:text-base ${
+              className={`text-sm font-semibold text-stone-700 dark:text-slate-200 sm:text-base ${
                 isYou ? "text-indigo-600 dark:text-indigo-300" : ""
               }`}
             >
@@ -146,9 +146,9 @@ const ScoreCard = ({
 };
 
 const StatChip = ({ label, value }) => (
-  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/65 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
+  <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-stone-100/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
     <span className="text-slate-400 dark:text-slate-500">{label}</span>
-    <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    <span className="text-stone-700 dark:text-slate-100">{value}</span>
   </div>
 );
 
@@ -231,7 +231,7 @@ const ScorePanel = ({
                 onChange={(e) => setEditValue(e.target.value)}
                 maxLength={20}
                 autoFocus
-                className="w-20 px-2 py-0.5 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-20 px-2 py-0.5 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveEdit();
                   if (e.key === 'Escape') handleCancelEdit();
@@ -256,7 +256,7 @@ const ScorePanel = ({
             </div>
           ) : (
             <span
-              className={`text-sm font-medium text-slate-700 dark:text-slate-200 ${
+              className={`text-sm font-medium text-stone-600 dark:text-slate-200 ${
                 card.isYou ? "text-indigo-600 dark:text-indigo-300 cursor-pointer hover:underline" : ""
               }`}
               onClick={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : undefined}
@@ -311,21 +311,21 @@ const ScorePanel = ({
     };
 
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-slate-900 shadow-[0_15px_45px_-30px_rgba(15,23,42,0.65)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
+      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
         <div className="flex items-center justify-center gap-4">
           {renderPlayerPill(xCard, "start")}
           <span className="text-2xl font-semibold">{xCard.score}</span>
-          <span className="text-base font-semibold text-slate-400 dark:text-slate-500">-</span>
+          <span className="text-base font-semibold text-stone-400 dark:text-slate-500">-</span>
           <span className="text-2xl font-semibold">{oCard.score}</span>
           {renderPlayerPill(oCard, "end")}
         </div>
-        <div className="flex items-start justify-between gap-3 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        <div className="flex items-start justify-between gap-3 text-xs uppercase tracking-wide text-stone-400 dark:text-slate-500">
           {renderOccupant(xCard, "start")}
-          <div className="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-300">
-            <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+          <div className="flex flex-col items-center gap-1 text-stone-500 dark:text-slate-300">
+            <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-stone-400/70 dark:text-slate-500/70">
               Turn
             </span>
-            <span className="text-base font-semibold text-slate-700 dark:text-slate-200">
+            <span className="text-base font-semibold text-stone-700 dark:text-slate-200">
               {gameState?.turn ? <ValueMark value={gameState.turn} /> : "--"}
             </span>
           </div>
@@ -337,8 +337,8 @@ const ScorePanel = ({
 
   return (
     <section className="relative w-full" data-tour="status">
-      <div className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-emerald-400/20 blur-3xl" />
-      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-5 rounded-[28px] border border-slate-200/70 bg-white/60 p-4 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:gap-6 sm:p-6">
+      <div className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/8 to-emerald-400/15 blur-3xl" />
+      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-5 rounded-[28px] border border-stone-200/80 bg-stone-50/70 p-4 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:gap-6 sm:p-6">
         <CompactScoreSummary />
         <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
           {cards.map((card) => (
