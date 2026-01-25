@@ -4,12 +4,6 @@ on:
     push:
         branches:
             - main
-        paths:
-            - 'server/**'
-            - 'package.json'
-            - 'package-lock.json'
-            - 'ecosystem.config.cjs'
-            - '.github/workflows/deploy-backend-aws.yml'
 
 jobs:
     deploy:
@@ -18,8 +12,29 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Check for backend changes
+              uses: dorny/paths-filter@v3
+              id: changes
+              with:
+                  filters: |
+                      backend:
+                        - 'server/**'
+                        - 'package.json'
+                        - 'package-lock.json'
+                        - 'ecosystem.config.cjs'
+                        - '.github/workflows/deploy-backend-aws.yml'
+
+            - name: Skip deployment (no backend changes)
+              if: steps.changes.outputs.backend != 'true'
+              run: |
+                echo "⏭️  No backend changes detected. Skipping deployment."
+                exit 0
 
             - name: Deploy via SSH
+              if: steps.changes.outputs.backend == 'true'
               uses: appleboy/ssh-action@v0.1.10
               env:
                   NODE_ENV: ${{ secrets.NODE_ENV }}
