@@ -2,8 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as RadixTooltip from "@radix-ui/react-tooltip";
 import useCoarsePointer from "../../hooks/useCoarsePointer";
 
+/**
+ * Tooltip - Hover/Long-press Information Overlay
+ * 
+ * Typography: Fluid label text
+ * Touch: Long-press support for touch devices
+ */
+
 const baseTooltipClasses =
-  "z-[60] rounded-lg border border-white/20 dark:border-slate-700/70 bg-slate-900/95 text-slate-100 shadow-lg backdrop-blur-md px-3 py-2 text-xs font-medium leading-relaxed";
+  "z-[60] rounded-btn border border-white/20 dark:border-slate-700/70 bg-slate-900/95 text-slate-100 shadow-lg backdrop-blur-md px-3 py-2 text-label font-medium leading-relaxed";
 
 const arrowClass = "fill-slate-900";
 const arrowClassDark = "dark:fill-slate-900";

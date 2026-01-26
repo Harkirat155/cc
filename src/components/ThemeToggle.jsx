@@ -112,7 +112,7 @@ const ThemeToggle = ({ className = '' }) => {
         aria-label="Toggle theme"
         aria-pressed={theme === 'dark'}
         onClick={toggle}
-        className={`inline-flex items-center justify-center h-10 w-10 rounded-full border transition z-40 
+        className={`inline-flex items-center justify-center min-h-touch min-w-touch h-11 w-11 rounded-full border transition z-40 
         bg-slate-900 text-white border-slate-800 hover:bg-slate-800 
         dark:bg-white dark:text-slate-900 dark:border-slate-200 dark:hover:bg-slate-50 
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:focus-visible:ring-slate-600 ${className}`}

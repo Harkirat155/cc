@@ -5,6 +5,16 @@ import ActionButtons from "./Menu/ActionButtons.jsx";
 import FabCylinder from "./Menu/FabCylinder.jsx";
 import { Tooltip } from "./ui/Tooltip.jsx";
 
+/**
+ * MenuPanel - Responsive Action Menu
+ * 
+ * Layout adapts based on screen height:
+ * - Compact mode (height < 710px): FAB with slide-up panel
+ * - Normal mode: Bottom-centered pill
+ * 
+ * Touch targets: All interactive elements meet 44px minimum
+ */
+
 const MenuPanel = ({
   onReset,
   onNewGame,
@@ -134,7 +144,7 @@ const MenuPanel = ({
           ref={menuRef}
           className={`fixed right-4 z-30 transform transition-all duration-200 origin-bottom-right ${
             expanded ? "opacity-100 scale-100" : "opacity-0 pointer-events-none scale-50"
-          } rounded-2xl border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35 p-3 shadow-2xl w-fit`}
+          } rounded-card border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35 p-card shadow-2xl w-fit`}
           style={{ bottom: `${cylHeight + 24}px` }}
           onClick={handleExpand}
           id="menu-panel-popover"
@@ -152,14 +162,14 @@ const MenuPanel = ({
     <Tooltip content={menuTooltip} sideOffset={14} side="top">
       <div
         ref={menuRef}
-        className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-2xl shadow-2xl transition-all duration-300 ${expanded ? "p-2" : "p-1"} z-30 border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35`}
+        className={`fixed left-1/2 bottom-4 transform -translate-x-1/2 rounded-card shadow-2xl transition-all duration-300 ${expanded ? "p-card" : "p-2"} z-30 border border-stone-200/40 dark:border-gray-700/50 backdrop-blur-xl bg-stone-100/50 dark:bg-gray-800/30 supports-[backdrop-filter]:bg-stone-100/55 supports-[backdrop-filter]:dark:bg-gray-800/35`}
         onClick={handleExpand}
         data-tour="menu"
       >
         {collapsed && !expanded ? (
-          <div className="flex items-center justify-center cursor-pointer">
-            <span className="text-base font-semibold text-stone-700 dark:text-gray-100">Menu</span>
-            <span className="ml-2 text-xs text-blue-500">▲</span>
+          <div className="flex items-center justify-center cursor-pointer min-h-touch px-4">
+            <span className="text-fluid-base font-semibold text-stone-700 dark:text-gray-100">Menu</span>
+            <span className="ml-2 text-fluid-sm text-blue-500">▲</span>
           </div>
         ) : (
           <Buttons />

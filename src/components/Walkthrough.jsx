@@ -1,5 +1,12 @@
 import React, { Suspense, lazy } from "react";
 
+/**
+ * Walkthrough - Onboarding Tour Guide
+ * 
+ * Typography: Fluid scaling via joyride styles
+ * Uses react-joyride for step-by-step tutorials
+ */
+
 const Joyride = lazy(() =>
   import("react-joyride").then((module) => ({ default: module.default }))
 );
@@ -15,29 +22,33 @@ const joyrideStyles = {
   },
   tooltipContainer: {
     textAlign: "left",
-    padding: "20px",
-    borderRadius: "18px",
+    padding: "clamp(16px, 4vw, 24px)",
+    borderRadius: "16px",
   },
   tooltipTitle: {
-    fontSize: "1.125rem",
+    fontSize: "clamp(1rem, 2.5vw, 1.125rem)",
     marginBottom: "0.75rem",
     fontWeight: 700,
   },
   tooltipContent: {
-    fontSize: "0.95rem",
+    fontSize: "clamp(0.875rem, 2vw, 0.95rem)",
     lineHeight: 1.6,
   },
   buttonNext: {
     backgroundColor: "#6366f1",
     borderRadius: "9999px",
-    padding: "0.45rem 1.25rem",
+    padding: "0.625rem 1.5rem",
+    minHeight: "44px",
   },
   buttonBack: {
     color: "#94a3b8",
     marginRight: "0.75rem",
+    minHeight: "44px",
   },
   buttonClose: {
     color: "#94a3b8",
+    minWidth: "44px",
+    minHeight: "44px",
   },
 };
 

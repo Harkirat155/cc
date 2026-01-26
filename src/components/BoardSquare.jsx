@@ -2,6 +2,15 @@ import React, { useEffect, useRef, useState } from "react";
 import ValueMark from "./marks/ValueMark";
 import { Tooltip } from "./ui/Tooltip";
 
+/**
+ * BoardSquare Component - Responsive Game Cell
+ * 
+ * Touch targets: Min 60px on mobile, scaling to 110px on large screens
+ * Based on Apple HIG (44px min) with extra margin for gameplay accuracy
+ * 
+ * Uses CSS clamp() for fluid sizing without JS calculations
+ */
+
 const BoardSquare = ({ value, onClick, isWinning, index }) => {
   const [isPressed, setIsPressed] = useState(false);
   const pressTimeoutRef = useRef(null);
@@ -38,7 +47,7 @@ const BoardSquare = ({ value, onClick, isWinning, index }) => {
     <Tooltip content={tooltipMessage}>
       <button
         type="button"
-        className={`group relative flex aspect-square w-[clamp(70px,22vw,110px)] items-center justify-center rounded-2xl border border-stone-200/80 bg-stone-50/90 text-4xl font-semibold text-stone-700 shadow-[0_15px_35px_-28px_rgba(28,25,23,0.45)] transition-all duration-200 ease-out dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 ${
+        className={`group relative flex aspect-square w-cell-md items-center justify-center rounded-cell border border-stone-200/80 bg-stone-50/90 text-fluid-3xl font-semibold text-stone-700 shadow-[0_15px_35px_-28px_rgba(28,25,23,0.45)] transition-all duration-200 ease-out dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 ${
           isWinning ? "ring-2 ring-indigo-400/80 dark:ring-emerald-400/70 animate-celebrate" : ""
         } ${value ? "cursor-not-allowed" : "cursor-pointer hover:-translate-y-1 hover:border-indigo-400/70 hover:bg-stone-100 hover:shadow-[0_20px_45px_-28px_rgba(99,102,241,0.45)] active:translate-y-0 active:scale-95"} ${isPressed ? "scale-95" : ""}`}
         onClick={handleClick}
@@ -47,7 +56,7 @@ const BoardSquare = ({ value, onClick, isWinning, index }) => {
       >
         {/* Subtle grid position hint for empty squares */}
         {!value && (
-          <span className="absolute inset-0 flex items-center justify-center text-stone-300 dark:text-slate-700 text-2xl font-light opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <span className="absolute inset-0 flex items-center justify-center text-stone-300 dark:text-slate-700 text-fluid-xl font-light opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             {index + 1}
           </span>
         )}
@@ -60,7 +69,7 @@ const BoardSquare = ({ value, onClick, isWinning, index }) => {
         </span>
         {/* Ripple effect container */}
         {isPressed && (
-          <span className="absolute inset-0 rounded-2xl bg-indigo-400/20 animate-ping" />
+          <span className="absolute inset-0 rounded-cell bg-indigo-400/20 animate-ping" />
         )}
       </button>
     </Tooltip>

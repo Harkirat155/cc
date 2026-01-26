@@ -1,6 +1,13 @@
 import React from "react";
 import { Tooltip } from "../ui/Tooltip.jsx";
 
+/**
+ * FabCylinder - Floating Action Button with Traffic Light Indicators
+ * 
+ * Touch targets: 58px width exceeds 44px minimum for comfortable touch
+ * Position: Fixed bottom-right for easy thumb access
+ */
+
 export default function FabCylinder({
   height,
   indicators = [],
@@ -16,7 +23,7 @@ export default function FabCylinder({
         aria-expanded={expanded}
         aria-controls="menu-panel-popover"
         onClick={onToggle}
-        className="group fixed bottom-4 right-4 z-40 outline-none"
+        className="group fixed bottom-4 right-4 z-40 outline-none min-w-touch min-h-touch"
         tabIndex={expanded ? -1 : 0}
         {...rest}
       >

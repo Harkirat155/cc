@@ -2,6 +2,14 @@ import React from "react";
 import Button from "../ui/Button.jsx";
 import { Tooltip } from "../ui/Tooltip.jsx";
 
+/**
+ * ActionButtons - Responsive Action Button Group
+ * 
+ * Touch targets: All buttons meet 44px minimum (via Button component)
+ * Typography: Fluid text sizing with clamp()
+ * Layout: Stacks vertically on mobile, horizontal on larger screens
+ */
+
 const truncate = (value, length = 36) => {
   if (!value) return value;
   if (value.length <= length) return value;
@@ -87,7 +95,7 @@ export default function ActionButtons({
   ].filter((action) => action.show);
 
   return (
-    <div className={`flex ${layout} gap-3 items-center justify-center`}>
+    <div className={`flex ${layout} gap-panel items-center justify-center`}>
       {actions.map(({ key, tooltip, variant, onClick, label, ariaLabel, children }) => (
         <Tooltip key={key} content={tooltip} side={tooltipSide} align={tooltipAlign} sideOffset={tooltipOffset}>
           <Button

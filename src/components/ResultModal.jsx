@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "./ui/Tooltip";
 
+/**
+ * ResultModal - Game Result Display Modal
+ * 
+ * Typography: Fluid text scaling for readability
+ * Touch targets: All buttons meet 44px minimum height
+ * Animation: Celebration effects for wins
+ */
+
 const ResultModal = ({
   result,
   onStartNewLocal, // original resetGame for initiator or local
@@ -124,14 +132,14 @@ const ResultModal = ({
       )}
 
       {/* Card with glassmorphism and entrance animation */}
-      <div className="relative max-w-sm w-full animate-modal-enter">
-        <div className={`group rounded-2xl border border-stone-200/30 dark:border-white/10 bg-stone-100/40 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
+      <div className="relative max-w-modal w-full animate-modal-enter">
+        <div className={`group rounded-panel border border-stone-200/30 dark:border-white/10 bg-stone-100/40 dark:bg-white/10 shadow-2xl backdrop-blur-xl px-6 py-5 sm:px-7 sm:py-6 transition-transform duration-200 will-change-transform ${isWin ? 'animate-celebrate' : ''}`}>
           <div className="flex flex-col items-center text-center gap-4">
             {/* Result icon */}
-            <div className={`text-4xl mb-1 ${isWin ? 'animate-gentle-bounce' : ''}`}>
+            <div className={`text-fluid-3xl mb-1 ${isWin ? 'animate-gentle-bounce' : ''}`}>
               {result?.toLowerCase().includes('draw') ? '🤝' : '🎉'}
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-stone-800 dark:text-gray-100">
+            <h2 className="text-fluid-2xl font-semibold tracking-tight text-stone-800 dark:text-gray-100">
               {result}
             </h2>
 
@@ -139,7 +147,7 @@ const ResultModal = ({
             {isMultiplayer && (
               <div className="w-full">
                 <div
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-label font-medium transition-all duration-300 ${
                     isOpponentPresent
                       ? 'bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-700/40'
                       : 'bg-amber-100/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/40'
@@ -167,14 +175,14 @@ const ResultModal = ({
 
             {/* Multiplayer state messaging */}
             {isMultiplayer && someoneRequested && (
-              <div className="w-full flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300">
+              <div className="w-full flex items-center justify-between gap-3 text-fluid-sm text-gray-700 dark:text-gray-300">
                 <span className="truncate">
                   {isRequester
                     ? "Waiting for opponent…"
                     : "Your opponent requested a rematch"}
                 </span>
                 {typeof remainingSec === "number" && (
-                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/40 dark:bg-white/20 px-2 py-0.5 text-xs text-gray-800 dark:text-gray-100">
+                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/40 dark:bg-white/20 px-2 py-0.5 text-label text-gray-800 dark:text-gray-100">
                     ⏱ {remainingSec}s
                   </span>
                 )}
@@ -186,7 +194,7 @@ const ResultModal = ({
               {!isMultiplayer && (
                 <Tooltip content="Play another local game" side="top">
                   <button
-                    className="inline-flex items-center justify-center rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white h-11 px-4 transition-colors sm:col-span-2 justify-self-center"
+                    className="inline-flex items-center justify-center rounded-btn bg-blue-600/90 hover:bg-blue-600 text-white min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors sm:col-span-2 justify-self-center w-full sm:w-auto"
                     onClick={onStartNewLocal}
                   >
                     Start new game
@@ -201,7 +209,7 @@ const ResultModal = ({
                     side="top"
                   >
                     <button
-                      className={`inline-flex items-center justify-center rounded-lg h-11 px-4 transition-colors ${
+                      className={`inline-flex items-center justify-center rounded-btn min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors ${
                         isOpponentPresent
                           ? 'bg-blue-600/90 hover:bg-blue-600 text-white'
                           : 'bg-gray-400/60 text-gray-500 dark:bg-gray-600/40 dark:text-gray-400 cursor-not-allowed'
@@ -215,7 +223,7 @@ const ResultModal = ({
                   </Tooltip>
                   <Tooltip content="Exit this multiplayer room" side="top">
                     <button
-                      className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
+                      className="inline-flex items-center justify-center rounded-btn bg-red-500/90 hover:bg-red-500 text-white min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors"
                       onClick={onLeaveRoom}
                     >
                       Leave room
@@ -228,7 +236,7 @@ const ResultModal = ({
                 <>
                   <Tooltip content="Accept the rematch and start playing" side="top">
                     <button
-                      className="inline-flex items-center justify-center rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white h-11 px-4 transition-colors"
+                      className="inline-flex items-center justify-center rounded-btn bg-emerald-600/90 hover:bg-emerald-600 text-white min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors"
                       onClick={onStartNewLocal}
                     >
                       Accept rematch
@@ -236,7 +244,7 @@ const ResultModal = ({
                   </Tooltip>
                   <Tooltip content="Exit this multiplayer room" side="top">
                     <button
-                      className="inline-flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white h-11 px-4 transition-colors"
+                      className="inline-flex items-center justify-center rounded-btn bg-red-500/90 hover:bg-red-500 text-white min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors"
                       onClick={onLeaveRoom}
                     >
                       Leave room
@@ -248,7 +256,7 @@ const ResultModal = ({
               {isMultiplayer && someoneRequested && isRequester && (
                 <Tooltip content="Withdraw your rematch request" side="top">
                   <button
-                    className="inline-flex items-center justify-center rounded-lg bg-gray-700/80 hover:bg-gray-700 text-white h-11 px-4 transition-colors col-span-1 sm:col-span-2"
+                    className="inline-flex items-center justify-center rounded-btn bg-gray-700/80 hover:bg-gray-700 text-white min-h-btn h-12 px-4 text-fluid-sm font-medium transition-colors col-span-1 sm:col-span-2"
                     onClick={cancelNewGameRequest}
                   >
                     Cancel request

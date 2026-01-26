@@ -1,7 +1,18 @@
 import React, { forwardRef } from "react";
 
+/**
+ * Button Component - Responsive Design System
+ * 
+ * Follows SOLID principles:
+ * - Single Responsibility: Only handles button rendering and variants
+ * - Open/Closed: Extend with new variants without modifying base logic
+ * 
+ * Touch targets: Min 44px height (Apple HIG), 48px preferred (Material Design)
+ * Typography: Fluid scaling with clamp()
+ */
+
 const base =
-  "py-2 px-5 min-w-[120px] rounded-xl border whitespace-nowrap text-center shadow-sm transition-all duration-200 backdrop-blur-md focus:outline-none focus:ring-2";
+  "inline-flex items-center justify-center gap-2 py-btn-y px-btn-x min-h-btn min-w-btn rounded-btn border whitespace-nowrap text-center text-fluid-sm font-medium shadow-sm transition-all duration-200 backdrop-blur-md focus:outline-none focus:ring-2 touch-target active:scale-[0.98]";
 
 const variants = {
   primary:

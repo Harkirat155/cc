@@ -9,16 +9,20 @@ const formatOccupant = (id, fallback) => {
   return `${id.slice(0, 5)}…${id.slice(-3)}`;
 };
 
+/**
+ * YouBadge - Responsive badge indicating current player
+ * Touch target compliant with adequate padding
+ */
 const YouBadge = ({ variant = "default", showText = true, className = "" }) => {
   const sizeClasses =
     variant === "compact"
-      ? showText ? "px-2.5 py-0.5 text-[9px]" : "p-1.5"
-      : "px-3 py-1 text-[10px]";
+      ? showText ? "px-2.5 py-1 text-badge" : "p-1.5 min-w-touch min-h-[1.75rem]"
+      : "px-3 py-1.5 text-label";
   const iconSize = variant === "compact" ? 12 : 14;
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 font-semibold uppercase tracking-[0.32em] text-white shadow-sm ${sizeClasses} ${className}`}
+      className={`inline-flex items-center justify-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 font-semibold uppercase tracking-[0.32em] text-white shadow-sm ${sizeClasses} ${className}`}
     >
       <Crown size={iconSize} className="drop-shadow-sm" />
       {showText && "You"}
@@ -26,6 +30,12 @@ const YouBadge = ({ variant = "default", showText = true, className = "" }) => {
   );
 };
 
+/**
+ * ScoreCard - Responsive player score display
+ * 
+ * Touch targets: Edit buttons 44px minimum
+ * Typography: Fluid scaling for scores and labels
+ */
 const ScoreCard = ({
   mark,
   score,
@@ -46,7 +56,7 @@ const ScoreCard = ({
 
   return (
     <div
-      className={`group relative flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:p-5 ${
+      className={`group relative flex flex-col gap-panel rounded-card border border-stone-200/80 bg-stone-50/80 p-card text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] transition duration-300 ease-out hover:-translate-y-1 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 ${
         isTurn ? "ring-2 ring-emerald-400/80 dark:ring-emerald-500/60" : ""
       } ${isMirrored ? "text-right" : ""}`}
     >
@@ -62,30 +72,30 @@ const ScoreCard = ({
       <div className={`flex items-start justify-between gap-3 ${isMirrored ? "flex-row-reverse" : ""}`}>
         <div className={`flex items-center gap-3 ${isMirrored ? "flex-row-reverse text-right" : ""}`}>
           <span
-            className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl font-semibold text-white shadow-lg sm:h-12 sm:w-12 sm:text-2xl ${accent}`}
+            className={`flex h-avatar-sm w-avatar-sm items-center justify-center rounded-xl text-fluid-lg font-semibold text-white shadow-lg sm:h-avatar-md sm:w-avatar-md sm:text-fluid-xl ${accent}`}
           >
             <ValueMark value={mark} />
           </span>
           <div className={`${isMirrored ? "text-right" : "text-left"}`}>
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+            <p className="text-label uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
               Player {mark}
             </p>
-            <p className="text-2xl font-semibold leading-tight sm:text-3xl">{score}</p>
+            <p className="text-fluid-2xl font-semibold leading-tight sm:text-fluid-3xl">{score}</p>
           </div>
         </div>
         {isTurn && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 animate-pulse-ring">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1.5 text-label font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 animate-pulse-ring">
             <Dot size={16} className="animate-gentle-bounce" />
             Turn
           </span>
         )}
       </div>
       <div
-        className={`mt-auto flex flex-col gap-1 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500 ${
+        className={`mt-auto flex flex-col gap-1 text-label uppercase tracking-wide text-slate-400 dark:text-slate-500 ${
           isMirrored ? "items-end text-right" : "items-start text-left"
         }`}
       >
-        <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+        <span className="text-badge font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
           Occupied
         </span>
         {isEditing ? (
@@ -96,7 +106,7 @@ const ScoreCard = ({
               onChange={(e) => onEditChange(e.target.value)}
               maxLength={20}
               autoFocus
-              className="w-24 px-2 py-1 text-sm font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-24 px-2 py-1.5 text-fluid-sm font-semibold rounded-btn border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-touch"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onEditSave();
                 if (e.key === 'Escape') onEditCancel();
@@ -104,7 +114,7 @@ const ScoreCard = ({
             />
             <button
               onClick={onEditSave}
-              className="p-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+              className="p-2 min-w-touch min-h-touch rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center justify-center"
               title="Save"
               aria-label="Save name"
             >
@@ -112,7 +122,7 @@ const ScoreCard = ({
             </button>
             <button
               onClick={onEditCancel}
-              className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
+              className="p-2 min-w-touch min-h-touch rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors flex items-center justify-center"
               title="Cancel"
               aria-label="Cancel editing"
             >
@@ -122,7 +132,7 @@ const ScoreCard = ({
         ) : (
           <div className={`flex items-center gap-2 ${isMirrored ? "flex-row-reverse" : ""}`}>
             <span
-              className={`text-sm font-semibold text-stone-700 dark:text-slate-200 sm:text-base ${
+              className={`text-fluid-sm font-semibold text-stone-700 dark:text-slate-200 truncate max-w-[120px] sm:max-w-[160px] ${
                 isYou ? "text-indigo-600 dark:text-indigo-300" : ""
               }`}
             >
@@ -131,7 +141,7 @@ const ScoreCard = ({
             {isYou && onEditName && (
               <button
                 onClick={onEditName}
-                className="p-1 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-2 min-w-touch min-h-touch rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center"
                 title="Edit name"
                 aria-label="Edit name"
               >
@@ -145,10 +155,13 @@ const ScoreCard = ({
   );
 };
 
+/**
+ * StatChip - Responsive status indicator chip
+ */
 const StatChip = ({ label, value }) => (
-  <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-stone-100/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
+  <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/80 bg-stone-100/70 px-3 py-1.5 text-label font-semibold uppercase tracking-wide text-stone-500 backdrop-blur-lg dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300 sm:px-4 sm:py-2">
     <span className="text-slate-400 dark:text-slate-500">{label}</span>
-    <span className="text-stone-700 dark:text-slate-100">{value}</span>
+    <span className="text-stone-700 dark:text-slate-100 truncate max-w-[100px]">{value}</span>
   </div>
 );
 
@@ -220,18 +233,18 @@ const ScorePanel = ({
             align === "end" ? "items-end text-right" : "items-start text-left"
           }`}
         >
-          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
+          <span className="text-badge font-medium uppercase tracking-[0.28em] text-slate-400/70 dark:text-slate-500/70">
             Occupied
           </span>
           {isEditing ? (
-            <div className={`flex items-center gap-1.5 ${align === "end" ? "flex-row-reverse" : ""}`}>
+            <div className={`flex items-center gap-2 ${align === "end" ? "flex-row-reverse" : ""}`}>
               <input
                 type="text"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 maxLength={20}
                 autoFocus
-                className="w-20 px-2 py-0.5 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-20 px-2 py-1.5 text-fluid-sm font-semibold rounded-btn border border-indigo-300 dark:border-indigo-600 bg-stone-50 dark:bg-slate-800 text-stone-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[36px]"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveEdit();
                   if (e.key === 'Escape') handleCancelEdit();
@@ -239,7 +252,7 @@ const ScorePanel = ({
               />
               <button
                 onClick={handleSaveEdit}
-                className="p-0.5 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+                className="p-2 min-w-touch min-h-touch rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center justify-center"
                 title="Save"
                 aria-label="Save name"
               >
@@ -247,7 +260,7 @@ const ScorePanel = ({
               </button>
               <button
                 onClick={handleCancelEdit}
-                className="p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors"
+                className="p-2 min-w-touch min-h-touch rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400 transition-colors flex items-center justify-center"
                 title="Cancel"
                 aria-label="Cancel editing"
               >
@@ -256,7 +269,7 @@ const ScorePanel = ({
             </div>
           ) : (
             <span
-              className={`text-sm font-medium text-stone-600 dark:text-slate-200 ${
+              className={`text-fluid-sm font-medium text-stone-600 dark:text-slate-200 truncate max-w-[80px] ${
                 card.isYou ? "text-indigo-600 dark:text-indigo-300 cursor-pointer hover:underline" : ""
               }`}
               onClick={card.isYou && onUpdateDisplayName ? () => handleStartEdit(card.mark, _displayName || '') : undefined}
@@ -279,7 +292,7 @@ const ScorePanel = ({
     const renderPlayerPill = (card, align) => {
       const icon = (
         <span
-          className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl text-white shadow-lg ${
+          className={`flex h-avatar-sm w-avatar-sm items-center justify-center rounded-xl text-fluid-lg text-white shadow-lg ${
             card.isTurn ? "ring-[3px] ring-emerald-400 dark:ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 animate-pulse-ring" : ""
           } ${card.accent}`}
         >
@@ -311,21 +324,21 @@ const ScorePanel = ({
     };
 
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200/80 bg-stone-50/80 p-4 text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
+      <div className="flex flex-col gap-3 rounded-card border border-stone-200/80 bg-stone-50/80 p-card text-stone-800 shadow-[0_15px_45px_-30px_rgba(28,25,23,0.4)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-100 sm:hidden">
         <div className="flex items-center justify-center gap-4">
           {renderPlayerPill(xCard, "start")}
-          <span className="text-2xl font-semibold">{xCard.score}</span>
-          <span className="text-base font-semibold text-stone-400 dark:text-slate-500">-</span>
-          <span className="text-2xl font-semibold">{oCard.score}</span>
+          <span className="text-fluid-2xl font-semibold">{xCard.score}</span>
+          <span className="text-fluid-base font-semibold text-stone-400 dark:text-slate-500">-</span>
+          <span className="text-fluid-2xl font-semibold">{oCard.score}</span>
           {renderPlayerPill(oCard, "end")}
         </div>
-        <div className="flex items-start justify-between gap-3 text-xs uppercase tracking-wide text-stone-400 dark:text-slate-500">
+        <div className="flex items-start justify-between gap-3 text-label uppercase tracking-wide text-stone-400 dark:text-slate-500">
           {renderOccupant(xCard, "start")}
           <div className="flex flex-col items-center gap-1 text-stone-500 dark:text-slate-300">
-            <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-stone-400/70 dark:text-slate-500/70">
+            <span className="text-badge font-medium uppercase tracking-[0.28em] text-stone-400/70 dark:text-slate-500/70">
               Turn
             </span>
-            <span className="text-base font-semibold text-stone-700 dark:text-slate-200">
+            <span className="text-fluid-base font-semibold text-stone-700 dark:text-slate-200">
               {gameState?.turn ? <ValueMark value={gameState.turn} /> : "--"}
             </span>
           </div>
@@ -337,10 +350,10 @@ const ScorePanel = ({
 
   return (
     <section className="relative w-full" data-tour="status">
-      <div className="pointer-events-none absolute inset-0 -z-10 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/8 to-emerald-400/15 blur-3xl" />
-      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-5 rounded-[28px] border border-stone-200/80 bg-stone-50/70 p-4 backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:gap-6 sm:p-6">
+      <div className="pointer-events-none absolute inset-0 -z-10 rounded-panel bg-gradient-to-br from-indigo-500/10 via-purple-500/8 to-emerald-400/15 blur-3xl" />
+      <div className="relative mx-auto flex w-full max-w-[min(90vw,720px)] flex-col gap-panel rounded-panel border border-stone-200/80 bg-stone-50/70 p-card backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/60 sm:p-6">
         <CompactScoreSummary />
-        <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
+        <div className="hidden gap-panel sm:grid sm:grid-cols-2">
           {cards.map((card) => (
             <ScoreCard 
               key={card.mark} 
