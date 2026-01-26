@@ -122,3 +122,36 @@ body {
   outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
+
+/* Scale-in animation for new moves */
+@keyframes scale-in {
+  0% {
+    transform: scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1) rotate(5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out;
+}
+
+/* Win line glow animation */
+@keyframes win-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(99, 102, 241, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(16, 185, 129, 0.6);
+  }
+}
+
+.animate-win-glow {
+  animation: win-glow 1s ease-in-out infinite;
+}

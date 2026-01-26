@@ -5,6 +5,7 @@ import config from './config.js';
 import { roomLog as log } from './logger.js';
 import { incCounter } from './metrics.js';
 import { clearPendingPublish } from './roomPublisher.js';
+import { initialState, getModeConfig, DEFAULT_MODE } from './gameLogic.js';
 
 // Re-export from extracted modules for backward compatibility
 export { publish, publishImmediate, clearPendingPublish } from './roomPublisher.js';
@@ -48,19 +49,11 @@ export function enforceLRU() {
 }
 
 /**
- * Create initial game state
+ * Create initial game state with mode support
+ * @param {string} modeId - Game mode id
  */
-export function createInitialGameState() {
-  return {
-    board: Array(9).fill(''),
-    turn: 'X',
-    winner: null,
-    winningLine: [],
-    xScore: 0,
-    oScore: 0,
-    newGameRequester: null,
-    newGameRequestedAt: null,
-  };
+export function createInitialGameState(modeId = DEFAULT_MODE) {
+  return initialState(modeId);
 }
 
 /**
@@ -74,13 +67,16 @@ export function createRoom(roomId, options = {}) {
     creatorSocketId, 
     creatorClientId, 
     creatorDisplayName,
-    initialState,
+    initialState: customInitialState,
+    gameMode = DEFAULT_MODE,
   } = options;
+
+  const { size } = getModeConfig(gameMode);
 
   const room = {
     players: { X: creatorSocketId || null, O: null },
     spectators: new Set(),
-    state: initialState || createInitialGameState(),
+    state: customInitialState || createInitialGameState(gameMode),
     voice: {},
     seatByClient: creatorClientId ? { [creatorClientId]: 'X' } : {},
     lastTouched: Date.now(),
@@ -88,13 +84,16 @@ export function createRoom(roomId, options = {}) {
       X: { displayName: creatorDisplayName || null },
       O: { displayName: null },
     },
+    gameMode,
+    boardSize: size,
+    modeChangeRequest: null, // Track pending mode change requests
   };
 
   rooms.set(roomId, room);
   enforceLRU();
   incCounter('roomsCreated');
   
-  log.debug('Room created', { roomId, creator: creatorSocketId });
+  log.debug('Room created', { roomId, creator: creatorSocketId, gameMode });
   
   return room;
 }

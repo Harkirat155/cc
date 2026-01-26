@@ -10,7 +10,7 @@ import {
   createRoom,
 } from '../roomManager.js';
 import { socketLog as log } from '../logger.js';
-import { validateRoomId, validateDisplayName } from './validation.js';
+import { validateRoomId, validateDisplayName, validateGameMode } from './validation.js';
 
 /**
  * Register room-related event handlers
@@ -30,6 +30,7 @@ export function registerRoomHandlers(socket, io) {
 
     const clientId = payload.clientId || null;
     const displayName = validateDisplayName(payload.displayName);
+    const gameMode = validateGameMode(payload.gameMode);
 
     // Generate unique room code
     let roomId = genCode();
@@ -49,14 +50,15 @@ export function registerRoomHandlers(socket, io) {
       creatorSocketId: socket.id,
       creatorClientId: clientId,
       creatorDisplayName: displayName,
+      gameMode,
     });
 
     socket.join(roomId);
     trackSocketRoom(socket.id, roomId);
 
-    log.debug('Room created', { roomId, socketId: socket.id, clientId, displayName });
+    log.debug('Room created', { roomId, socketId: socket.id, clientId, displayName, gameMode });
 
-    ack?.({ roomId, player: 'X' });
+    ack?.({ roomId, player: 'X', gameMode });
     publish(io, roomId);
   });
 

@@ -11,6 +11,7 @@ import { lobbyManager, broadcastLobbyState } from '../lobbyManager.js';
 import { socketLog as log } from '../logger.js';
 import { generateUniqueRoomId } from '../utils/roomIdGenerator.js';
 import { notifyPlayersOfMatch, notifyPlayersOfMatchFailure } from '../utils/matchNotifier.js';
+import { validateGameMode } from './validation.js';
 
 /**
  * Register lobby-related event handlers
@@ -18,37 +19,41 @@ import { notifyPlayersOfMatch, notifyPlayersOfMatchFailure } from '../utils/matc
  * @param {Server} io - Socket.IO server instance
  */
 export function registerLobbyHandlers(socket, io) {
-  socket.on('joinLobby', ({ displayName }, ack) => {
-    const result = lobbyManager.addPlayer(socket.id, displayName);
+  socket.on('joinLobby', ({ displayName, gameMode }, ack) => {
+    const validGameMode = validateGameMode(gameMode);
+    const result = lobbyManager.addPlayer(socket.id, displayName, validGameMode);
 
     if (!result.success) {
       return ack?.({ success: false, error: result.error });
     }
 
-    broadcastLobbyState(io);
-    ack?.({ success: true, position: result.position });
+    broadcastLobbyState(io, validGameMode);
+    ack?.({ success: true, position: result.position, gameMode: validGameMode });
 
-    // Attempt matching
-    const matchResult = lobbyManager.matchPlayers();
+    // Attempt matching for this game mode
+    const matchResult = lobbyManager.matchPlayers(validGameMode);
     if (matchResult.matched) {
-      handleMatch(io, matchResult.players);
+      handleMatch(io, matchResult.players, matchResult.gameMode);
     }
   });
 
   socket.on('leaveLobby', (ack) => {
+    const playerInfo = lobbyManager.getPlayer(socket.id);
+    const gameMode = playerInfo?.gameMode || 'classic';
     const removed = lobbyManager.removePlayer(socket.id);
 
     if (removed) {
-      broadcastLobbyState(io);
+      broadcastLobbyState(io, gameMode);
       ack?.({ success: true });
     } else {
       ack?.({ success: false, error: 'Not in lobby' });
     }
   });
 
-  socket.on('getLobbyState', (ack) => {
-    const state = lobbyManager.getQueueState();
-    ack?.({ queue: state });
+  socket.on('getLobbyState', ({ gameMode } = {}, ack) => {
+    const validGameMode = validateGameMode(gameMode);
+    const state = lobbyManager.getQueueState(validGameMode);
+    ack?.({ queue: state, gameMode: validGameMode });
   });
 }
 
@@ -58,12 +63,14 @@ export function registerLobbyHandlers(socket, io) {
  * @param {string} roomId - Room ID
  * @param {Object} player1 - First player details
  * @param {Object} player2 - Second player details
+ * @param {string} gameMode - Game mode
  */
-function setupMatchedRoom(roomId, player1, player2) {
-  // Create room with first player
+function setupMatchedRoom(roomId, player1, player2, gameMode = 'classic') {
+  // Create room with first player and game mode
   createRoom(roomId, {
     creatorSocketId: player1.socketId,
     creatorDisplayName: player1.displayName,
+    gameMode,
   });
 
   // Add second player to room
@@ -94,8 +101,9 @@ function addPlayersToSocketRoom(io, roomId, players) {
  * Follows Single Responsibility - orchestrates match creation by delegating to specialized functions
  * @param {Server} io - Socket.IO server instance
  * @param {Array} players - Array of matched players
+ * @param {string} gameMode - Game mode for the match
  */
-export function handleMatch(io, players) {
+export function handleMatch(io, players, gameMode = 'classic') {
   const [player1, player2] = players;
 
   // Generate unique room ID
@@ -109,18 +117,19 @@ export function handleMatch(io, players) {
 
   const roomId = roomIdResult.roomId;
 
-  // Setup room and add players
-  setupMatchedRoom(roomId, player1, player2);
+  // Setup room and add players with game mode
+  setupMatchedRoom(roomId, player1, player2, gameMode);
   addPlayersToSocketRoom(io, roomId, [player1, player2]);
 
-  // Notify players of successful match
-  notifyPlayersOfMatch(io, roomId, player1, player2);
+  // Notify players of successful match (include game mode)
+  notifyPlayersOfMatch(io, roomId, player1, player2, gameMode);
 
   // Log match creation
   log.info('Match created', {
     roomId,
     player1: player1.displayName,
     player2: player2.displayName,
+    gameMode,
   });
 
   broadcastLobbyState(io);

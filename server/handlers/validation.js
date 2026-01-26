@@ -26,8 +26,22 @@ export function validateDisplayName(name) {
 /**
  * Validate board index
  * @param {number} index - Board index to validate
+ * @param {number} maxIndex - Maximum valid index (exclusive), defaults to 9 for 3x3
  * @returns {boolean} True if valid
  */
-export function validateIndex(index) {
-  return Number.isInteger(index) && index >= 0 && index <= 8;
+export function validateIndex(index, maxIndex = 9) {
+  return Number.isInteger(index) && index >= 0 && index < maxIndex;
+}
+
+/**
+ * Validate game mode
+ * @param {string} mode - Game mode to validate
+ * @returns {string} Valid game mode or 'classic' as default
+ */
+export function validateGameMode(mode) {
+  const validModes = ['classic', 'ultimate'];
+  if (mode && typeof mode === 'string' && validModes.includes(mode)) {
+    return mode;
+  }
+  return 'classic';
 }

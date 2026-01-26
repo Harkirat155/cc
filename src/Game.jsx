@@ -14,6 +14,7 @@ import ScorePanel from "./components/ScorePanel";
 import ToastStack from "./components/ui/ToastStack";
 import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
+import ModeChangeToast from "./components/ModeChangeToast";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -54,6 +55,12 @@ const Game = () => {
     connectionState,
     displayName,
     updateDisplayName,
+    gameMode,
+    changeGameMode,
+    modeChangeRequest,
+    acceptModeChange,
+    rejectModeChange,
+    cancelModeChangeRequest,
   } = useSocketGame();
   // Voice chat hook
   const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
@@ -313,6 +320,9 @@ const Game = () => {
         micMuted={muted}
         onToggleMic={handleToggleMic}
         connectionState={connectionState}
+        gameMode={gameMode}
+        onGameModeChange={changeGameMode}
+        modeChangeRequest={modeChangeRequest}
         menuPanel={
           isMultiplayer ? (
             <PeoplePanel
@@ -347,6 +357,7 @@ const Game = () => {
               squares={displayedBoard}
               onSquareClick={handleSquareClick}
               winningSquares={winningSquares}
+              gameMode={gameState.gameMode}
             />
             <MenuPanel
               onReset={resetScores}
@@ -417,6 +428,13 @@ const Game = () => {
           rematchTimeoutSec={20}
         />
       )}
+  <ModeChangeToast
+    modeChangeRequest={modeChangeRequest}
+    socketId={socketId}
+    onAccept={acceptModeChange}
+    onReject={rejectModeChange}
+    onCancel={cancelModeChangeRequest}
+  />
   <ToastStack messages={toasts} onDismiss={dismissToast} />
       <FeedbackDialog
         open={isFeedbackOpen}

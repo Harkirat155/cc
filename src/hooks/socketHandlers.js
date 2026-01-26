@@ -22,9 +22,11 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
     setNewGameRequester,
     setNewGameRequestedAt,
     setShowModal,
+    setModeChangeRequest,
+    setGameMode,
   } = stateSetters;
 
-  const { recordMoveRef } = refs;
+  const { recordMoveRef, resetHistoryRef } = refs;
 
   return {
     handleGameUpdate: (payload) => {
@@ -35,6 +37,11 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
       setGameState((prev) => ({ ...prev, ...payload }));
       if (payload.roster) setRoster(payload.roster);
       if (payload.voiceRoster) setVoiceRoster(payload.voiceRoster || {});
+
+      // Update game mode if it changed
+      if (payload.gameMode && setGameMode) {
+        setGameMode(payload.gameMode);
+      }
 
       if (payload.newGameRequester !== undefined) {
         setNewGameRequester(payload.newGameRequester);
@@ -74,6 +81,46 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
       setShowModal(false);
+    },
+
+    // Mode change request handlers
+    handleModeChangeRequested: ({ requesterSocketId, newMode, requestedAt }) => {
+      console.log("[Socket] modeChangeRequested:", newMode, "from:", requesterSocketId);
+      if (setModeChangeRequest) {
+        setModeChangeRequest({
+          requesterSocketId,
+          newMode,
+          requestedAt,
+        });
+      }
+    },
+
+    handleModeChangeAccepted: ({ newMode, acceptedBy }) => {
+      console.log("[Socket] modeChangeAccepted:", newMode, "by:", acceptedBy);
+      if (setModeChangeRequest) {
+        setModeChangeRequest(null);
+      }
+      if (setGameMode) {
+        setGameMode(newMode);
+      }
+      // Reset history for the new mode
+      if (resetHistoryRef?.current) {
+        resetHistoryRef.current("Mode changed • X to move", "system", newMode);
+      }
+    },
+
+    handleModeChangeRejected: ({ rejectedMode, rejectedBy }) => {
+      console.log("[Socket] modeChangeRejected:", rejectedMode, "by:", rejectedBy);
+      if (setModeChangeRequest) {
+        setModeChangeRequest(null);
+      }
+    },
+
+    handleModeChangeCancelled: ({ cancelledBy }) => {
+      console.log("[Socket] modeChangeCancelled by:", cancelledBy);
+      if (setModeChangeRequest) {
+        setModeChangeRequest(null);
+      }
     },
   };
 }
@@ -160,6 +207,10 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     handleMatchError,
     handleStartGame,
     handleConnection,
+    handleModeChangeRequested,
+    handleModeChangeAccepted,
+    handleModeChangeRejected,
+    handleModeChangeCancelled,
   } = handlers;
 
   // Register event listeners
@@ -169,6 +220,12 @@ export function registerSocketHandlers(socket, handlers, addListener) {
   socket.on("matchFound", handleMatchFound);
   socket.on("matchError", handleMatchError);
   socket.on("startGame", handleStartGame);
+  
+  // Mode change events
+  if (handleModeChangeRequested) socket.on("modeChangeRequested", handleModeChangeRequested);
+  if (handleModeChangeAccepted) socket.on("modeChangeAccepted", handleModeChangeAccepted);
+  if (handleModeChangeRejected) socket.on("modeChangeRejected", handleModeChangeRejected);
+  if (handleModeChangeCancelled) socket.on("modeChangeCancelled", handleModeChangeCancelled);
 
   // Subscribe to connection state changes
   const unsubscribe = addListener(handleConnection);
@@ -186,6 +243,10 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     socket.off("matchFound", handleMatchFound);
     socket.off("matchError", handleMatchError);
     socket.off("startGame", handleStartGame);
+    socket.off("modeChangeRequested", handleModeChangeRequested);
+    socket.off("modeChangeAccepted", handleModeChangeAccepted);
+    socket.off("modeChangeRejected", handleModeChangeRejected);
+    socket.off("modeChangeCancelled", handleModeChangeCancelled);
     unsubscribe();
   };
 }

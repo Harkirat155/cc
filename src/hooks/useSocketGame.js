@@ -16,40 +16,28 @@ import {
   createConnectionHandler,
   registerSocketHandlers,
 } from "./socketHandlers";
-import { emptyBoard } from "../utils/board";
+import { getModeConfig, getPersistedMode, setPersistedMode, createEmptyBoard, DEFAULT_MODE } from "../utils/gameMode";
+import { calcWinnerWithMode } from "../utils/winCheck";
 
-// Local game helpers (fallback when not in a multiplayer room)
-const LINES = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
-function calcWinner(board) {
-  for (const [a, b, c] of LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c])
-      return { winner: board[a], line: [a, b, c] };
-  }
-  if (board.every((c) => c !== "")) return { winner: "draw", line: [] };
-  return null;
+// Local game helpers with mode support
+function calcWinner(board, modeId = DEFAULT_MODE) {
+  const { size, streak } = getModeConfig(modeId);
+  return calcWinnerWithMode(board, size, streak);
 }
 
-const initialLocalState = {
-  board: emptyBoard(),
+const createInitialLocalState = (modeId = DEFAULT_MODE) => ({
+  board: createEmptyBoard(modeId),
   turn: "X",
   winner: null,
   winningLine: [],
   xScore: 0,
   oScore: 0,
-};
+  gameMode: modeId,
+});
 
 export default function useSocketGame() {
-  const [gameState, setGameState] = useState(initialLocalState);
+  const [gameMode, setGameMode] = useState(() => getPersistedMode());
+  const [gameState, setGameState] = useState(() => createInitialLocalState(gameMode));
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null);
   const [roster, setRoster] = useState({ X: null, O: null, spectators: [] });
@@ -60,6 +48,7 @@ export default function useSocketGame() {
   const [newGameRequester, setNewGameRequester] = useState(null);
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
   const [connectionState, setConnectionState] = useState(isConnected() ? "connected" : "disconnected");
+  const [modeChangeRequest, setModeChangeRequest] = useState(null);
 
   // Lobby state (inlined to avoid closure issues)
   const [lobbyQueue, setLobbyQueue] = useState([]);
@@ -71,6 +60,7 @@ export default function useSocketGame() {
   const clientIdRef = useRef(getClientId());
   const socketRef = useRef(null); // Lazy socket reference
   const recordMoveRef = useRef(null); // Ref to latest recordMove function
+  const resetHistoryRef = useRef(null); // Ref to latest resetHistory function
 
   // Use extracted hooks
   const { displayName, updateDisplayName: baseUpdateDisplayName } = useDisplayName();
@@ -91,6 +81,11 @@ export default function useSocketGame() {
     recordMoveRef.current = recordMove;
   }, [recordMove]);
 
+  // Keep resetHistoryRef updated with latest function
+  useEffect(() => {
+    resetHistoryRef.current = resetHistory;
+  }, [resetHistory]);
+
   const isMultiplayer = !!roomId;
 
   // Register socket event handlers (using extracted handler creators - Dependency Inversion)
@@ -107,7 +102,9 @@ export default function useSocketGame() {
       setNewGameRequester,
       setNewGameRequestedAt,
       setShowModal,
-    }, { recordMoveRef });
+      setModeChangeRequest,
+      setGameMode,
+    }, { recordMoveRef, resetHistoryRef });
 
     const lobbyHandlers = createLobbyEventHandlers({
       setLobbyQueue,
@@ -157,13 +154,16 @@ export default function useSocketGame() {
       ensureSocket();
       const socket = await waitForConnection();
       
-      console.log("[Lobby] Socket connected, emitting joinLobby with name:", displayNameArg);
+      console.log("[Lobby] Socket connected, emitting joinLobby with name:", displayNameArg, "mode:", gameMode);
       
       return new Promise((resolve, reject) => {
-        socket.emit("joinLobby", { displayName: displayNameArg }, (response) => {
+        socket.emit("joinLobby", { displayName: displayNameArg, gameMode }, (response) => {
           console.log("[Lobby] joinLobby response:", response);
           if (response?.success) {
             setIsInLobby(true);
+            if (response.gameMode) {
+              setGameMode(response.gameMode);
+            }
             resolve(response);
           } else {
             const error = response?.error || "Failed to join lobby";
@@ -178,7 +178,7 @@ export default function useSocketGame() {
       setLobbyError("Connection failed");
       throw err;
     }
-  }, [ensureSocket]);
+  }, [ensureSocket, gameMode]);
 
   // Leave lobby
   const leaveLobby = useCallback(() => {
@@ -205,13 +205,62 @@ export default function useSocketGame() {
   }, []);
 
 
+  // Change game mode (local: immediate, multiplayer: request-based)
+  const changeGameMode = useCallback((newMode) => {
+    if (!isMultiplayer) {
+      // Local mode: apply immediately
+      setPersistedMode(newMode);
+      setGameMode(newMode);
+      setGameState(createInitialLocalState(newMode));
+      resetHistory("Mode changed • X to move", "system", newMode);
+    } else if (socketRef.current?.connected && roomId) {
+      // Multiplayer mode: send request for other player to approve
+      socketRef.current.emit("requestModeChange", { roomId, newMode }, (response) => {
+        if (!response?.success) {
+          console.error("[ModeChange] Request failed:", response?.error);
+        }
+      });
+    }
+  }, [isMultiplayer, roomId, resetHistory]);
+
+  // Accept a mode change request from another player
+  const acceptModeChange = useCallback(() => {
+    if (!isMultiplayer || !socketRef.current?.connected || !roomId) return;
+    socketRef.current.emit("acceptModeChange", { roomId }, (response) => {
+      if (!response?.success) {
+        console.error("[ModeChange] Accept failed:", response?.error);
+      }
+    });
+  }, [isMultiplayer, roomId]);
+
+  // Reject a mode change request from another player
+  const rejectModeChange = useCallback(() => {
+    if (!isMultiplayer || !socketRef.current?.connected || !roomId) return;
+    socketRef.current.emit("rejectModeChange", { roomId }, (response) => {
+      if (!response?.success) {
+        console.error("[ModeChange] Reject failed:", response?.error);
+      }
+    });
+  }, [isMultiplayer, roomId]);
+
+  // Cancel your own mode change request
+  const cancelModeChangeRequest = useCallback(() => {
+    if (!isMultiplayer || !socketRef.current?.connected || !roomId) return;
+    socketRef.current.emit("cancelModeChangeRequest", { roomId }, (response) => {
+      if (!response?.success) {
+        console.error("[ModeChange] Cancel failed:", response?.error);
+      }
+    });
+    setModeChangeRequest(null);
+  }, [isMultiplayer, roomId]);
+
   const createRoom = useCallback(async () => {
     const currentDisplayName = getDisplayName();
     
     try {
       ensureSocket();
       const socket = await waitForConnection();
-      socket.emit("createRoom", { clientId: clientIdRef.current, displayName: currentDisplayName }, (resp) => {
+      socket.emit("createRoom", { clientId: clientIdRef.current, displayName: currentDisplayName, gameMode }, (resp) => {
         if (resp?.error) {
           setMessage(resp.error);
           return;
@@ -221,12 +270,15 @@ export default function useSocketGame() {
         setIsRoomCreator(true);
         setMessage(`Room ${resp.roomId} created. Waiting for opponent...`);
         setPersistedRoom(resp.roomId);
+        if (resp.gameMode) {
+          setGameMode(resp.gameMode);
+        }
       });
     } catch (err) {
       console.error("[Room] Failed to create room:", err);
       setMessage("Connection failed");
     }
-  }, [ensureSocket]);
+  }, [ensureSocket, gameMode]);
 
   const joinRoom = useCallback(async (code) => {
     const currentDisplayName = getDisplayName();
@@ -271,12 +323,14 @@ export default function useSocketGame() {
         return;
       }
 
-      // Local fallback
+      // Local fallback with mode support
+      const currentMode = gameState.gameMode || gameMode;
+      
       setGameState((current) => {
         if (current.winner || current.board[index] !== "") return current;
         const newBoard = [...current.board];
         newBoard[index] = current.turn;
-        const result = calcWinner(newBoard);
+        const result = calcWinner(newBoard, currentMode);
         const newTurn = current.turn === "X" ? "O" : "X";
 
         const newState = {
@@ -301,40 +355,43 @@ export default function useSocketGame() {
         return newState;
       });
     },
-    [isMultiplayer, player, roomId, gameState.turn, gameState.winner, gameState.board, recordMove, resumeLatest]
+    [isMultiplayer, player, roomId, gameState.turn, gameState.winner, gameState.board, gameState.gameMode, gameMode, recordMove, resumeLatest]
   );
 
   const resetGame = useCallback(() => {
     finalizeCurrentGame(gameState.winner);
+    const currentMode = gameState.gameMode || gameMode;
 
     if (isMultiplayer && socketRef.current?.connected) {
       socketRef.current.emit("resetGame", { roomId });
     } else {
       setGameState((prev) => ({
-        ...initialLocalState,
+        ...createInitialLocalState(currentMode),
         xScore: prev.xScore,
         oScore: prev.oScore,
       }));
     }
 
-    resetHistory("New game • X to move", "reset");
+    resetHistory("New game • X to move", "reset", currentMode);
     setShowModal(false);
     setNewGameRequester(null);
-  }, [finalizeCurrentGame, gameState.winner, isMultiplayer, roomId, resetHistory]);
+  }, [finalizeCurrentGame, gameState.winner, gameState.gameMode, gameMode, isMultiplayer, roomId, resetHistory]);
 
   const resetScores = useCallback(() => {
+    const currentMode = gameState.gameMode || gameMode;
+    
     if (isMultiplayer && socketRef.current?.connected) {
       // In multiplayer, only emit to server - don't reset local state
       // Server will broadcast gameUpdate with zeroed scores
       socketRef.current.emit("resetScores", { roomId });
     } else {
       // Local game: reset everything
-      setGameState(() => ({ ...initialLocalState }));
-      resetHistory("Scores reset • X to move", "system");
+      setGameState(() => ({ ...createInitialLocalState(currentMode) }));
+      resetHistory("Scores reset • X to move", "system", currentMode);
     }
     setShowModal(false);
     setNewGameRequester(null);
-  }, [isMultiplayer, roomId, resetHistory]);
+  }, [isMultiplayer, roomId, gameState.gameMode, gameMode, resetHistory]);
 
   const leaveRoom = useCallback(() => {
     return new Promise((resolve) => {
@@ -353,15 +410,15 @@ export default function useSocketGame() {
       setPlayer(null);
       setIsRoomCreator(false);
       setRoster({ X: null, O: null, spectators: [] });
-      setGameState(initialLocalState);
+      setGameState(createInitialLocalState(gameMode));
       setMessage("Left room");
       setPersistedRoom(null);
-      resetHistory("Left room", "system");
+      resetHistory("Left room", "system", gameMode);
       setShowModal(false);
       setNewGameRequester(null);
       resolve();
     });
-  }, [isMultiplayer, roomId, finalizeCurrentGame, gameState.winner, resetHistory]);
+  }, [isMultiplayer, roomId, finalizeCurrentGame, gameState.winner, gameMode, resetHistory]);
 
   // Display name update with server notification
   const updateDisplayName = useCallback(
@@ -427,5 +484,13 @@ export default function useSocketGame() {
     // Display name
     displayName,
     updateDisplayName,
+    // Game mode
+    gameMode,
+    changeGameMode,
+    // Mode change request (multiplayer)
+    modeChangeRequest,
+    acceptModeChange,
+    rejectModeChange,
+    cancelModeChangeRequest,
   };
 }

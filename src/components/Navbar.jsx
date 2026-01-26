@@ -4,6 +4,7 @@ import ThemeToggle from "./ThemeToggle";
 import { Mic, MicOff, Wifi, WifiOff } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
+import AppLauncher from "./AppLauncher";
 
 const Navbar = ({
   onToggleHistory,
@@ -16,6 +17,9 @@ const Navbar = ({
   connectionState = 'disconnected',
   menuPanel = null,
   menuItems = [],
+  gameMode = 'classic',
+  onGameModeChange,
+  modeChangeRequest = null,
 }) => {
   const menuActions = [...menuItems];
 
@@ -107,6 +111,12 @@ const Navbar = ({
                 </button>
               </Tooltip>
             )}
+            <AppLauncher
+              currentMode={gameMode}
+              onModeChange={onGameModeChange}
+              isMultiplayer={isMultiplayer}
+              modeChangeRequest={modeChangeRequest}
+            />
             <ThemeToggle />
             <NavMenu actions={menuActions} panel={menuPanel} />
           </div>

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LobbyView from './components/LobbyView';
 import useSocketGame from './hooks/useSocketGame';
+import { getPersistedMode } from './utils/gameMode';
 
 /**
  * Lobby Page - Matchmaking lobby container
@@ -20,25 +21,34 @@ const Lobby = () => {
     roomId,
     displayName,
     connectionState,
+    gameMode,
+    changeGameMode,
   } = useSocketGame();
 
+  const [selectedMode, setSelectedMode] = useState(() => getPersistedMode());
   const hasJoinedRef = useRef(false);
 
-  // Auto-join lobby on mount with generated name
-  useEffect(() => {
-    if (!hasJoinedRef.current && !isInLobby && displayName) {
+  // Handle mode change before joining lobby
+  const handleModeChange = useCallback((mode) => {
+    setSelectedMode(mode);
+    changeGameMode(mode);
+  }, [changeGameMode]);
+
+  // Handle join lobby with selected mode
+  const handleJoinLobby = useCallback(() => {
+    if (!hasJoinedRef.current && displayName) {
       hasJoinedRef.current = true;
       
       joinLobby(displayName)
         .then(() => {
-          console.log('[Lobby] Successfully joined lobby');
+          console.log('[Lobby] Successfully joined lobby with mode:', selectedMode);
         })
         .catch((err) => {
           hasJoinedRef.current = false;
           console.error('Failed to join lobby:', err);
         });
     }
-  }, [displayName, isInLobby, joinLobby]);
+  }, [displayName, joinLobby, selectedMode]);
 
   // Leave lobby on unmount
   useEffect(() => {
@@ -68,10 +78,13 @@ const Lobby = () => {
     <LobbyView
       lobbyQueue={lobbyQueue}
       isInLobby={isInLobby}
+      onJoinLobby={handleJoinLobby}
       onLeaveLobby={handleLeaveLobby}
       socketId={socketId}
       displayName={displayName}
       connectionState={connectionState}
+      gameMode={selectedMode}
+      onGameModeChange={handleModeChange}
     />
   );
 };

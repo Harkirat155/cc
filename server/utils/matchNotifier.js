@@ -9,18 +9,21 @@
  * @param {string} roomId - Room ID
  * @param {Object} player1 - First player details
  * @param {Object} player2 - Second player details
+ * @param {string} gameMode - Game mode
  */
-export function notifyPlayersOfMatch(io, roomId, player1, player2) {
+export function notifyPlayersOfMatch(io, roomId, player1, player2, gameMode = 'classic') {
   io.to(player1.socketId).emit('matchFound', {
     roomId,
     player: 'X',
     opponent: player2.displayName,
+    gameMode,
   });
   
   io.to(player2.socketId).emit('matchFound', {
     roomId,
     player: 'O',
     opponent: player1.displayName,
+    gameMode,
   });
 }
 

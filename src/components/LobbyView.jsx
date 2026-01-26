@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Button from './ui/Button';
+import GameModeSelector from './GameModeSelector';
+import { GAME_MODES, getPersistedMode } from '../utils/gameMode';
 
 // Fun tips to show while waiting
 const WAITING_TIPS = [
@@ -16,19 +18,36 @@ const WAITING_TIPS = [
 /**
  * LobbyView - Matchmaking lobby interface
  * Single Responsibility: Display lobby UI and handle user interactions
- * Users are automatically placed in lobby with a generated name
+ * Supports game mode selection before joining
  */
 const LobbyView = ({ 
   lobbyQueue = [], 
   isInLobby = false, 
+  onJoinLobby,
   onLeaveLobby,
   socketId,
   displayName = '',
-  connectionState = 'disconnected'
+  connectionState = 'disconnected',
+  gameMode: externalGameMode,
+  onGameModeChange,
 }) => {
+  const [selectedMode, setSelectedMode] = useState(() => externalGameMode || getPersistedMode());
+
+  const handleModeChange = useCallback((mode) => {
+    setSelectedMode(mode);
+    onGameModeChange?.(mode);
+  }, [onGameModeChange]);
+
+  const handleJoinLobby = useCallback(() => {
+    onJoinLobby?.(selectedMode);
+  }, [onJoinLobby, selectedMode]);
+
   const handleLeaveLobby = useCallback(() => {
     onLeaveLobby();
   }, [onLeaveLobby]);
+
+  // Get mode display info
+  const modeInfo = useMemo(() => GAME_MODES[selectedMode] || GAME_MODES.classic, [selectedMode]);
 
   // Calculate user's position in queue
   const userPosition = lobbyQueue.findIndex(p => p.socketId === socketId);
@@ -92,23 +111,58 @@ const LobbyView = ({
         </div>
 
         <div className="p-8">
-          {/* Waiting State */}
-          <div className="space-y-6">
-            <div className="text-center py-8">
-              <div className="relative inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
-                <svg 
-                  className="animate-spin h-10 w-10 text-blue-600 dark:text-blue-400" 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  fill="none" 
-                  viewBox="0 0 24 24"
+          {!isInLobby ? (
+            /* Pre-lobby: Show mode selector and join button */
+            <div className="space-y-6">
+              <div className="text-center py-4">
+                <h2 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">
+                  Choose Your Game Mode
+                </h2>
+                <p className="text-stone-600 dark:text-gray-400">
+                  Select a mode and find an opponent
+                </p>
+              </div>
+
+              <GameModeSelector
+                selectedMode={selectedMode}
+                onModeChange={handleModeChange}
+                disabled={false}
+              />
+
+              <div className="pt-4">
+                <Button
+                  onClick={handleJoinLobby}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 rounded-xl font-semibold text-lg shadow-lg transition-all hover:shadow-xl"
                 >
-                  <circle 
-                    className="opacity-25" 
-                    cx="12" 
-                    cy="12" 
-                    r="10" 
-                    stroke="currentColor" 
-                    strokeWidth="4"
+                  🎮 Find Match
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* In lobby: Waiting state */
+            <div className="space-y-6">
+              {/* Mode indicator */}
+              <div className="flex justify-center">
+                <span className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">
+                  {modeInfo.icon} {modeInfo.name}
+                </span>
+              </div>
+
+              <div className="text-center py-8">
+                <div className="relative inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
+                  <svg 
+                    className="animate-spin h-10 w-10 text-blue-600 dark:text-blue-400" 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    fill="none" 
+                    viewBox="0 0 24 24"
+                  >
+                    <circle 
+                      className="opacity-25" 
+                      cx="12" 
+                      cy="12" 
+                      r="10" 
+                      stroke="currentColor" 
+                      strokeWidth="4"
                   />
                   <path 
                     className="opacity-75" 
@@ -193,7 +247,8 @@ const LobbyView = ({
             >
               Leave Lobby
             </Button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Info Footer */}

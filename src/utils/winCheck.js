@@ -1,51 +1,8 @@
-// Game logic helpers
-
-/**
- * Game mode configurations (mirrored from client)
- */
-export const GAME_MODES = {
-  classic: { id: 'classic', size: 3, streak: 3 },
-  ultimate: { id: 'ultimate', size: 5, streak: 4 },
-};
-
-export const DEFAULT_MODE = 'classic';
-
-/**
- * Get mode config by id
- * @param {string} modeId
- * @returns {Object}
- */
-export function getModeConfig(modeId) {
-  return GAME_MODES[modeId] || GAME_MODES[DEFAULT_MODE];
-}
-
-/**
- * Create empty board for a given mode
- * @param {string} modeId
- * @returns {string[]}
- */
-export function emptyBoard(modeId = DEFAULT_MODE) {
-  const { size } = getModeConfig(modeId);
-  return Array(size * size).fill("");
-}
-
-// Legacy export for backward compatibility (3x3)
-export const LINES = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
-
 /**
  * Check for a winner on a generalized board
  * @param {string[]} board - Flat array of board state
- * @param {number} size - Board dimension
- * @param {number} streak - Number in a row to win
+ * @param {number} size - Board dimension (size x size)
+ * @param {number} streak - Number in a row needed to win
  * @param {string} player - 'X' or 'O'
  * @returns {{ win: boolean, line?: number[] }}
  */
@@ -122,14 +79,22 @@ export function checkWin(board, size, streak, player) {
 }
 
 /**
- * Calculate winner with mode support
+ * Check for draw (board full, no winner)
  * @param {string[]} board
- * @param {string} modeId - Game mode id (optional, defaults to classic for backward compat)
- * @returns {{ winner: string | null, line: number[] } | null}
+ * @returns {boolean}
  */
-export function calcWinner(board, modeId = DEFAULT_MODE) {
-  const { size, streak } = getModeConfig(modeId);
-  
+export function checkDraw(board) {
+  return board.every((cell) => cell !== '');
+}
+
+/**
+ * Calculate winner using mode configuration
+ * @param {string[]} board
+ * @param {number} size
+ * @param {number} streak
+ * @returns {{ winner: string | null, line: number[] }}
+ */
+export function calcWinnerWithMode(board, size, streak) {
   const xResult = checkWin(board, size, streak, 'X');
   if (xResult.win) {
     return { winner: 'X', line: xResult.line };
@@ -140,31 +105,9 @@ export function calcWinner(board, modeId = DEFAULT_MODE) {
     return { winner: 'O', line: oResult.line };
   }
 
-  if (board.every((c) => c !== "")) {
-    return { winner: "draw", line: [] };
+  if (checkDraw(board)) {
+    return { winner: 'draw', line: [] };
   }
 
-  return null;
-}
-
-export function genCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 5; i++)
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return code;
-}
-
-export function initialState(modeId = DEFAULT_MODE) {
-  return {
-    board: emptyBoard(modeId),
-    turn: "X",
-    winner: null,
-    winningLine: [],
-    xScore: 0,
-    oScore: 0,
-    newGameRequester: null,
-    newGameRequestedAt: null,
-    gameMode: modeId,
-  };
+  return { winner: null, line: [] };
 }

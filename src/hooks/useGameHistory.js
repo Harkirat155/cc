@@ -5,7 +5,7 @@ import {
   detectChangedIndex,
 } from "../utils/history";
 import { shouldArchiveCompletedGame } from "../utils/completedGames";
-import { emptyBoard } from "../utils/board";
+import { createEmptyBoard, DEFAULT_MODE } from "../utils/gameMode";
 
 /**
  * Hook for managing game move history and completed game archives.
@@ -17,7 +17,7 @@ export default function useGameHistory() {
   // Move-by-move history for the CURRENT (ongoing) game
   const [moveHistory, setMoveHistory] = useState(() => [
     createSystemEntry({
-      board: emptyBoard(),
+      board: createEmptyBoard(DEFAULT_MODE),
       message: "Game start • X to move",
       moveNumber: 0,
     }),
@@ -29,7 +29,7 @@ export default function useGameHistory() {
   // Sequence of moves for current game (compact form)
   const moveSequenceRef = useRef([]);
   const lastArchivedSignatureRef = useRef(null);
-  const lastBoardRef = useRef(emptyBoard());
+  const lastBoardRef = useRef(createEmptyBoard(DEFAULT_MODE));
 
   // Time-travel index (which snapshot user is viewing)
   const [viewIndex, setViewIndex] = useState(0);
@@ -43,7 +43,7 @@ export default function useGameHistory() {
    * Record a move in history
    */
   const recordMove = useCallback((board, resultText, entryType, timestamp = Date.now()) => {
-    const boardSnapshot = Array.isArray(board) ? board.slice() : emptyBoard();
+    const boardSnapshot = Array.isArray(board) ? board.slice() : createEmptyBoard(DEFAULT_MODE);
     const changedIndex = detectChangedIndex(lastBoardRef.current, boardSnapshot);
     const mark = changedIndex !== null && changedIndex >= 0 ? boardSnapshot[changedIndex] : null;
 
@@ -119,9 +119,12 @@ export default function useGameHistory() {
 
   /**
    * Reset history for a new game
+   * @param {string} message - Message to display
+   * @param {string} tag - Tag for the entry type
+   * @param {string} modeId - Game mode for correct board size
    */
-  const resetHistory = useCallback((message = "New game • X to move", tag = "reset") => {
-    const freshBoard = emptyBoard();
+  const resetHistory = useCallback((message = "New game • X to move", tag = "reset", modeId = DEFAULT_MODE) => {
+    const freshBoard = createEmptyBoard(modeId);
     moveSequenceRef.current = [];
     lastBoardRef.current = freshBoard;
     setMoveHistory([
