@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MenuPanel from "./components/MenuPanel";
@@ -18,6 +18,11 @@ import FeedbackDialog from "./components/FeedbackDialog";
 const Game = () => {
   const navigate = useNavigate();
   const { roomId: paramRoomId } = useParams();
+  const [searchParams] = useSearchParams();
+  // Allow deep-linking a game variant: /?game=connect4 will create rooms with
+  // gameId='connect4'. Unknown values fall through and the server picks the
+  // default ('ttt'), so this is safe to feed user input.
+  const requestedGameId = searchParams.get("game") || null;
   const {
     run: runWalkthrough,
     steps: walkthroughSteps,
@@ -43,8 +48,11 @@ const Game = () => {
     createRoom,
     joinRoom,
     handleSquareClick,
+    selection,
+    legalTargets,
     resetGame,
     resetScores,
+    switchGame,
     leaveRoom,
     socketId,
     roster,
@@ -341,20 +349,34 @@ const Game = () => {
             roomId={roomId}
             displayName={displayName}
             onUpdateDisplayName={updateDisplayName}
+            onSwitchGame={switchGame}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
             <GameBoard
               squares={displayedBoard}
               onSquareClick={handleSquareClick}
               winningSquares={winningSquares}
+              rows={gameState?.boardSpec?.rows}
+              cols={gameState?.boardSpec?.cols}
+              playerInfo={gameState?.playerInfo}
+              boardSpec={gameState?.boardSpec}
+              moveStyle={gameState?.moveStyle}
+              selection={selection}
+              legalTargets={legalTargets}
             />
             <MenuPanel
               onReset={resetScores}
               onNewGame={resetGame}
               hasMoves={history.length > 1}
               canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
-              createRoom={createRoom}
-              onFindMatch={() => navigate('/lobby')}
+              createRoom={() => createRoom(requestedGameId)}
+              onFindMatch={() => {
+                const gameId = gameState?.gameId || requestedGameId;
+                navigate({
+                  pathname: '/lobby',
+                  search: gameId && gameId !== 'ttt' ? `?game=${encodeURIComponent(gameId)}` : '',
+                });
+              }}
               leaveRoom={async () => {
                 setSuppressAutoJoin(true);
                 await leaveRoom();

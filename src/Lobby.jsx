@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LobbyView from './components/LobbyView';
 import useSocketGame from './hooks/useSocketGame';
+import '@shared/games/index.js';
+import { get as getGameRules } from '@shared/games/registry.js';
 
 /**
  * Lobby Page - Matchmaking lobby container
@@ -11,7 +13,9 @@ import useSocketGame from './hooks/useSocketGame';
  */
 const Lobby = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
+    gameState,
     lobbyQueue,
     isInLobby,
     joinLobby,
@@ -23,13 +27,23 @@ const Lobby = () => {
   } = useSocketGame();
 
   const hasJoinedRef = useRef(false);
+  const preferredGameId = useMemo(() => {
+    const requested = searchParams.get('game') || gameState?.gameId || 'ttt';
+    const normalized = requested.trim().toLowerCase();
+    try {
+      getGameRules(normalized);
+      return normalized;
+    } catch {
+      return 'ttt';
+    }
+  }, [gameState?.gameId, searchParams]);
 
   // Auto-join lobby on mount with generated name
   useEffect(() => {
     if (!hasJoinedRef.current && !isInLobby && displayName) {
       hasJoinedRef.current = true;
       
-      joinLobby(displayName)
+      joinLobby(displayName, preferredGameId)
         .then(() => {
           console.log('[Lobby] Successfully joined lobby');
         })
@@ -38,7 +52,7 @@ const Lobby = () => {
           console.error('Failed to join lobby:', err);
         });
     }
-  }, [displayName, isInLobby, joinLobby]);
+  }, [displayName, isInLobby, joinLobby, preferredGameId]);
 
   // Leave lobby on unmount
   useEffect(() => {
@@ -72,6 +86,7 @@ const Lobby = () => {
       socketId={socketId}
       displayName={displayName}
       connectionState={connectionState}
+      preferredGameId={preferredGameId}
     />
   );
 };

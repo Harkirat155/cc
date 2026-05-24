@@ -112,7 +112,22 @@ export default [
         module: 'readonly',
         require: 'readonly',
         process: 'readonly',
+        URL: 'readonly',
       },
+    },
+  },
+
+  // Shared game rules — pure ESM, imported by both server and client.
+  // No DOM, no Node globals.
+  {
+    name: 'shared-games',
+    files: ['shared/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
 
@@ -130,6 +145,8 @@ export default [
         expect: 'readonly',
         beforeEach: 'readonly',
         afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
         jest: 'readonly',
       },
     },

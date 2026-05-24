@@ -5,12 +5,18 @@ import {
   publish,
   trackSocketRoom,
   createRoom,
+  DEFAULT_GAME_ID,
   rooms,
 } from '../roomManager.js';
 import { lobbyManager, broadcastLobbyState } from '../lobbyManager.js';
 import { socketLog as log } from '../logger.js';
 import { generateUniqueRoomId } from '../utils/roomIdGenerator.js';
 import { notifyPlayersOfMatch, notifyPlayersOfMatchFailure } from '../utils/matchNotifier.js';
+import { validateGameId } from './validation.js';
+
+function resolveMatchGameId(player1) {
+  return validateGameId(player1?.gameId) || DEFAULT_GAME_ID;
+}
 
 /**
  * Register lobby-related event handlers
@@ -18,8 +24,9 @@ import { notifyPlayersOfMatch, notifyPlayersOfMatchFailure } from '../utils/matc
  * @param {Server} io - Socket.IO server instance
  */
 export function registerLobbyHandlers(socket, io) {
-  socket.on('joinLobby', ({ displayName }, ack) => {
-    const result = lobbyManager.addPlayer(socket.id, displayName);
+  socket.on('joinLobby', ({ displayName, gameId } = {}, ack) => {
+    const preferredGameId = validateGameId(gameId) || DEFAULT_GAME_ID;
+    const result = lobbyManager.addPlayer(socket.id, displayName, preferredGameId);
 
     if (!result.success) {
       return ack?.({ success: false, error: result.error });
@@ -60,10 +67,13 @@ export function registerLobbyHandlers(socket, io) {
  * @param {Object} player2 - Second player details
  */
 function setupMatchedRoom(roomId, player1, player2) {
+  const gameId = resolveMatchGameId(player1);
+
   // Create room with first player
   createRoom(roomId, {
     creatorSocketId: player1.socketId,
     creatorDisplayName: player1.displayName,
+    gameId,
   });
 
   // Add second player to room
@@ -108,6 +118,7 @@ export function handleMatch(io, players) {
   }
 
   const roomId = roomIdResult.roomId;
+  const gameId = resolveMatchGameId(player1);
 
   // Setup room and add players
   setupMatchedRoom(roomId, player1, player2);
@@ -119,6 +130,7 @@ export function handleMatch(io, players) {
   // Log match creation
   log.info('Match created', {
     roomId,
+    gameId,
     player1: player1.displayName,
     player2: player2.displayName,
   });

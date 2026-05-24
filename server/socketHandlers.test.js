@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import '../shared/games/index.js'; // register built-in games
 import { registerSocketHandlers } from './socketHandlers.js';
 import { rooms } from './roomManager.js';
 

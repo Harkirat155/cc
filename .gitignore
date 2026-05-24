@@ -2,6 +2,7 @@
 /dist
 /build
 /.env
+/.env.deploy
 /.DS_Store
 
 /.vscode
@@ -27,6 +28,9 @@
 
 first.md
 package-lock.json
+
+# Claude Code per-developer settings (committed: .claude/settings.json)
+/.claude/settings.local.json
 
 # Playwright
 node_modules/

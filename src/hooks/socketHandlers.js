@@ -22,19 +22,33 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
     setNewGameRequester,
     setNewGameRequestedAt,
     setShowModal,
+    setSelection,
   } = stateSetters;
 
-  const { recordMoveRef } = refs;
+  const { recordMoveRef, resetHistoryRef, gameIdRef } = refs;
 
   return {
     handleGameUpdate: (payload) => {
       console.log("[Socket] gameUpdate received");
       const effectiveRoomId = payload.roomId;
+      const previousGameId = gameIdRef?.current;
+      const nextGameId = payload.gameId || previousGameId;
+      const gameChanged = Boolean(
+        previousGameId && nextGameId && previousGameId !== nextGameId
+      );
+      if (nextGameId && gameIdRef) gameIdRef.current = nextGameId;
+
       if (effectiveRoomId) setPersistedRoom(effectiveRoomId);
       setRoomId(effectiveRoomId);
-      setGameState((prev) => ({ ...prev, ...payload }));
+      setGameState((prev) => {
+        const next = { ...prev, ...payload };
+        delete next.__internal;
+        return next;
+      });
       if (payload.roster) setRoster(payload.roster);
       if (payload.voiceRoster) setVoiceRoster(payload.voiceRoster || {});
+
+      const boardSnapshot = Array.isArray(payload.board) ? payload.board.slice() : emptyBoard();
 
       if (payload.newGameRequester !== undefined) {
         setNewGameRequester(payload.newGameRequester);
@@ -48,6 +62,13 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
         setNewGameRequestedAt(null);
       }
 
+      if (gameChanged) {
+        setShowModal(Boolean(payload.winner));
+        setSelection?.(null);
+        resetHistoryRef?.current?.("Game switched", "system", boardSnapshot);
+        return;
+      }
+
       // Record move in history (using ref to get latest recordMove function)
       if (recordMoveRef?.current) {
         const resultText = payload.winner
@@ -55,13 +76,16 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
             ? "Draw"
             : `${payload.winner} wins`
           : `${payload.turn}'s turn`;
-        const boardSnapshot = Array.isArray(payload.board) ? payload.board.slice() : emptyBoard();
         const entryType = payload.winner
           ? payload.winner === "draw"
             ? "draw"
             : "win"
           : "move";
-        recordMoveRef.current(boardSnapshot, resultText, entryType);
+        recordMoveRef.current(boardSnapshot, resultText, entryType, {
+          move: payload.lastMove ?? null,
+          events: Array.isArray(payload.lastEvents) ? payload.lastEvents : null,
+          slot: Number.isInteger(payload.lastMoveBy) ? payload.lastMoveBy : null,
+        });
       }
 
       // Show modal on game end
@@ -74,6 +98,7 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
       setNewGameRequester(null);
       setNewGameRequestedAt(null);
       setShowModal(false);
+      setSelection?.(null);
     },
   };
 }

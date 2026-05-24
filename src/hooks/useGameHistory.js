@@ -13,11 +13,23 @@ import { emptyBoard } from "../utils/board";
  *
  * @returns {object} History state and actions
  */
-export default function useGameHistory() {
+export default function useGameHistory(initialBoardFactory) {
+  const resolveSeed = () => {
+    if (typeof initialBoardFactory === "function") {
+      try {
+        const v = initialBoardFactory();
+        if (Array.isArray(v)) return v;
+      } catch { /* fall through */ }
+    } else if (Array.isArray(initialBoardFactory)) {
+      return initialBoardFactory;
+    }
+    return emptyBoard();
+  };
+  const seedFactoryRef = useRef(resolveSeed);
   // Move-by-move history for the CURRENT (ongoing) game
   const [moveHistory, setMoveHistory] = useState(() => [
     createSystemEntry({
-      board: emptyBoard(),
+      board: seedFactoryRef.current(),
       message: "Game start • X to move",
       moveNumber: 0,
     }),
@@ -29,7 +41,7 @@ export default function useGameHistory() {
   // Sequence of moves for current game (compact form)
   const moveSequenceRef = useRef([]);
   const lastArchivedSignatureRef = useRef(null);
-  const lastBoardRef = useRef(emptyBoard());
+  const lastBoardRef = useRef(seedFactoryRef.current());
 
   // Time-travel index (which snapshot user is viewing)
   const [viewIndex, setViewIndex] = useState(0);
@@ -40,16 +52,40 @@ export default function useGameHistory() {
   }, [viewIndex]);
 
   /**
-   * Record a move in history
+   * Record a move in history.
+   *
+   * Backward-compatible signature: the 4th arg may be a timestamp (legacy)
+   * OR an options bag: { timestamp, move, events, slot }. When `events` is
+   * provided, its first entry's `affectedCells` takes precedence over the
+   * board-diff heuristic — required for piece-movement games where the
+   * board changes in 2+ cells per move.
    */
-  const recordMove = useCallback((board, resultText, entryType, timestamp = Date.now()) => {
+  const recordMove = useCallback((board, resultText, entryType, optionsOrTimestamp) => {
+    const options =
+      typeof optionsOrTimestamp === "object" && optionsOrTimestamp !== null
+        ? optionsOrTimestamp
+        : { timestamp: optionsOrTimestamp };
+    const timestamp = options.timestamp ?? Date.now();
+    const move = options.move ?? null;
+    const events = Array.isArray(options.events) ? options.events : null;
+    const slot = Number.isInteger(options.slot) ? options.slot : null;
+
     const boardSnapshot = Array.isArray(board) ? board.slice() : emptyBoard();
-    const changedIndex = detectChangedIndex(lastBoardRef.current, boardSnapshot);
-    const mark = changedIndex !== null && changedIndex >= 0 ? boardSnapshot[changedIndex] : null;
+
+    // Prefer affected cells from the rules-engine event (handles transfer
+    // moves cleanly); fall back to the board-diff heuristic for legacy
+    // callers / TTT-style placement.
+    const eventAffected = events?.[0]?.affectedCells;
+    const affectedCells = Array.isArray(eventAffected) && eventAffected.length
+      ? eventAffected.slice()
+      : null;
+    const diffIndex = detectChangedIndex(lastBoardRef.current, boardSnapshot);
+    const primaryIndex = affectedCells?.[0] ?? diffIndex;
+    const mark = primaryIndex !== null && primaryIndex >= 0 ? boardSnapshot[primaryIndex] : null;
 
     setMoveHistory((historyList) => {
       const moveNumber =
-        mark && changedIndex !== null
+        mark && primaryIndex !== null
           ? moveSequenceRef.current.length + 1
           : historyList.length;
 
@@ -59,12 +95,22 @@ export default function useGameHistory() {
         type: entryType,
         moveNumber,
         mark,
-        index: changedIndex,
+        index: primaryIndex,
         timestamp,
+        move,
+        affectedCells,
+        slot,
       });
 
-      if (appended && mark && changedIndex !== null) {
-        moveSequenceRef.current.push({ mark, index: changedIndex, timestamp });
+      if (appended && mark && primaryIndex !== null) {
+        moveSequenceRef.current.push({
+          mark,
+          index: primaryIndex,
+          timestamp,
+          move,
+          affectedCells,
+          slot,
+        });
       }
 
       // Auto-advance view if user was at the latest move
@@ -76,7 +122,7 @@ export default function useGameHistory() {
       return nextHistory;
     });
 
-    return { changedIndex, mark };
+    return { changedIndex: primaryIndex, mark };
   }, []);
 
   /**
@@ -120,8 +166,10 @@ export default function useGameHistory() {
   /**
    * Reset history for a new game
    */
-  const resetHistory = useCallback((message = "New game • X to move", tag = "reset") => {
-    const freshBoard = emptyBoard();
+  const resetHistory = useCallback((message = "New game • X to move", tag = "reset", boardOverride = null) => {
+    const freshBoard = Array.isArray(boardOverride)
+      ? boardOverride.slice()
+      : seedFactoryRef.current();
     moveSequenceRef.current = [];
     lastBoardRef.current = freshBoard;
     setMoveHistory([

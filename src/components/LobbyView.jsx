@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Button from './ui/Button';
+import '@shared/games/index.js';
+import { listAll } from '@shared/games/registry.js';
 
 // Fun tips to show while waiting
 const WAITING_TIPS = [
@@ -24,7 +26,8 @@ const LobbyView = ({
   onLeaveLobby,
   socketId,
   displayName = '',
-  connectionState = 'disconnected'
+  connectionState = 'disconnected',
+  preferredGameId = 'ttt'
 }) => {
   const handleLeaveLobby = useCallback(() => {
     onLeaveLobby();
@@ -54,6 +57,14 @@ const LobbyView = ({
   }, [isInLobby]);
 
   const currentTip = useMemo(() => WAITING_TIPS[tipIndex], [tipIndex]);
+  const gameNames = useMemo(
+    () => new Map(listAll().map((game) => [game.id, game.displayName])),
+    []
+  );
+  const gameName = useCallback(
+    (gameId) => gameNames.get(gameId) || gameNames.get('ttt') || 'Tic-Tac-Toe',
+    [gameNames]
+  );
 
   // Calculate estimated wait time based on queue position
   const estimatedWait = useMemo(() => {
@@ -125,6 +136,9 @@ const LobbyView = ({
               <p className="text-sm text-stone-500 dark:text-gray-400 mb-2">
                 Playing as: <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{displayName}</span>
               </p>
+              <p className="text-sm text-stone-500 dark:text-gray-400 mb-2">
+                Game: <span className="font-semibold text-stone-700 dark:text-gray-200">{gameName(preferredGameId)}</span>
+              </p>
               <div className="flex flex-col items-center gap-1">
                 <p className="text-stone-600 dark:text-gray-400">
                   {userPosition >= 0 && `Position in queue: ${userPosition + 1}`}
@@ -181,6 +195,9 @@ const LobbyView = ({
                           </p>
                         </div>
                       </div>
+                      <span className="rounded-full bg-stone-200 px-2.5 py-1 text-xs font-semibold text-stone-600 dark:bg-gray-700 dark:text-gray-200">
+                        {gameName(player.gameId)}
+                      </span>
                     </div>
                   );
                 })}

@@ -62,6 +62,20 @@ describe('LobbyManager', () => {
       expect(player.joinedAt).toBeGreaterThanOrEqual(beforeAdd);
       expect(player.joinedAt).toBeLessThanOrEqual(afterAdd);
     });
+
+    test('should store selected game id with queued player', () => {
+      lobbyManager.addPlayer('socket123', 'TestPlayer', 'connect4');
+      const player = lobbyManager.getPlayer('socket123');
+
+      expect(player.gameId).toBe('connect4');
+    });
+
+    test('should default queued player game id to ttt', () => {
+      lobbyManager.addPlayer('socket123', 'TestPlayer');
+      const player = lobbyManager.getPlayer('socket123');
+
+      expect(player.gameId).toBe('ttt');
+    });
   });
 
   describe('removePlayer', () => {
@@ -116,6 +130,17 @@ describe('LobbyManager', () => {
       expect(result.players[1].socketId).toBe('socket2');
     });
 
+    test('should preserve first queued player game id in FIFO match', () => {
+      lobbyManager.addPlayer('socket1', 'Player1', 'connect4');
+      lobbyManager.addPlayer('socket2', 'Player2', 'checkers');
+
+      const result = lobbyManager.matchPlayers();
+
+      expect(result.matched).toBe(true);
+      expect(result.players[0].gameId).toBe('connect4');
+      expect(result.players[1].gameId).toBe('checkers');
+    });
+
     test('should remove matched players from queue', () => {
       lobbyManager.addPlayer('socket1', 'Player1');
       lobbyManager.addPlayer('socket2', 'Player2');
@@ -156,9 +181,11 @@ describe('LobbyManager', () => {
       expect(state).toHaveLength(2);
       expect(state[0]).toHaveProperty('socketId', 'socket1');
       expect(state[0]).toHaveProperty('displayName', 'Player1');
+      expect(state[0]).toHaveProperty('gameId', 'ttt');
       expect(state[0]).toHaveProperty('joinedAt');
       expect(state[1]).toHaveProperty('socketId', 'socket2');
       expect(state[1]).toHaveProperty('displayName', 'Player2');
+      expect(state[1]).toHaveProperty('gameId', 'ttt');
     });
 
     test('should return a copy of queue data', () => {
@@ -288,6 +315,7 @@ describe('broadcastLobbyState', () => {
         expect.objectContaining({
           socketId: 'socket1',
           displayName: 'Player1',
+          gameId: 'ttt',
         }),
       ]),
       timestamp: expect.any(Number),

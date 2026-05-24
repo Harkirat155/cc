@@ -17,14 +17,28 @@ const GRID_BY_INDEX = GRID_LOOKUP.reduce((acc, cell) => {
 
 const randomId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-export const boardSignature = (board = []) =>
-  Array.isArray(board) ? board.join("|") : "";
+export const boardSignature = (board = []) => {
+  if (!Array.isArray(board)) return "";
+  // Pieces (Checkers etc.) are objects — `Array#join` would stringify them
+  // to "[object Object]", collapsing distinct boards into the same signature
+  // and breaking dedupe in appendHistorySnapshot. Stringify cell-by-cell.
+  return board
+    .map((cell) => (cell && typeof cell === "object" ? JSON.stringify(cell) : cell ?? ""))
+    .join("|");
+};
 
 export const detectChangedIndex = (prev = [], next = []) => {
   if (!Array.isArray(prev) || !Array.isArray(next)) return null;
   const length = Math.min(prev.length, next.length);
+  const cellEq = (a, b) => {
+    if (a === b) return true;
+    if (a && b && typeof a === "object" && typeof b === "object") {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+    return false;
+  };
   for (let i = 0; i < length; i += 1) {
-    if (prev[i] !== next[i]) return i;
+    if (!cellEq(prev[i], next[i])) return i;
   }
   return null;
 };
@@ -58,6 +72,9 @@ export const createMoveEntry = ({
   index = null,
   type = "move",
   timestamp,
+  move = null,
+  affectedCells = null,
+  slot = null,
 }) => {
   const base = createBaseEntry({ board, result, moveNumber, type, timestamp });
   const coord = indexToCoordinate(index);
@@ -68,6 +85,12 @@ export const createMoveEntry = ({
     coordinate: coord?.label ?? null,
     row: coord?.row ?? null,
     column: coord?.column ?? null,
+    // Phase 5 additions — preserve the rules-engine Move + affected cells so
+    // piece-movement games can render multi-cell transitions correctly. Null
+    // for legacy/board-diff callers; downstream renderers must tolerate that.
+    move,
+    affectedCells: Array.isArray(affectedCells) ? affectedCells.slice() : null,
+    slot: Number.isInteger(slot) ? slot : null,
   };
 };
 
@@ -98,6 +121,9 @@ export const appendHistorySnapshot = (
     mark = null,
     index = null,
     timestamp,
+    move = null,
+    affectedCells = null,
+    slot = null,
   }
 ) => {
   const normalizedBoard = Array.isArray(board) ? board.slice() : [];
@@ -133,6 +159,9 @@ export const appendHistorySnapshot = (
           index,
           type,
           timestamp,
+          move,
+          affectedCells,
+          slot,
         });
 
   return {

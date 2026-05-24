@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { Crown, Dot, Pencil, Check, X } from "lucide-react";
 import ValueMark from "./marks/ValueMark";
+import GameSelector from "./GameSelector";
 
 const formatOccupant = (id, fallback) => {
   if (!id) return fallback;
@@ -41,6 +42,7 @@ const ScoreCard = ({
   onEditChange,
   onEditSave,
   onEditCancel,
+  playerInfo,
 }) => {
   const occupantLabel = formatOccupant(occupant, fallbackLabel);
 
@@ -64,7 +66,7 @@ const ScoreCard = ({
           <span
             className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl font-semibold text-white shadow-lg sm:h-12 sm:w-12 sm:text-2xl ${accent}`}
           >
-            <ValueMark value={mark} />
+            <ValueMark value={mark} playerInfo={playerInfo} />
           </span>
           <div className={`${isMirrored ? "text-right" : "text-left"}`}>
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
@@ -160,6 +162,7 @@ const ScorePanel = ({
   roomId,
   displayName: _displayName, // Used for initial edit value fallback
   onUpdateDisplayName,
+  onSwitchGame,
 }) => {
   const [editingMark, setEditingMark] = useState(null); // 'X' | 'O' | null
   const [editValue, setEditValue] = useState('');
@@ -182,31 +185,57 @@ const ScorePanel = ({
     setEditValue('');
   }, []);
 
-  const cards = [
-    {
-      mark: "X",
-      score: gameState?.xScore ?? 0,
-      occupant: roster?.XName || roster?.X,
-      isTurn: gameState?.turn === "X",
-      isYou: roster?.X && socketId && roster.X === socketId,
-      accent: "bg-gradient-to-br from-indigo-500 via-indigo-600 to-sky-500",
-      fallbackLabel: isMultiplayer ? "Seat open" : "Player One",
-    },
-    {
-      mark: "O",
-      score: gameState?.oScore ?? 0,
-      occupant: roster?.OName || roster?.O,
-      isTurn: gameState?.turn === "O",
-      isYou: roster?.O && socketId && roster.O === socketId,
-      accent: "bg-gradient-to-br from-rose-500 via-rose-600 to-orange-500",
-      fallbackLabel: isMultiplayer ? "Seat open" : "Player Two",
-    },
-  ];
+  const playerInfo = Array.isArray(gameState?.playerInfo)
+    ? gameState.playerInfo
+    : [
+        { slot: 0, label: 'X', color: 'sky' },
+        { slot: 1, label: 'O', color: 'rose' },
+      ];
+
+  // Accent class per player color token. Mirrors COLOR_CLASSES in ValueMark.
+  const ACCENT_BY_COLOR = {
+    sky:     'bg-gradient-to-br from-indigo-500 via-indigo-600 to-sky-500',
+    rose:    'bg-gradient-to-br from-rose-500 via-rose-600 to-orange-500',
+    red:     'bg-gradient-to-br from-rose-500 via-rose-600 to-red-500',
+    amber:   'bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-500',
+    emerald: 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-500',
+  };
+
+  // Score lookup: prefer slot-indexed gameState.scores; fall back to legacy
+  // xScore/oScore for older payloads.
+  const scoreFor = (slot) => {
+    if (Array.isArray(gameState?.scores)) return gameState.scores[slot] ?? 0;
+    return slot === 0 ? gameState?.xScore ?? 0 : gameState?.oScore ?? 0;
+  };
+
+  // Whose seat is this? roster still uses legacy X/O slot keys.
+  const seatKey = (slot) => (slot === 0 ? 'X' : 'O');
+  const nameKey = (slot) => (slot === 0 ? 'XName' : 'OName');
+
+  const turnSlot = Number.isInteger(gameState?.turnSlot)
+    ? gameState.turnSlot
+    : gameState?.turn === playerInfo[0].label ? 0
+    : gameState?.turn === playerInfo[1].label ? 1
+    : null;
+
+  const cards = playerInfo.map((p) => ({
+    mark: p.label,
+    slot: p.slot,
+    score: scoreFor(p.slot),
+    occupant: roster?.[nameKey(p.slot)] || roster?.[seatKey(p.slot)],
+    isTurn: turnSlot === p.slot,
+    isYou: roster?.[seatKey(p.slot)] && socketId && roster[seatKey(p.slot)] === socketId,
+    accent: ACCENT_BY_COLOR[p.color] || ACCENT_BY_COLOR.sky,
+    fallbackLabel: isMultiplayer ? "Seat open" : `Player ${p.slot + 1}`,
+    playerInfo,
+  }));
 
   const chips = [
     { label: "Mode", value: isMultiplayer ? "Multiplayer" : "Local" },
     roomId ? { label: "Room", value: roomId } : null,
   ].filter(Boolean);
+
+  const canSwitchGame = !isMultiplayer || cards.some((card) => card.isYou);
 
   const CompactScoreSummary = () => {
     const [xCard, oCard] = cards;
@@ -283,7 +312,7 @@ const ScorePanel = ({
             card.isTurn ? "ring-[3px] ring-emerald-400 dark:ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 animate-pulse-ring" : ""
           } ${card.accent}`}
         >
-          <ValueMark value={card.mark} />
+          <ValueMark value={card.mark} playerInfo={playerInfo} />
         </span>
       );
 
@@ -326,7 +355,7 @@ const ScorePanel = ({
               Turn
             </span>
             <span className="text-base font-semibold text-stone-700 dark:text-slate-200">
-              {gameState?.turn ? <ValueMark value={gameState.turn} /> : "--"}
+              {gameState?.turn ? <ValueMark value={gameState.turn} playerInfo={playerInfo} /> : "--"}
             </span>
           </div>
           {renderOccupant(oCard, "end")}
@@ -357,9 +386,16 @@ const ScorePanel = ({
         </div>
         {!!chips.length && (
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-between sm:gap-3">
-            {chips.map((chip, index) => (
-              <StatChip key={`${chip.label}-${index}`} {...chip} />
-            ))}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {chips.map((chip, index) => (
+                <StatChip key={`${chip.label}-${index}`} {...chip} />
+              ))}
+            </div>
+            <GameSelector
+              isMultiplayer={isMultiplayer}
+              currentGameId={gameState?.gameId}
+              onSwitchGame={canSwitchGame ? onSwitchGame : null}
+            />
           </div>
         )}
       </div>

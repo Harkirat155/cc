@@ -5,10 +5,13 @@ import config from './config.js';
 import { roomLog as log } from './logger.js';
 import { incCounter } from './metrics.js';
 import { clearPendingPublish } from './roomPublisher.js';
+import { get as getGameRules, has as hasGame } from '../shared/games/registry.js';
 
 // Re-export from extracted modules for backward compatibility
 export { publish, publishImmediate, clearPendingPublish } from './roomPublisher.js';
 export { startRoomGC, stopRoomGC } from './roomGC.js';
+
+export const DEFAULT_GAME_ID = 'ttt';
 
 // Room storage: roomId -> RoomData
 // Using Map maintains insertion order for LRU
@@ -24,10 +27,10 @@ export const socketRooms = new Map();
 export function touch(id) {
   const room = rooms.get(id);
   if (!room) return;
-  
+
   // Update timestamp
   room.lastTouched = Date.now();
-  
+
   // Move to end for LRU ordering (delete and re-set)
   rooms.delete(id);
   rooms.set(id, room);
@@ -48,39 +51,40 @@ export function enforceLRU() {
 }
 
 /**
- * Create initial game state
+ * Create initial game state for a given game id.
+ * The state shape is whatever the rules module returns — DO NOT shape-check
+ * here. Game-agnostic room-level fields (newGameRequester, etc.) live on the
+ * room object, not inside state.
+ *
+ * @param {string} [gameId='ttt']
  */
-export function createInitialGameState() {
-  return {
-    board: Array(9).fill(''),
-    turn: 'X',
-    winner: null,
-    winningLine: [],
-    xScore: 0,
-    oScore: 0,
-    newGameRequester: null,
-    newGameRequestedAt: null,
-  };
+export function createInitialGameState(gameId = DEFAULT_GAME_ID) {
+  const rules = getGameRules(gameId);
+  return rules.createInitialState();
 }
 
 /**
  * Create a new room with initial state
- * @param {string} roomId 
- * @param {Object} options 
+ * @param {string} roomId
+ * @param {Object} options
  * @returns {Object} Created room
  */
 export function createRoom(roomId, options = {}) {
-  const { 
-    creatorSocketId, 
-    creatorClientId, 
+  const {
+    creatorSocketId,
+    creatorClientId,
     creatorDisplayName,
     initialState,
+    gameId,
   } = options;
 
+  const resolvedGameId = gameId && hasGame(gameId) ? gameId : DEFAULT_GAME_ID;
+
   const room = {
+    gameId: resolvedGameId,
     players: { X: creatorSocketId || null, O: null },
     spectators: new Set(),
-    state: initialState || createInitialGameState(),
+    state: initialState || createInitialGameState(resolvedGameId),
     voice: {},
     seatByClient: creatorClientId ? { [creatorClientId]: 'X' } : {},
     lastTouched: Date.now(),
@@ -88,14 +92,17 @@ export function createRoom(roomId, options = {}) {
       X: { displayName: creatorDisplayName || null },
       O: { displayName: null },
     },
+    // Room-level (not game-state) — request a fresh game / cancellation.
+    newGameRequester: null,
+    newGameRequestedAt: null,
   };
 
   rooms.set(roomId, room);
   enforceLRU();
   incCounter('roomsCreated');
-  
-  log.debug('Room created', { roomId, creator: creatorSocketId });
-  
+
+  log.debug('Room created', { roomId, gameId: resolvedGameId, creator: creatorSocketId });
+
   return room;
 }
 

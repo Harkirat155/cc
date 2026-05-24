@@ -18,6 +18,10 @@ import { getHealthStatus, getMetrics, incCounter } from './metrics.js';
 import { stopRateLimitCleanup } from './rateLimiter.js';
 import './polyfills/objectHasOwn.js';
 
+// Register built-in games into the shared rules registry.
+// Side-effecting import — must precede any handler that resolves a gameId.
+import '../shared/games/index.js';
+
 // Validate configuration on startup
 validateConfig();
 

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import autoprefixer from 'autoprefixer';
 import tailwindcss from 'tailwindcss';
@@ -6,6 +7,11 @@ import tailwindcss from 'tailwindcss';
 export default defineConfig({
   plugins: [react()],
   base: '/cc/',
+  resolve: {
+    alias: {
+      '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+    },
+  },
   esbuild: {
     // loader: 'jsx', // Remove or set as string if needed
     minify: true, // Minify JS in dev and build

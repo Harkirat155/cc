@@ -30,6 +30,7 @@ export function registerRoomHandlers(socket, io) {
 
     const clientId = payload.clientId || null;
     const displayName = validateDisplayName(payload.displayName);
+    const gameId = typeof payload.gameId === 'string' ? payload.gameId : undefined;
 
     // Generate unique room code
     let roomId = genCode();
@@ -49,6 +50,7 @@ export function registerRoomHandlers(socket, io) {
       creatorSocketId: socket.id,
       creatorClientId: clientId,
       creatorDisplayName: displayName,
+      gameId,
     });
 
     socket.join(roomId);

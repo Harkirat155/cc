@@ -9,7 +9,7 @@ let broadcastTimeout = null;
 
 class LobbyManager {
   constructor() {
-    // Queue of waiting players: Array<{socketId, displayName, joinedAt}>
+    // Queue of waiting players: Array<{socketId, displayName, gameId, joinedAt}>
     this.queue = [];
     // Fast lookup: socketId -> queue index (for O(1) removal)
     this.playerIndex = new Map();
@@ -19,9 +19,10 @@ class LobbyManager {
    * Add a player to the matchmaking queue
    * @param {string} socketId 
    * @param {string} displayName 
+  * @param {string} gameId
    * @returns {{ success: boolean, error?: string, position?: number }}
    */
-  addPlayer(socketId, displayName) {
+  addPlayer(socketId, displayName, gameId = 'ttt') {
     // Validation
     if (!socketId || typeof socketId !== 'string') {
       return { success: false, error: 'Invalid socket ID' };
@@ -48,6 +49,7 @@ class LobbyManager {
     const player = {
       socketId,
       displayName: trimmedName,
+      gameId: typeof gameId === 'string' && gameId.trim() ? gameId.trim() : 'ttt',
       joinedAt: Date.now(),
     };
 
@@ -55,7 +57,7 @@ class LobbyManager {
     this.queue.push(player);
     this.playerIndex.set(socketId, position);
 
-    log.debug('Player joined lobby', { socketId, displayName: trimmedName, position });
+    log.debug('Player joined lobby', { socketId, displayName: trimmedName, gameId: player.gameId, position });
 
     return { success: true, position };
   }
@@ -98,6 +100,7 @@ class LobbyManager {
       .map(p => ({
         socketId: p.socketId,
         displayName: p.displayName,
+        gameId: p.gameId || 'ttt',
         joinedAt: p.joinedAt,
       }));
   }
@@ -133,6 +136,7 @@ class LobbyManager {
     log.info('Players matched', {
       player1: player1.displayName,
       player2: player2.displayName,
+      gameId: player1.gameId || 'ttt',
     });
 
     return {
