@@ -55,18 +55,18 @@ const NavMenu = ({ actions = [], panel = null }) => {
           onClick={handleToggle}
           aria-haspopup="menu"
           aria-expanded={open}
-          className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-stone-200 dark:border-gray-700 bg-stone-50/80 dark:bg-gray-800/70 hover:bg-stone-100 dark:hover:bg-gray-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
-            open ? "ring-2 ring-indigo-500/40" : ""
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] text-foreground/60 transition hover:bg-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 ${
+            open ? "bg-foreground/10 text-foreground ring-1 ring-foreground/10" : ""
           }`}
         >
           <span className="flex flex-col items-center justify-center gap-1">
             <span
-              className={`block h-0.5 w-4 rounded-full transition-transform duration-200 bg-gray-700 dark:bg-gray-200 ${
+              className={`block h-0.5 w-4 rounded-full bg-current transition-transform duration-200 ${
                 open ? "translate-y-0.5" : ""
               }`}
             />
             <span
-              className={`block h-0.5 w-4 rounded-full transition-transform duration-200 bg-gray-700 dark:bg-gray-200 ${
+              className={`block h-0.5 w-4 rounded-full bg-current transition-transform duration-200 ${
                 open ? "-translate-y-0.5" : ""
               }`}
             />
@@ -78,12 +78,12 @@ const NavMenu = ({ actions = [], panel = null }) => {
       <div
         role="menu"
         aria-hidden={!open}
-        className={`absolute right-0 mt-3 w-72 max-w-[85vw] origin-top-right rounded-xl border border-stone-200 dark:border-gray-700 bg-stone-50/95 backdrop-blur dark:bg-gray-900/95 shadow-xl transition-all duration-150 ${
+        className={`absolute right-0 mt-3 w-72 max-w-[85vw] origin-top-right rounded-2xl border border-foreground/10 bg-background/90 text-foreground shadow-[0_24px_80px_-40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-150 ${
           open ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
         }`}
       >
         {panel && (
-          <div className="max-h-80 overflow-y-auto border-b border-gray-200/80 p-3 dark:border-gray-700/80">
+          <div className="max-h-80 overflow-y-auto border-b border-foreground/10 p-3">
             {panel}
           </div>
         )}
@@ -94,12 +94,12 @@ const NavMenu = ({ actions = [], panel = null }) => {
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 focus-visible:bg-stone-100 dark:text-gray-200 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800 rounded-lg transition"
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground/75 transition hover:bg-foreground/[0.05] hover:text-foreground focus-visible:bg-foreground/[0.05] focus-visible:text-foreground focus-visible:outline-none"
                   onClick={() => handleSelect(onSelect)}
                 >
                   <span className="font-medium">{label}</span>
                   {description && (
-                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <span className="mt-0.5 block text-xs text-foreground/45">
                       {description}
                     </span>
                   )}

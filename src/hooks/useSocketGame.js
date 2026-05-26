@@ -50,9 +50,8 @@ function createInitialBoardForGame(gameId) {
   return getGameRules(resolvedGameId).createInitialState().board.slice();
 }
 
-// Read ?game= from the URL at module load so the local-mode initial state is
-// built against the right rules. The GameSelector reloads on change, so this
-// runs each time the user picks a new game.
+// Read ?game= from the URL so the local-mode initial state is built against
+// the requested rules.
 function resolveLocalGameId() {
   if (typeof window === "undefined") return DEFAULT_GAME_ID;
   try {
@@ -97,8 +96,10 @@ function toLegacyLocalShape(state, gameId = DEFAULT_GAME_ID) {
   };
 }
 
-function buildInitialLocalState() {
-  const gameId = resolveLocalGameId();
+function buildInitialLocalState(gameIdOverride) {
+  const gameId = gameIdOverride
+    ? resolveKnownGameId(gameIdOverride)
+    : resolveLocalGameId();
   return toLegacyLocalShape(getGameRules(gameId).createInitialState(), gameId);
 }
 
@@ -223,12 +224,9 @@ export default function useSocketGame() {
       // Ensure socket exists and wait for connection
       ensureSocket();
       const socket = await waitForConnection();
-      
-      console.log("[Lobby] Socket connected, emitting joinLobby with name:", displayNameArg);
-      
+
       return new Promise((resolve, reject) => {
         socket.emit("joinLobby", { displayName: displayNameArg, gameId: preferredGameId }, (response) => {
-          console.log("[Lobby] joinLobby response:", response);
           if (response?.success) {
             setIsInLobby(true);
             resolve(response);
@@ -539,13 +537,24 @@ export default function useSocketGame() {
       return Promise.resolve({ success: false, error });
     }
 
-    if (!isMultiplayer || !roomId) {
-      const error = "Join a room before switching games";
-      setMessage(error);
-      return Promise.resolve({ success: false, error });
+    if (gameState.gameId === nextGameId) {
+      return Promise.resolve({ success: true, gameId: nextGameId });
     }
 
-    if (gameState.gameId === nextGameId) {
+    if (!isMultiplayer || !roomId) {
+      const nextState = buildInitialLocalState(nextGameId);
+      setGameState(nextState);
+      gameIdRef.current = nextGameId;
+      resetHistory(
+        `Switched to ${getGameDisplayName(nextGameId)} • ${nextState.turn} to move`,
+        "system",
+        nextState.board
+      );
+      setShowModal(false);
+      setNewGameRequester(null);
+      setNewGameRequestedAt(null);
+      setSelection(null);
+      setMessage(`Switched to ${getGameDisplayName(nextGameId)}`);
       return Promise.resolve({ success: true, gameId: nextGameId });
     }
 
@@ -573,7 +582,7 @@ export default function useSocketGame() {
         resolve({ success: true, gameId: response?.gameId || nextGameId });
       });
     });
-  }, [gameState.gameId, isMultiplayer, roomId]);
+  }, [gameState.gameId, isMultiplayer, resetHistory, roomId]);
 
   const resetScores = useCallback(() => {
     if (isMultiplayer && socketRef.current?.connected) {

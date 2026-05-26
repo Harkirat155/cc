@@ -1,5 +1,9 @@
 import React from "react";
-import { Users, User, Eye, Mic, MicOff } from "lucide-react";
+import Eye from "lucide-react/dist/esm/icons/eye.js";
+import Mic from "lucide-react/dist/esm/icons/mic.js";
+import MicOff from "lucide-react/dist/esm/icons/mic-off.js";
+import User from "lucide-react/dist/esm/icons/user.js";
+import Users from "lucide-react/dist/esm/icons/users.js";
 import ValueMark from "./marks/ValueMark";
 import { Tooltip } from "./ui/Tooltip";
 
@@ -32,27 +36,26 @@ const PeoplePanel = ({
     return (
       <Tooltip key={id + roleLabel} content={tooltipContent} side="right" align="start">
         <li
-          className={`flex items-center justify-between px-3 py-2 rounded border text-sm ${
+          className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-sm ${
             isYou
-              ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
-              : "bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700"
+              ? "border-emerald-500/20 bg-emerald-500/10"
+              : "border-foreground/5 bg-foreground/[0.03]"
           }`}
           aria-label={`${baseLabel} ${isYou ? "(You)" : ""}`}
         >
-        <div className="flex items-center gap-2 min-w-0">
-          <User size={14} className="text-gray-600 dark:text-gray-300 shrink-0" />
-          <span className="truncate text-gray-800 dark:text-gray-100">
-            {id.slice(0, 6)}…
-          </span>
-          {isYou && (
-            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              You
+          <div className="flex min-w-0 items-center gap-2">
+            <User size={14} className="shrink-0 text-muted-foreground" />
+            <span className="truncate text-foreground">
+              {id.slice(0, 6)}…
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {mark && <ValueMark value={mark} />}
-          {/* Mic status */}
+            {isYou && (
+              <span className="ml-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300">
+                You
+              </span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {mark && <ValueMark value={mark} />}
             <Tooltip content={isMuted ? "Muted or not publishing audio" : "Voice channel active"}>
               {isMuted ? (
                 <MicOff size={14} className="text-red-600" />
@@ -60,10 +63,10 @@ const PeoplePanel = ({
                 <Mic size={14} className="text-emerald-600" />
               )}
             </Tooltip>
-          <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {roleLabel}
-          </span>
-        </div>
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {roleLabel}
+            </span>
+          </div>
         </li>
       </Tooltip>
     );
@@ -74,18 +77,20 @@ const PeoplePanel = ({
       className={`flex flex-col ${isMenuVariant ? "gap-3" : "h-full"} ${className}`}
     >
       <div
-        className={`flex items-center justify-between border-b border-gray-200 dark:border-gray-700 ${
+        className={`flex items-center justify-between border-b border-foreground/5 ${
           isMenuVariant
-            ? "px-2.5 py-2 text-sm text-gray-700 dark:text-gray-200"
-            : "px-4 py-3 bg-white/70 dark:bg-gray-900/50"
+            ? "px-2.5 py-2 text-sm text-foreground"
+            : "bg-card/70 px-4 py-3 backdrop-blur-xl"
         }`}
       >
         <div className="flex items-center gap-2">
-          <Users size={16} className="text-gray-700 dark:text-gray-200" />
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">People</h3>
+          <Users size={16} className="text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">People</h3>
         </div>
         {isMultiplayer && roomId && (
-          <span className="text-[11px] text-gray-500 dark:text-gray-400">Room {roomId}</span>
+          <span className="rounded-full border border-foreground/5 bg-foreground/[0.03] px-2 py-0.5 text-[11px] text-muted-foreground">
+            Room {roomId}
+          </span>
         )}
       </div>
       <div
@@ -94,7 +99,7 @@ const PeoplePanel = ({
         } space-y-3 overflow-y-auto`}
       >
         {!isMultiplayer ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300">
+          <div className="text-sm text-muted-foreground">
             Local mode — no room members.
           </div>
         ) : (
@@ -104,9 +109,9 @@ const PeoplePanel = ({
               {renderPerson(O, "Player", "O")}
             </ul>
             <div className="pt-1">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+              <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
                 <Eye size={12} /> Spectators
-                <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">
+                <span className="ml-auto text-[10px] text-muted-foreground">
                   {spectators.length}
                 </span>
               </div>
@@ -115,7 +120,7 @@ const PeoplePanel = ({
                   {spectators.map((sid) => renderPerson(sid, "Spectator", null))}
                 </ul>
               ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400">None</div>
+                <div className="text-sm text-muted-foreground">None</div>
               )}
             </div>
           </>

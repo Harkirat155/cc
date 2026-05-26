@@ -5,35 +5,58 @@ import { AppTooltipProvider } from './components/ui/Tooltip';
 
 const Game = lazy(() => import('./Game'));
 const Lobby = lazy(() => import('./Lobby'));
+const Agents = lazy(() => import('./Agents'));
+
+function LoadingScreen() {
+  return (
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-6 text-foreground">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center"
+      >
+        <div className="h-[60vw] w-[60vw] rounded-full bg-indigo-500 opacity-[0.04] blur-[100px]" />
+      </div>
+      <div className="relative flex flex-col items-center gap-6 rounded-[2rem] border border-foreground/5 bg-foreground/[0.02] px-8 py-7 shadow-2xl backdrop-blur-sm">
+        <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-foreground/5 bg-foreground/[0.03] p-3">
+          {Array.from({ length: 9 }).map((_, index) => (
+            <span
+              key={index}
+              className={`h-3 w-3 rounded-full ${
+                index === 0 || index === 4 || index === 8
+                  ? "bg-foreground/50"
+                  : "bg-foreground/10"
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-lg font-semibold tracking-tight text-transparent">
+            CrissCross
+          </span>
+          <div className="flex items-center gap-1.5" aria-label="Loading CrissCross">
+            {[0, 160, 320].map((delay) => (
+              <span
+                key={delay}
+                className="h-1.5 w-1.5 animate-typing-dot rounded-full bg-foreground/35"
+                style={{ animationDelay: `${delay}ms` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
     <AppTooltipProvider>
-      <Suspense
-        fallback={
-          <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-100 dark:bg-slate-950">
-            {/* Animated logo placeholder */}
-            <div className="relative">
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-pulse" />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 blur-xl opacity-50 animate-pulse" />
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-                Loading CrissCross
-              </span>
-              <div className="flex gap-1">
-                <span className="h-2 w-2 rounded-full bg-indigo-500 animate-typing-dot" style={{ animationDelay: '0ms' }} />
-                <span className="h-2 w-2 rounded-full bg-purple-500 animate-typing-dot" style={{ animationDelay: '200ms' }} />
-                <span className="h-2 w-2 rounded-full bg-pink-500 animate-typing-dot" style={{ animationDelay: '400ms' }} />
-              </div>
-            </div>
-          </div>
-        }
-      >
+      <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<Game />} />
           <Route path="/room/:roomId" element={<Game />} />
           <Route path="/lobby" element={<Lobby />} />
+          <Route path="/agents" element={<Agents />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>

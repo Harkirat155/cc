@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import HistoryItem from "./HistoryItem";
 import { Tooltip } from "./ui/Tooltip";
 import ValueMark from "./marks/ValueMark";
-import { Crown, RefreshCcw, Users } from "lucide-react";
+import Crown from "lucide-react/dist/esm/icons/crown.js";
+import RefreshCcw from "lucide-react/dist/esm/icons/refresh-ccw.js";
+import Users from "lucide-react/dist/esm/icons/users.js";
 import { indexToCoordinate } from "../utils/history";
 
 const formatSequence = (sequence = []) =>
@@ -93,13 +95,13 @@ const HistoryPanel = ({
   };
 
   return (
-    <div className="flex h-full flex-col bg-stone-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
-      <header className="flex items-center justify-between border-b border-stone-200 px-4 py-3 dark:border-slate-700">
+    <div className="flex h-full flex-col bg-card/85 text-foreground backdrop-blur-xl">
+      <header className="flex items-center justify-between border-b border-foreground/5 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-slate-100">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
             Game Timeline
           </h3>
-          <p className="text-[11px] text-stone-500 dark:text-slate-400">
+          <p className="text-[11px] text-muted-foreground">
             Viewing move {safeIndex} of {totalMoves}
           </p>
         </div>
@@ -107,7 +109,7 @@ const HistoryPanel = ({
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-full border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600 transition hover:border-stone-300 hover:text-stone-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+            className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-1 text-xs font-medium text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
           >
             Close
           </button>
@@ -115,8 +117,8 @@ const HistoryPanel = ({
       </header>
 
       <div className="px-4 pt-4">
-        <div className="rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-100/90 to-stone-50/50 p-4 shadow-sm dark:border-slate-700 dark:from-slate-800/70 dark:to-slate-900/30">
-          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-stone-500 dark:text-slate-400">
+        <div className="rounded-3xl border border-foreground/5 bg-foreground/[0.03] p-4 shadow-sm backdrop-blur-xl">
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
             <span className="flex items-center gap-1">
               <Users size={12} />
               {isLiveView ? "Live view" : "Time travel"}
@@ -125,19 +127,19 @@ const HistoryPanel = ({
           </div>
           <div className="mt-2 flex items-center gap-3">
             {winner ? (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-amber-500/15 bg-amber-500/10 text-amber-500">
                 <Crown size={20} />
               </div>
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.04] text-foreground">
                 <ValueMark value={activeEntry?.mark || currentTurn || ""} />
               </div>
             )}
             <div className="flex-1">
-              <p className="text-sm font-semibold text-stone-700 dark:text-slate-100">
+              <p className="text-sm font-semibold text-foreground">
                 {statusLine}
               </p>
-              <p className="text-xs text-stone-500 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {activeEntry?.result || (winner ? "Awaiting rematch" : "Follow each move in order")}
               </p>
             </div>
@@ -161,7 +163,7 @@ const HistoryPanel = ({
             ))}
           </ul>
         ) : (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+          <div className="rounded-2xl border border-dashed border-foreground/10 bg-foreground/[0.03] p-4 text-sm text-muted-foreground">
             No moves yet. Start playing to populate the timeline.
           </div>
         )}
@@ -173,7 +175,7 @@ const HistoryPanel = ({
             <button
               type="button"
               onClick={resumeLatest}
-              className="mb-4 w-full rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              className="mb-4 w-full rounded-full border border-foreground/10 bg-foreground/[0.03] px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
             >
               Resume Live
             </button>
@@ -181,8 +183,8 @@ const HistoryPanel = ({
         </div>
       )}
 
-      <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4 dark:border-slate-700 dark:bg-slate-900/60">
-        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <div className="border-t border-foreground/5 bg-background/60 px-4 py-4 backdrop-blur-xl">
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
           <span>Completed Games</span>
           {completedGames.length > 0 && (
             <span>{completedGames.length}</span>
@@ -201,9 +203,9 @@ const HistoryPanel = ({
                 return (
                   <div
                     key={game.id}
-                    className="rounded-xl border border-slate-200 bg-white/70 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+                    className="rounded-2xl border border-foreground/5 bg-foreground/[0.03] p-3 shadow-sm"
                   >
-                    <div className="flex items-center justify-between text-sm font-semibold text-stone-700 dark:text-slate-100">
+                    <div className="flex items-center justify-between text-sm font-semibold text-foreground">
                       <span className="flex items-center gap-2">
                         {game.draw ? (
                           <RefreshCcw size={14} className="text-amber-500" />
@@ -212,24 +214,24 @@ const HistoryPanel = ({
                         )}
                         {game.draw ? "Draw" : `${game.winner} Victory`}
                       </span>
-                      <span className="text-[11px] font-normal uppercase text-slate-400 dark:text-slate-500">
+                      <span className="text-[11px] font-normal uppercase text-muted-foreground">
                         {finishedLabel}
                       </span>
                     </div>
                     <div className="mt-2 grid gap-2">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-muted-foreground">
                         Total moves: {game.totalMoves ?? sequence.length}
                       </div>
                       {sequence.length ? (
                         <Tooltip content={sequence.join(" → ")}
                           side="top"
                         >
-                          <div className="truncate text-xs font-mono text-slate-600 dark:text-slate-300">
+                          <div className="truncate text-xs font-mono text-foreground/75">
                             {sequence.join(" · ")}
                           </div>
                         </Tooltip>
                       ) : (
-                        <div className="text-xs italic text-slate-400 dark:text-slate-500">
+                        <div className="text-xs italic text-muted-foreground">
                           Sequence unavailable
                         </div>
                       )}
@@ -238,7 +240,7 @@ const HistoryPanel = ({
                 );
               })
           ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <div className="rounded-2xl border border-dashed border-foreground/10 px-3 py-4 text-sm text-muted-foreground">
               Finish a match to start building your archive.
             </div>
           )}

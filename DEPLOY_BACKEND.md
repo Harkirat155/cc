@@ -2,24 +2,19 @@
 
 The backend is a long-running Express + Socket.IO process. It keeps active rooms and lobby state in memory, so use a provider/plan that can keep one Node process warm for reliable multiplayer sessions.
 
-## Recommended Order
+## Provider
 
-1. Fly.io with one small always-on machine.
-2. Railway with an always-on service.
-3. Koyeb only if the selected service keeps at least one instance warm.
-4. Render only on a paid/no-sleep service. Render free sleeps and is not reliable for realtime rooms.
+Fly.io is the supported backend deployment target. The backend runs as one long-lived machine using the repo's `Dockerfile` and `fly.toml`.
 
 ## One-time Setup
 
-Install the provider CLI you want to try:
+Install the Fly CLI:
 
 ```bash
 brew install flyctl
-npm install -g @railway/cli
-brew install koyeb/tap/koyeb
 ```
 
-Copy the deploy env template and fill in the provider values:
+Copy the deploy env template and fill in the Fly values:
 
 ```bash
 cp .env.deploy.example .env.deploy
@@ -35,19 +30,16 @@ PORT=10000
 
 ## Deploy From Local
 
-Run one provider at a time:
+Deploy to Fly:
 
 ```bash
 npm run deploy:backend -- fly
-npm run deploy:backend -- railway
-npm run deploy:backend -- koyeb
 ```
 
-The script runs `npm run check` and `npm test` before deployment. For a quick provider experiment, you can skip one or both:
+The script runs `npm run check` and `npm test` before deployment. For a quick Fly deploy check, you can skip one or both:
 
 ```bash
 npm run deploy:backend -- fly --skip-tests
-npm run deploy:backend -- railway --skip-checks --skip-tests
 ```
 
 ## Fly.io
@@ -72,35 +64,6 @@ FLY_USE_LOCAL_AUTH=1
 ```
 
 The `fly.toml` keeps the machine warm with `auto_stop_machines = "off"` while avoiding Fly's extra high-availability machine during ramp-up. Fly deploys with the repo's `Dockerfile`, which packages only the backend runtime files.
-
-## Railway
-
-Link the local repo once:
-
-```bash
-railway login
-railway link
-```
-
-Then deploy:
-
-```bash
-npm run deploy:backend -- railway
-```
-
-If variable sync fails because your Railway CLI version changed its flags, set `RAILWAY_SET_VARIABLES=0` in `.env.deploy` and configure `NODE_ENV`, `CORS_ORIGIN`, and optional Google Sheets secrets in the Railway dashboard.
-
-## Koyeb
-
-The Koyeb command in `scripts/deploy-backend.sh` redeploys an existing Koyeb service source. It is included for comparison, but Fly/Railway are better for direct local source deploys.
-
-Set `KOYEB_SERVICE_REF` in `.env.deploy`, then run:
-
-```bash
-npm run deploy:backend -- koyeb
-```
-
-Reject any Koyeb plan/configuration that scales to zero if first-user latency or realtime reliability matters.
 
 ## GitHub Pages Wiring
 

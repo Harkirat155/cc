@@ -1,9 +1,13 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { Mic, MicOff, Wifi, WifiOff } from "lucide-react";
+import Mic from "lucide-react/dist/esm/icons/mic.js";
+import MicOff from "lucide-react/dist/esm/icons/mic-off.js";
+import Wifi from "lucide-react/dist/esm/icons/wifi.js";
+import WifiOff from "lucide-react/dist/esm/icons/wifi-off.js";
 import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
+import GameSelector from "./GameSelector";
 
 const Navbar = ({
   onToggleHistory,
@@ -16,6 +20,8 @@ const Navbar = ({
   connectionState = 'disconnected',
   menuPanel = null,
   menuItems = [],
+  currentGameId = null,
+  onSwitchGame,
 }) => {
   const menuActions = [...menuItems];
 
@@ -38,81 +44,79 @@ const Navbar = ({
   }
   const showVoiceControl = isMultiplayer && typeof onToggleMic === "function";
   const micIsOn = showVoiceControl && voiceEnabled && !micMuted;
+  const connectionLabel =
+    connectionState === 'connected'
+      ? 'Connected to server'
+      : connectionState === 'connecting'
+      ? 'Connecting...'
+      : 'Disconnected - trying to reconnect';
 
   return (
-    <nav
-      className="fixed top-0 left-0 right-0 z-50 bg-stone-50/80 dark:bg-gray-900/70 backdrop-blur border-b border-stone-200 dark:border-gray-800"
+    <header
+      className="sticky top-0 z-50 h-16 border-b border-foreground/5 bg-background/50 backdrop-blur-xl"
       data-tour="navbar"
     >
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="h-16 flex items-center justify-between">
-          {/* Brand */}
-          <Tooltip content="Return to home">
-            <Link
-              to="/"
-              className="text-2xl font-extrabold tracking-tight select-none bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent hover:opacity-90 transition"
-              aria-label="CrissCross Home"
-            >
-              CrissCross
-            </Link>
-          </Tooltip>
+      <nav className="mx-auto flex h-full w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <Tooltip content="Return to home">
+          <Link
+            to="/"
+            className="shrink-0 select-none bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-lg font-semibold tracking-tight text-transparent transition hover:opacity-90 sm:text-xl"
+            aria-label="CrissCross Home"
+          >
+            CrissCross
+          </Link>
+        </Tooltip>
 
-          {/* Actions: Connection Status + History + Theme */}
-          <div className="flex items-center gap-2" data-tour="panels">
-            {/* Connection Status Indicator (only in multiplayer) */}
-            {isMultiplayer && (
-              <Tooltip
-                content={
-                  connectionState === 'connected'
-                    ? 'Connected to server'
-                    : connectionState === 'connecting'
-                    ? 'Connecting...'
-                    : 'Disconnected - trying to reconnect'
-                }
-              >
-                <div
-                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
-                    connectionState === 'connected'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                      : connectionState === 'connecting'
-                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 animate-pulse'
-                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-connection-pulse'
-                  }`}
-                >
-                  {connectionState === 'connected' ? (
-                    <Wifi size={16} />
-                  ) : (
-                    <WifiOff size={16} />
-                  )}
-                </div>
-              </Tooltip>
-            )}
-            {showVoiceControl && (
-              <Tooltip
-                content={micIsOn ? "Mute microphone" : "Enable microphone"}
-              >
-                <button
-                  type="button"
-                  onClick={onToggleMic}
-                  className={`inline-flex items-center justify-center w-10 h-10 rounded-full border border-stone-200 dark:border-gray-700 bg-stone-50/80 dark:bg-gray-800/70 hover:bg-stone-100 dark:hover:bg-gray-800 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
-                    micIsOn ? "ring-2 ring-emerald-500/50 dark:ring-emerald-500/60" : ""
-                  }`}
-                  aria-label={micIsOn ? "Mute microphone" : "Enable microphone"}
-                >
-                  {micIsOn ? (
-                    <Mic size={16} className="text-emerald-600 dark:text-emerald-300" />
-                  ) : (
-                    <MicOff size={16} className="text-gray-700 dark:text-gray-200" />
-                  )}
-                </button>
-              </Tooltip>
-            )}
-            <ThemeToggle />
-            <NavMenu actions={menuActions} panel={menuPanel} />
-          </div>
+        <div className="hidden min-w-0 flex-1 justify-center px-2 sm:flex">
+          <GameSelector
+            variant="desktop"
+            isMultiplayer={isMultiplayer}
+            currentGameId={currentGameId}
+            onSwitchGame={onSwitchGame}
+          />
         </div>
-      </div>
-    </nav>
+
+        <div className="flex shrink-0 items-center gap-2" data-tour="panels">
+          {isMultiplayer && (
+            <Tooltip content={connectionLabel}>
+              <div
+                role="status"
+                aria-label={connectionLabel}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] transition ${
+                  connectionState === 'connected'
+                    ? 'text-emerald-500 ring-1 ring-emerald-400/20'
+                    : connectionState === 'connecting'
+                    ? 'animate-pulse text-amber-500 ring-1 ring-amber-400/20'
+                    : 'animate-connection-pulse text-red-500 ring-1 ring-red-400/20'
+                }`}
+              >
+                {connectionState === 'connected' ? (
+                  <Wifi size={16} />
+                ) : (
+                  <WifiOff size={16} />
+                )}
+              </div>
+            </Tooltip>
+          )}
+          {showVoiceControl && (
+            <Tooltip content={micIsOn ? "Mute microphone" : "Enable microphone"}>
+              <button
+                type="button"
+                onClick={onToggleMic}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] text-foreground/60 transition hover:bg-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 ${
+                  micIsOn ? "bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-400/25" : ""
+                }`}
+                aria-label={micIsOn ? "Mute microphone" : "Enable microphone"}
+              >
+                {micIsOn ? <Mic size={16} /> : <MicOff size={16} />}
+              </button>
+            </Tooltip>
+          )}
+          <ThemeToggle />
+          <NavMenu actions={menuActions} panel={menuPanel} />
+        </div>
+      </nav>
+    </header>
   );
 };
 

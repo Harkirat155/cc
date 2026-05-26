@@ -4,6 +4,7 @@ import LobbyView from './components/LobbyView';
 import useSocketGame from './hooks/useSocketGame';
 import '@shared/games/index.js';
 import { get as getGameRules } from '@shared/games/registry.js';
+import { getGamePalette } from './components/games/palette';
 
 /**
  * Lobby Page - Matchmaking lobby container
@@ -43,14 +44,10 @@ const Lobby = () => {
     if (!hasJoinedRef.current && !isInLobby && displayName) {
       hasJoinedRef.current = true;
       
-      joinLobby(displayName, preferredGameId)
-        .then(() => {
-          console.log('[Lobby] Successfully joined lobby');
-        })
-        .catch((err) => {
-          hasJoinedRef.current = false;
-          console.error('Failed to join lobby:', err);
-        });
+      joinLobby(displayName, preferredGameId).catch((err) => {
+        hasJoinedRef.current = false;
+        console.error('Failed to join lobby:', err);
+      });
     }
   }, [displayName, isInLobby, joinLobby, preferredGameId]);
 
@@ -78,16 +75,30 @@ const Lobby = () => {
     });
   }, [leaveLobby, navigate]);
 
+  const glowClass = getGamePalette(preferredGameId).p1.glow;
+
   return (
-    <LobbyView
-      lobbyQueue={lobbyQueue}
-      isInLobby={isInLobby}
-      onLeaveLobby={handleLeaveLobby}
-      socketId={socketId}
-      displayName={displayName}
-      connectionState={connectionState}
-      preferredGameId={preferredGameId}
-    />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground font-sans selection:bg-foreground/10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
+      >
+        <div
+          className={`h-[60vw] w-[60vw] rounded-full opacity-[0.04] blur-[100px] transition-colors duration-1000 ${glowClass}`}
+        />
+      </div>
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-8">
+        <LobbyView
+          lobbyQueue={lobbyQueue}
+          isInLobby={isInLobby}
+          onLeaveLobby={handleLeaveLobby}
+          socketId={socketId}
+          displayName={displayName}
+          connectionState={connectionState}
+          preferredGameId={preferredGameId}
+        />
+      </main>
+    </div>
   );
 };
 

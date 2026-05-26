@@ -29,7 +29,6 @@ export function createGameEventHandlers(stateSetters, refs = {}) {
 
   return {
     handleGameUpdate: (payload) => {
-      console.log("[Socket] gameUpdate received");
       const effectiveRoomId = payload.roomId;
       const previousGameId = gameIdRef?.current;
       const nextGameId = payload.gameId || previousGameId;
@@ -120,12 +119,10 @@ export function createLobbyEventHandlers(stateSetters) {
 
   return {
     handleLobbyUpdate: ({ queue }) => {
-      console.log("[Socket] lobbyUpdate received, queue size:", queue?.length);
       setLobbyQueue(queue || []);
     },
 
     handleMatchFound: ({ roomId: matchedRoomId, player: assignedPlayer, opponent }) => {
-      console.log("[Socket] matchFound:", matchedRoomId, assignedPlayer);
       setIsInLobby(false);
       setLobbyError(null);
       setRoomId(matchedRoomId);
@@ -133,9 +130,7 @@ export function createLobbyEventHandlers(stateSetters) {
       setPersistedRoom(matchedRoomId);
       setMessage(`Matched with ${opponent}! You are ${assignedPlayer}`);
     },
-
     handleMatchError: ({ error }) => {
-      console.log("[Socket] matchError:", error);
       setIsInLobby(false);
       setLobbyError(error);
     },

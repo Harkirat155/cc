@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Star, X } from "lucide-react";
+import Star from "lucide-react/dist/esm/icons/star.js";
+import X from "lucide-react/dist/esm/icons/x.js";
 import Button from "./ui/Button";
 
 const MAX_RATING = 5;
@@ -67,12 +68,12 @@ const FeedbackDialog = ({
       aria-modal="true"
       aria-labelledby="feedback-dialog-title"
     >
-      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-stone-200/50 bg-stone-50/90 p-6 shadow-2xl backdrop-blur-xl transition-all dark:border-white/5 dark:bg-slate-900/80">
+      <div className="absolute inset-0 bg-foreground/15 backdrop-blur-sm" />
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-foreground/5 bg-card/85 p-6 text-foreground shadow-2xl backdrop-blur-xl transition-all supports-[backdrop-filter]:bg-card/75">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-stone-100/80 text-stone-600 transition hover:bg-stone-200 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-800"
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
           aria-label="Close feedback form"
         >
           <X size={18} strokeWidth={2} />
@@ -86,17 +87,17 @@ const FeedbackDialog = ({
           <div className="space-y-2 text-center sm:text-left">
             <h2
               id="feedback-dialog-title"
-              className="text-2xl font-semibold tracking-tight text-stone-800 dark:text-slate-100"
+              className="text-2xl font-semibold tracking-tight text-foreground"
             >
               We value your feedback
             </h2>
-            <p className="text-sm text-stone-600 dark:text-slate-300">
+            <p className="text-sm text-muted-foreground">
               Help us make CrissCross even better. Share your experience and suggestions.
             </p>
           </div>
 
           <fieldset className="space-y-3">
-            <legend className="text-sm font-medium text-stone-700 dark:text-slate-200">
+            <legend className="text-sm font-medium text-foreground">
               Overall experience
             </legend>
             <div className="flex items-center justify-center gap-2 sm:justify-start">
@@ -107,7 +108,7 @@ const FeedbackDialog = ({
                   <button
                     key={value}
                     type="button"
-                    className={`relative transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
+                    className={`relative rounded-full transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 ${
                       isActive ? "scale-110" : "scale-100"
                     }`}
                     onMouseEnter={() => setHoverRating(value)}
@@ -125,7 +126,7 @@ const FeedbackDialog = ({
                       className={`${
                         isActive
                           ? "fill-amber-400 text-amber-400 drop-shadow-sm"
-                          : "text-slate-400 dark:text-slate-600"
+                          : "text-muted-foreground/45"
                       } transition-colors duration-150`}
                     />
                   </button>
@@ -135,7 +136,7 @@ const FeedbackDialog = ({
           </fieldset>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-stone-700 dark:text-slate-200">
+            <span className="text-sm font-medium text-foreground">
               Share more details
             </span>
             <textarea
@@ -145,7 +146,7 @@ const FeedbackDialog = ({
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               disabled={submitting}
-              className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3 text-sm text-stone-800 shadow-inner transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:focus:border-indigo-400"
+              className="w-full resize-none rounded-2xl border border-border bg-background/70 px-4 py-3 text-sm text-foreground shadow-inner transition placeholder:text-muted-foreground/70 focus:border-foreground/20 focus:outline-none focus:ring-2 focus:ring-foreground/10"
               placeholder="Let us know what you enjoyed or what could be improved..."
             />
           </label>

@@ -73,9 +73,6 @@ function record(extra = {}) {
   createNodeStub(workspace, 'nvm', `${recorder}record(); process.exit(0);`);
   createNodeStub(workspace, 'flyctl', `${recorder}record(); process.exit(process.env.STUB_FLYCTL_EXIT ? Number(process.env.STUB_FLYCTL_EXIT) : 0);`);
   createNodeStub(workspace, 'fly', `${recorder}record(); process.exit(0);`);
-  createNodeStub(workspace, 'railway', `${recorder}record(); process.exit(0);`);
-  createNodeStub(workspace, 'koyeb', `${recorder}record(); process.exit(0);`);
-  createNodeStub(workspace, 'curl', `${recorder}record(); process.stdout.write('{}'); process.exit(0);`);
   createNodeStub(
     workspace,
     'npm',
@@ -286,19 +283,15 @@ describe('deployment scripts integration', () => {
     expect(readLog(workspace).some((entry) => entry.cmd === 'flyctl')).toBe(false);
   });
 
-  test('backend missing required provider env fails before external command', () => {
+  test('backend rejects unsupported providers before external command', () => {
     const result = runScript(workspace, 'deploy-backend.sh', [
-      'render',
+      'unknown',
       '--skip-checks',
       '--skip-tests',
-    ], {
-      RENDER_SERVICE_ID: '',
-      RENDER_API_KEY: '',
-    });
+    ]);
 
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('Missing required env var: RENDER_SERVICE_ID');
-    expect(result.stderr).toContain('Missing required env var: RENDER_API_KEY');
-    expect(readLog(workspace).some((entry) => entry.cmd === 'curl')).toBe(false);
+    expect(result.stderr).toContain('Unknown argument: unknown');
+    expect(readLog(workspace).some((entry) => entry.cmd === 'flyctl')).toBe(false);
   });
 });

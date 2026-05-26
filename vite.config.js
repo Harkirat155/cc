@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import autoprefixer from 'autoprefixer';
-import tailwindcss from 'tailwindcss';
 
 export default defineConfig({
   plugins: [react()],
@@ -37,6 +35,9 @@ export default defineConfig({
           if (normalized.includes('react-joyride')) {
             return 'walkthrough';
           }
+          if (normalized.includes('motion')) {
+            return 'motion';
+          }
           // Let React and its helpers live with the rest of the vendor chunk to
           // prevent chunk loading order issues at runtime (e.g., React depending on
           // other vendor utilities that in turn depend on React).
@@ -46,14 +47,6 @@ export default defineConfig({
           return 'vendor';
         },
       },
-    },
-  },
-  css: {
-    postcss: {
-      plugins: [
-        autoprefixer,
-        tailwindcss,
-      ],
     },
   },
 });

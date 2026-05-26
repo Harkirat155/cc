@@ -16,9 +16,6 @@ Usage: scripts/deploy-backend.sh <provider> [options]
 
 Providers:
   fly       Deploy local source to Fly.io with flyctl/fly
-  railway   Deploy local source to Railway with railway up
-  koyeb     Redeploy an existing Koyeb service source
-  render    Trigger a paid/no-sleep Render service deploy
 
 Options:
   --env-file <path>   Load deploy env from a custom file
@@ -46,7 +43,7 @@ die() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      fly|railway|koyeb|render)
+      fly)
         PROVIDER="$1"
         shift
         ;;
@@ -144,25 +141,14 @@ load_node_version() {
   warn "nvm is not available in this shell; continuing with $(node --version 2>/dev/null || echo unknown node)"
 }
 
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
-}
-
-require_env() {
-  local missing=0
-  for name in "$@"; do
-    if [[ -z "${!name:-}" ]]; then
-      printf 'error: Missing required env var: %s\n' "$name" >&2
-      missing=1
-    fi
-  done
-  [[ "$missing" -eq 0 ]] || exit 1
-}
-
 ensure_dependencies() {
   if [[ ! -d "$ROOT_DIR/node_modules" ]]; then
     log "Installing dependencies"
-    npm ci
+    if [[ -f "$ROOT_DIR/package-lock.json" ]]; then
+      npm ci
+    else
+      npm install
+    fi
   fi
 }
 
@@ -248,56 +234,6 @@ deploy_fly() {
   print_success "$BACKEND_URL"
 }
 
-deploy_railway() {
-  require_cmd railway
-
-  if [[ "${RAILWAY_SET_VARIABLES:-1}" == "1" ]]; then
-    log "Setting Railway variables"
-    local env_pairs=()
-    while IFS= read -r pair; do
-      env_pairs+=("$pair")
-    done < <(optional_env_pairs)
-    for pair in "${env_pairs[@]}"; do
-      railway variables --set "$pair"
-    done
-  else
-    warn "Skipping Railway variable sync because RAILWAY_SET_VARIABLES=0"
-  fi
-
-  log "Deploying local source to Railway"
-  local args=(up --detach)
-  [[ -n "${RAILWAY_SERVICE:-}" ]] && args+=(--service "$RAILWAY_SERVICE")
-  railway "${args[@]}"
-
-  print_success "${RAILWAY_PUBLIC_URL:-}"
-}
-
-deploy_koyeb() {
-  require_cmd koyeb
-  require_env KOYEB_SERVICE_REF
-
-  warn "Koyeb support here redeploys an existing Koyeb service source. Use Fly or Railway for true local source upload."
-  log "Redeploying Koyeb service $KOYEB_SERVICE_REF"
-  koyeb service redeploy "$KOYEB_SERVICE_REF"
-
-  print_success "${KOYEB_PUBLIC_URL:-}"
-}
-
-deploy_render() {
-  require_cmd curl
-  require_env RENDER_SERVICE_ID RENDER_API_KEY
-
-  warn "Render free services sleep. Use this only for paid/no-sleep Render services."
-  log "Triggering Render deploy for service $RENDER_SERVICE_ID"
-  curl -fsS \
-    -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-    -H "Authorization: Bearer $RENDER_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d '{}'
-
-  print_success "${RENDER_SERVICE_URL:-}"
-}
-
 print_success() {
   local backend_url="$1"
   log "Deployment command completed"
@@ -306,7 +242,7 @@ print_success() {
     printf 'Backend URL: %s\n' "$backend_url"
     printf 'Set GitHub Pages secret BACKEND_URL to this value before the next frontend deploy.\n'
   else
-    printf 'Set BACKEND_URL to the public backend URL shown by the provider dashboard/CLI.\n'
+    printf 'Set BACKEND_URL to the public backend URL shown by the Fly dashboard/CLI.\n'
   fi
 
   printf 'Smoke test: curl -fsS "$BACKEND_URL/health"\n'
@@ -322,9 +258,6 @@ main() {
 
   case "$PROVIDER" in
     fly) deploy_fly ;;
-    railway) deploy_railway ;;
-    koyeb) deploy_koyeb ;;
-    render) deploy_render ;;
     *) die "Unsupported provider: $PROVIDER" ;;
   esac
 }

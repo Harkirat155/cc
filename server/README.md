@@ -1,25 +1,74 @@
 # Realtime Backend
 
-Express + Socket.IO server for Tic Tac Toe.
-
-Features:
-
-- Short 5-char room codes
-- LRU-capped in-memory rooms (env ROOM_LIMIT, default 500)
-- Spectators (third+ clients) read-only
-- Turn & winner enforcement server-side
-- Health endpoint /health
+Express + Socket.IO backend for CrissCross rooms, matchmaking, feedback, voice signaling, metrics, and public agent discovery.
 
 ## Run
 
 ```bash
-node server/app.js
+nvm use --lts
+npm run server
 ```
 
-Env vars (see `config.js` for full list):
+Default port: `10000`.
 
-- `PORT` (default 10000)
-- `ROOM_LIMIT` (default 500, max simultaneous rooms)
-- `ROOM_TTL_MS` (default 120000, empty room cleanup)
+## Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Health, uptime, room/lobby status |
+| `GET /metrics` | Runtime counters |
+| `POST /feedback` | Feedback intake and optional Google Sheets sync |
+| `GET /agent/manifest.json` | Read-only Socket.IO/game contract for agents |
+
+## Socket.IO events
+
+Room/game events:
+
+- `createRoom`, `joinRoom`, `leaveRoom`
+- `makeMove`, `resetGame`, `resetScores`, `switchGame`
+- `requestNewGame`, `cancelNewGameRequest`, `updateDisplayName`
+
+Lobby events:
+
+- `joinLobby`, `leaveLobby`, `getLobbyState`
+- emits `lobbyUpdate`, `matchFound`, `matchError`
+
+Voice events:
+
+- `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal`
+- emits `voice:user-joined`, `voice:user-left`, `voice:signal`
+
+Room state is broadcast through `gameUpdate` and reset notifications through `gameReset`.
+
+## Game model
+
+Server game rules come from `shared/games/`, currently:
+
+- `ttt`
+- `connect4`
+- `checkers`
+
+Rooms keep a current `gameId`, board, turn slot, winner slot, scores, roster, and rule metadata (`boardSpec`, `playerInfo`, `moveStyle`). `switchGame` resets the board for the room while preserving room membership.
+
+## Handler pattern
+
+Handlers in `server/handlers/*.js` should stay thin:
+
+1. Validate inputs with `handlers/validation.js`.
+2. Look up the room/lobby state.
+3. `touch(roomId)` for room events.
+4. Mutate state through the shared game rules.
+5. `publish(io, roomId)`.
+
+Do not bypass rate limiting or emit partial room state manually.
+
+## Environment
+
+Loaded through `server/config.js`:
+
+- `PORT` (default `10000`)
 - `CORS_ORIGIN` (default `*`)
-- `RATE_LIMIT_*` — rate limiting settings
+- `ROOM_LIMIT` (default `500`)
+- `ROOM_TTL_MS` (default `120000`)
+- `RATE_LIMIT_*`
+- optional Google Sheets feedback settings

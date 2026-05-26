@@ -1,10 +1,8 @@
 /**
  * Integration test for the local-mode game switching UX.
  *
- * Reproduces the regression where picking Checkers via the GameSelector
- * reloaded the page but useSocketGame still booted into TTT because
- * LOCAL_GAME_ID was hardcoded. Asserts that the URL ?game= param drives
- * which rules engine the hook initialises against.
+ * Covers local-mode game switching and deep-link initialisation so the selected
+ * rules engine can change without a document reload.
  */
 import React from "react";
 import { act, render, screen } from "@testing-library/react";
@@ -105,6 +103,29 @@ describe("useSocketGame — local game selection via ?game=", () => {
   test("unknown ?game= falls back to TTT", async () => {
     await mountWithSearch("?game=nonsense");
     expect(screen.getByTestId("gameId").textContent).toBe("ttt");
+  });
+
+  test("switchGame in local mode switches state and resets history in place", async () => {
+    const snap = await mountWithSearch("?game=ttt");
+
+    await act(async () => {
+      snap().handleSquareClick(0);
+    });
+    expect(snap().history).toHaveLength(2);
+
+    let result;
+    await act(async () => {
+      result = await snap().switchGame("checkers");
+    });
+
+    expect(result).toEqual({ success: true, gameId: "checkers" });
+    expect(snap().gameState.gameId).toBe("checkers");
+    expect(snap().gameState.board).toHaveLength(64);
+    expect(snap().history).toHaveLength(1);
+    expect(snap().history[0].squares).toHaveLength(64);
+    expect(snap().displayedBoard).toHaveLength(64);
+    expect(snap().selection).toBeNull();
+    expect(mockSocket.emit).not.toHaveBeenCalled();
   });
 
   test("local checkers click flow: select piece then play a step move", async () => {

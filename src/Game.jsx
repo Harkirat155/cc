@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
-import MenuPanel from "./components/MenuPanel";
+import MatchActionBar from "./components/MatchActionBar";
 import ResultModal from "./components/ResultModal";
+import WinnerCard from "./components/WinnerCard";
+import GameSelector from "./components/GameSelector";
 import useSocketGame from "./hooks/useSocketGame";
 import Navbar from "./components/Navbar";
 import useVoiceChat from "./hooks/useVoiceChat";
@@ -11,9 +13,9 @@ import AudioRenderer from "./components/AudioRenderer";
 import useWalkthrough from "./hooks/useWalkthrough";
 import Walkthrough from "./components/Walkthrough";
 import ScorePanel from "./components/ScorePanel";
-import ToastStack from "./components/ui/ToastStack";
 import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
+import { getGamePalette } from "./components/games/palette";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -85,12 +87,18 @@ const Game = () => {
     }
   };
   const winningSquares = gameState.winningLine || [];
+  const activeGlowClass = useMemo(() => {
+    const palette = getGamePalette(gameState?.gameId);
+    const turnSlot = Number.isInteger(gameState?.turnSlot)
+      ? gameState.turnSlot
+      : gameState?.turn === gameState?.playerInfo?.[1]?.label
+      ? 1
+      : 0;
+    return turnSlot === 1 ? palette.p2.glow : palette.p1.glow;
+  }, [gameState?.gameId, gameState?.playerInfo, gameState?.turn, gameState?.turnSlot]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   // Prevent auto-join when user is actively leaving a room from a room URL
   const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
-  const [toasts, setToasts] = useState([]);
-  const lastToastRef = useRef({ text: null, at: 0 });
-  const toastTimeoutsRef = useRef(new Map());
   const feedbackAbortRef = useRef(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackError, setFeedbackError] = useState("");
@@ -123,54 +131,6 @@ const Game = () => {
 
   // winningSquares derived from multiplayer/local hook state
 
-  const dismissToast = useCallback((id) => {
-    const timeoutId = toastTimeoutsRef.current.get(id);
-    if (timeoutId) {
-      window.clearTimeout(timeoutId);
-      toastTimeoutsRef.current.delete(id);
-    }
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
-
-  const enqueueToast = useCallback(
-    (text, { duration = 5000, dedupe = true } = {}) => {
-      if (!text) return null;
-      const now = Date.now();
-      if (dedupe) {
-        const { text: lastText, at: lastAt } = lastToastRef.current || {};
-        if (lastText === text && now - lastAt < 1500) return null;
-      }
-
-      const id = `${now}-${Math.random().toString(36).slice(2)}`;
-      setToasts((prev) => [...prev.slice(-3), { id, text, duration }]);
-      lastToastRef.current = { text, at: now };
-
-      const timeoutId = window.setTimeout(() => {
-        toastTimeoutsRef.current.delete(id);
-        dismissToast(id);
-      }, duration);
-      toastTimeoutsRef.current.set(id, timeoutId);
-      return id;
-    },
-    [dismissToast]
-  );
-
-  useEffect(() => {
-    if (!message) return undefined;
-    enqueueToast(message);
-    return undefined;
-  }, [message, enqueueToast]);
-
-  useEffect(
-    () => () => {
-      toastTimeoutsRef.current.forEach((timeoutId) =>
-        window.clearTimeout(timeoutId)
-      );
-      toastTimeoutsRef.current.clear();
-    },
-    []
-  );
-
   const openFeedbackForm = useCallback(() => {
     setFeedbackError("");
     setIsFeedbackOpen(true);
@@ -194,9 +154,9 @@ const Game = () => {
         feedbackAbortRef.current.abort();
       }
 
-  const abortCtor = globalThis.AbortController;
-  const controller = abortCtor ? new abortCtor() : null;
-  feedbackAbortRef.current = controller;
+      const abortCtor = globalThis.AbortController;
+      const controller = abortCtor ? new abortCtor() : null;
+      feedbackAbortRef.current = controller;
 
       try {
         const payload = {
@@ -239,10 +199,8 @@ const Game = () => {
             errorDetail || "We couldn't send your feedback. Please try again."
           );
         }
-
         setIsFeedbackSubmitting(false);
         setIsFeedbackOpen(false);
-        enqueueToast("Thanks! Your feedback was sent.", { dedupe: false });
       } catch (error) {
         feedbackAbortRef.current = null;
         if (error?.name === "AbortError") {
@@ -256,7 +214,7 @@ const Game = () => {
         setIsFeedbackSubmitting(false);
       }
     },
-    [enqueueToast, feedbackEndpoint, isMultiplayer, roomId, socketId]
+    [feedbackEndpoint, isMultiplayer, roomId, socketId]
   );
 
   const menuItems = useMemo(
@@ -304,8 +262,34 @@ const Game = () => {
     navigate(expected);
   }, [roomId, navigate, paramRoomId]);
 
+  const handleCreateMatch = useCallback(() => {
+    createRoom(gameState?.gameId || requestedGameId);
+  }, [createRoom, gameState?.gameId, requestedGameId]);
+
+  const handleFindMatch = useCallback(() => {
+    const gameId = gameState?.gameId || requestedGameId;
+    navigate({
+      pathname: "/lobby",
+      search: gameId && gameId !== "ttt" ? `?game=${encodeURIComponent(gameId)}` : "",
+    });
+  }, [gameState?.gameId, navigate, requestedGameId]);
+  const canResetScore = Array.isArray(gameState?.scores)
+    ? gameState.scores.some((score) => score !== 0)
+    : gameState.xScore !== 0 || gameState.oScore !== 0;
+  const winnerCardResult = !isMultiplayer ? gameState.winner : null;
+  const shouldShowResultModal =
+    isMultiplayer && showModal && Boolean(gameState.winner);
+
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-x-hidden bg-slate-100 text-slate-900 transition-colors duration-500 dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground font-sans selection:bg-foreground/10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
+      >
+        <div
+          className={`h-[60vw] w-[60vw] rounded-full opacity-[0.04] blur-[100px] transition-colors duration-1000 ${activeGlowClass}`}
+        />
+      </div>
       <Walkthrough
         run={runWalkthrough}
         steps={walkthroughSteps}
@@ -321,6 +305,8 @@ const Game = () => {
         micMuted={muted}
         onToggleMic={handleToggleMic}
         connectionState={connectionState}
+        currentGameId={gameState?.gameId}
+        onSwitchGame={!isMultiplayer || player ? switchGame : null}
         menuPanel={
           isMultiplayer ? (
             <PeoplePanel
@@ -335,63 +321,68 @@ const Game = () => {
         }
         menuItems={menuItems}
       />
-      {/* push content below navbar height */}
-      <div className="h-20" />
       {/* Hidden audio elements for remote peers */}
       <AudioRenderer streamsById={remoteAudioStreams} />
-      <main className="relative z-0 flex w-full flex-1 justify-center px-4">
-        <div className="flex w-full max-w-5xl flex-col items-center gap-10">
+      <main className="relative z-10 flex w-full flex-1 justify-center px-4 pb-28 pt-7 sm:pb-32 sm:pt-8">
+        <div className="flex w-full max-w-5xl flex-col items-center gap-8 sm:gap-10">
+          <GameSelector
+            variant="mobile"
+            isMultiplayer={isMultiplayer}
+            currentGameId={gameState?.gameId}
+            onSwitchGame={!isMultiplayer || player ? switchGame : null}
+          />
           <ScorePanel
             gameState={gameState}
             roster={roster}
             socketId={socketId}
             isMultiplayer={isMultiplayer}
-            roomId={roomId}
             displayName={displayName}
             onUpdateDisplayName={updateDisplayName}
-            onSwitchGame={switchGame}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
-            <GameBoard
-              squares={displayedBoard}
-              onSquareClick={handleSquareClick}
-              winningSquares={winningSquares}
-              rows={gameState?.boardSpec?.rows}
-              cols={gameState?.boardSpec?.cols}
-              playerInfo={gameState?.playerInfo}
-              boardSpec={gameState?.boardSpec}
-              moveStyle={gameState?.moveStyle}
-              selection={selection}
-              legalTargets={legalTargets}
-            />
-            <MenuPanel
-              onReset={resetScores}
-              onNewGame={resetGame}
-              hasMoves={history.length > 1}
-              canResetScore={gameState.xScore !== 0 || gameState.oScore !== 0}
-              createRoom={() => createRoom(requestedGameId)}
-              onFindMatch={() => {
-                const gameId = gameState?.gameId || requestedGameId;
-                navigate({
-                  pathname: '/lobby',
-                  search: gameId && gameId !== 'ttt' ? `?game=${encodeURIComponent(gameId)}` : '',
-                });
-              }}
-              leaveRoom={async () => {
-                setSuppressAutoJoin(true);
-                await leaveRoom();
-                navigate("/", { replace: true });
-              }}
-              isMultiplayer={isMultiplayer}
-              roomId={roomId}
-            />
+            <div className="relative w-full">
+              <GameBoard
+                squares={displayedBoard}
+                onSquareClick={handleSquareClick}
+                winningSquares={winningSquares}
+                rows={gameState?.boardSpec?.rows}
+                cols={gameState?.boardSpec?.cols}
+                playerInfo={gameState?.playerInfo}
+                boardSpec={gameState?.boardSpec}
+                moveStyle={gameState?.moveStyle}
+                selection={selection}
+                legalTargets={legalTargets}
+              />
+              <WinnerCard
+                winner={winnerCardResult}
+                winnerSlot={gameState.winnerSlot}
+                gameId={gameState?.gameId}
+                playerInfo={gameState?.playerInfo}
+                onReset={resetGame}
+              />
+            </div>
           </div>
         </div>
       </main>
+      <MatchActionBar
+        hasMoves={history.length > 1}
+        canResetScore={canResetScore}
+        isMultiplayer={isMultiplayer}
+        roomId={roomId}
+        onNewGame={resetGame}
+        onResetScores={resetScores}
+        onCreateMatch={handleCreateMatch}
+        onFindMatch={handleFindMatch}
+        onLeaveRoom={async () => {
+          setSuppressAutoJoin(true);
+          await leaveRoom();
+          navigate("/", { replace: true });
+        }}
+      />
       {/* Slide-over panels */}
       {/* History Panel (right slide-over) */}
       <div
-        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-stone-200/80 bg-stone-50/90 backdrop-blur-xl shadow-xl transition-transform duration-300 dark:border-slate-700/70 dark:bg-slate-950/70 ${
+        className={`fixed top-16 right-0 bottom-0 z-40 w-80 max-w-[85vw] transform border-l border-foreground/10 bg-background/90 shadow-xl backdrop-blur-xl transition-transform duration-300 ${
           isHistoryOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -410,7 +401,7 @@ const Game = () => {
           winner={gameState.winner}
         />
       </div>
-      {showModal && (
+      {shouldShowResultModal && (
         <ResultModal
           result={
             gameState.winner === "draw"
@@ -419,14 +410,12 @@ const Game = () => {
               ? `${gameState.winner} Wins!`
               : "Game Over"
           }
-          onStartNewLocal={resetGame}
-          onJoinNewGame={resetGame}
+          onAcceptRematch={resetGame}
           onLeaveRoom={async () => {
             setSuppressAutoJoin(true);
             await leaveRoom();
             navigate("/", { replace: true });
           }}
-          isMultiplayer={isMultiplayer}
           player={player}
           roster={roster}
           newGameRequester={newGameRequester}
@@ -439,7 +428,6 @@ const Game = () => {
           rematchTimeoutSec={20}
         />
       )}
-  <ToastStack messages={toasts} onDismiss={dismissToast} />
       <FeedbackDialog
         open={isFeedbackOpen}
         onClose={closeFeedbackForm}

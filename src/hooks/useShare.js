@@ -30,7 +30,7 @@ export default function useShare({ roomId }) {
       }
       return true;
     } catch (e) {
-      console.log(`Copy this link: ${shareUrl}`, e);
+      console.warn("Unable to copy share link", e);
       return false;
     }
   }, [roomId, shareUrl]);

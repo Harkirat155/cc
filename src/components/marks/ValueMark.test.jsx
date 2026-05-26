@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
 import ValueMark from './ValueMark';
+import { getGamePalette } from '../games/palette';
 
 // Cleanup after each test to prevent DOM pollution
 afterEach(() => {
@@ -22,6 +23,22 @@ describe('ValueMark', () => {
     expect(span).toBeInTheDocument();
     expect(span).toHaveClass('text-red-600');
     expect(span).toHaveClass('transition-all', 'duration-300');
+  });
+
+  it('optically balances the TTT circle symbol', () => {
+    render(
+      <ValueMark
+        value="O"
+        playerInfo={[
+          { slot: 0, label: 'X', color: 'sky' },
+          { slot: 1, label: 'O', color: 'rose' },
+        ]}
+        palette={getGamePalette('ttt')}
+      />
+    );
+    const span = screen.getByRole('img', { name: '○' });
+    expect(span).toHaveClass('inline-flex', 'items-center', 'justify-center');
+    expect(span.firstChild).toHaveClass('h-[1em]', 'w-[1em]', 'rounded-full', 'border-current');
   });
 
 //   it('renders empty string when value is empty', () => {

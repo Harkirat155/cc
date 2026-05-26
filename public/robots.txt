@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /cc/
+Allow: /cc/agents
+Allow: /cc/llms.txt
+Allow: /cc/agent-manifest.json
+Disallow: /cc/room
+Disallow: /cc/lobby
+
+Sitemap: https://harkirat155.github.io/cc/sitemap.xml

@@ -75,29 +75,29 @@ const LobbyView = ({
   }, [userPosition, lobbyQueue.length]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-100 to-indigo-100/80 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-stone-50 dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="flex w-full items-center justify-center">
+      <div className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-foreground/10 bg-background/80 shadow-[0_24px_90px_-48px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 px-8 py-6">
+        <div className="border-b border-foreground/5 bg-foreground/[0.03] px-8 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-white mb-2">Matchmaking Lobby</h1>
+            <h1 className="mb-2 text-3xl font-semibold tracking-tight text-foreground">Matchmaking Lobby</h1>
             {/* Connection indicator */}
             <div className="flex items-center gap-2">
-              <span 
+              <span
                 className={`w-2.5 h-2.5 rounded-full ${
-                  connectionState === 'connected' 
-                    ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]' 
+                  connectionState === 'connected'
+                    ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]'
                     : connectionState === 'connecting'
                     ? 'bg-yellow-400 animate-pulse'
                     : 'bg-red-400'
-                }`} 
+                }`}
               />
-              <span className="text-sm text-blue-100">
+              <span className="text-sm text-foreground/50">
                 {connectionState === 'connected' ? 'Connected' : connectionState === 'connecting' ? 'Connecting...' : 'Disconnected'}
               </span>
             </div>
           </div>
-          <p className="text-blue-100 dark:text-blue-200">
+          <p className="text-foreground/55">
             {connectionState === 'connected' ? 'Finding an opponent for you...' : connectionState === 'connecting' ? 'Establishing connection...' : 'Connection lost, reconnecting...'}
           </p>
         </div>
@@ -106,45 +106,45 @@ const LobbyView = ({
           {/* Waiting State */}
           <div className="space-y-6">
             <div className="text-center py-8">
-              <div className="relative inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
-                <svg 
-                  className="animate-spin h-10 w-10 text-blue-600 dark:text-blue-400" 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  fill="none" 
+              <div className="relative mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-foreground/[0.05]">
+                <svg
+                  className="h-10 w-10 animate-spin text-foreground/60"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
                   viewBox="0 0 24 24"
                 >
-                  <circle 
-                    className="opacity-25" 
-                    cx="12" 
-                    cy="12" 
-                    r="10" 
-                    stroke="currentColor" 
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
                     strokeWidth="4"
                   />
-                  <path 
-                    className="opacity-75" 
-                    fill="currentColor" 
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
                 {/* Pulsing ring */}
-                <span className="absolute inset-0 rounded-full bg-blue-400/30 animate-ping" />
+                <span className="absolute inset-0 animate-ping rounded-full bg-foreground/10" />
               </div>
-              <h2 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">
+              <h2 className="mb-2 text-2xl font-semibold text-foreground">
                 Searching for opponent...
               </h2>
-              <p className="text-sm text-stone-500 dark:text-gray-400 mb-2">
-                Playing as: <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{displayName}</span>
+              <p className="mb-2 text-sm text-foreground/55">
+                Playing as: <span className="font-mono font-semibold text-foreground">{displayName}</span>
               </p>
-              <p className="text-sm text-stone-500 dark:text-gray-400 mb-2">
-                Game: <span className="font-semibold text-stone-700 dark:text-gray-200">{gameName(preferredGameId)}</span>
+              <p className="mb-2 text-sm text-foreground/55">
+                Game: <span className="font-semibold text-foreground/80">{gameName(preferredGameId)}</span>
               </p>
               <div className="flex flex-col items-center gap-1">
-                <p className="text-stone-600 dark:text-gray-400">
+                <p className="text-foreground/55">
                   {userPosition >= 0 && `Position in queue: ${userPosition + 1}`}
                 </p>
                 {estimatedWait && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  <p className="text-sm font-medium text-foreground/75">
                     {estimatedWait}
                   </p>
                 )}
@@ -152,15 +152,15 @@ const LobbyView = ({
             </div>
 
             {/* Rotating Tips */}
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-4 border border-indigo-100 dark:border-indigo-800/50 transition-all duration-300">
-              <p className="text-sm text-indigo-700 dark:text-indigo-300 text-center min-h-[2.5rem] flex items-center justify-center">
+            <div className="rounded-2xl border border-foreground/5 bg-foreground/[0.03] p-4 transition-all duration-300">
+              <p className="flex min-h-[2.5rem] items-center justify-center text-center text-sm text-foreground/65">
                 {currentTip}
               </p>
             </div>
 
             {/* Waiting Players List */}
-            <div className="bg-stone-100 dark:bg-gray-700 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-stone-700 dark:text-gray-300 mb-3">
+            <div className="rounded-2xl bg-foreground/[0.03] p-4">
+              <h3 className="mb-3 text-sm font-semibold text-foreground/70">
                 Waiting Players ({lobbyQueue.length})
               </h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -173,29 +173,29 @@ const LobbyView = ({
                       key={player.socketId}
                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
                         isCurrentUser
-                          ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500'
-                          : 'bg-stone-50 dark:bg-gray-800'
+                          ? 'border border-foreground/10 bg-foreground/10'
+                          : 'bg-background/60'
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <span className="flex-shrink-0 w-8 h-8 bg-stone-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-semibold text-stone-700 dark:text-gray-300">
+                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-sm font-semibold text-foreground/70">
                           {index + 1}
                         </span>
                         <div>
-                          <p className="font-medium text-stone-800 dark:text-white font-mono">
+                          <p className="font-mono font-medium text-foreground">
                             {player.displayName}
                             {isCurrentUser && (
-                              <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 font-semibold font-sans">
+                              <span className="ml-2 font-sans text-xs font-semibold text-foreground/60">
                                 (You)
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-foreground/45">
                             Waiting {waitTime}s
                           </p>
                         </div>
                       </div>
-                      <span className="rounded-full bg-stone-200 px-2.5 py-1 text-xs font-semibold text-stone-600 dark:bg-gray-700 dark:text-gray-200">
+                      <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 text-xs font-semibold text-foreground/60">
                         {gameName(player.gameId)}
                       </span>
                     </div>
@@ -206,7 +206,7 @@ const LobbyView = ({
 
             <Button
               onClick={handleLeaveLobby}
-              className="w-full border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 py-3 rounded-lg transition-colors"
+              className="w-full rounded-full border border-foreground/10 py-3 transition-colors hover:bg-foreground/[0.05]"
             >
               Leave Lobby
             </Button>
@@ -214,8 +214,8 @@ const LobbyView = ({
         </div>
 
         {/* Info Footer */}
-        <div className="bg-stone-100 dark:bg-gray-900 px-8 py-4 border-t border-stone-200 dark:border-gray-700">
-          <p className="text-xs text-stone-600 dark:text-gray-400 text-center">
+        <div className="border-t border-foreground/5 bg-foreground/[0.03] px-8 py-4">
+          <p className="text-center text-xs text-foreground/45">
             Players are matched automatically on a first-come, first-served basis
           </p>
         </div>

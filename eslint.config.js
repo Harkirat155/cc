@@ -15,7 +15,6 @@ export default [
       'build',
       '.vite',
       '.vercel',
-      '.render',
       '**/*.min.js',
     ],
   },
@@ -88,7 +87,7 @@ export default [
   // Tooling config files (CommonJS style)
   {
     name: 'tooling-configs-commonjs',
-    files: ['postcss.config.js', 'tailwind.config.js'],
+    files: ['postcss.config.js', 'postcss.config.cjs', 'tailwind.config.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',

@@ -16,6 +16,7 @@ import { appendFeedbackRow } from './googleSheetsClient.js';
 import { setupGracefulShutdown, onShutdown, createShutdownMiddleware } from './gracefulShutdown.js';
 import { getHealthStatus, getMetrics, incCounter } from './metrics.js';
 import { stopRateLimitCleanup } from './rateLimiter.js';
+import { buildAgentManifest } from './agentManifest.js';
 import './polyfills/objectHasOwn.js';
 
 // Register built-in games into the shared rules registry.
@@ -90,6 +91,11 @@ app.get('/health', (_req, res) => {
 app.get('/metrics', (_req, res) => {
   const metrics = getMetrics();
   res.json(metrics);
+});
+
+app.get('/agent/manifest.json', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.json(buildAgentManifest(req));
 });
 
 // ========== Feedback Endpoint ==========

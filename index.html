@@ -3,11 +3,105 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CrissCross | Multiplayer Board Games</title>
     <meta
       name="description"
-      content="A modern, minimalist Tic Tac Toe game built with React and Tailwind CSS. Play, track history, and enjoy a beautiful UI."
+      content="Play CrissCross, a free browser-based multiplayer board-game app for public matchmaking and private rooms across Tic-Tac-Toe, Connect Four, and Checkers."
     />
-    <title>CrissCross</title>
+    <meta name="robots" content="index, follow" />
+    <meta name="application-name" content="CrissCross" />
+    <meta name="apple-mobile-web-app-title" content="CrissCross" />
+    <meta
+      name="keywords"
+      content="CrissCross, multiplayer board games, online Tic-Tac-Toe, Connect Four, Checkers, browser games"
+    />
+    <meta name="author" content="Harkirat155" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="canonical" href="https://harkirat155.github.io/cc/" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="%BASE_URL%sitemap.xml" />
+    <link
+      rel="alternate"
+      type="text/plain"
+      title="Robots.txt"
+      href="%BASE_URL%robots.txt"
+    />
+    <link rel="help" type="text/plain" title="LLMs.txt" href="%BASE_URL%llms.txt" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="CrissCross | Multiplayer Board Games" />
+    <meta
+      property="og:description"
+      content="Play Tic-Tac-Toe, Connect Four, and Checkers online with private rooms, public matchmaking, scores, and optional voice chat."
+    />
+    <meta property="og:url" content="https://harkirat155.github.io/cc/" />
+    <meta property="og:site_name" content="CrissCross" />
+    <meta property="og:locale" content="en_US" />
+    <meta
+      property="og:image"
+      content="https://harkirat155.github.io/cc/icons/icon-512x512.svg"
+    />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="CrissCross board-game grid icon" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="CrissCross | Multiplayer Board Games" />
+    <meta
+      name="twitter:description"
+      content="Play Tic-Tac-Toe, Connect Four, and Checkers online with rooms, matchmaking, scores, and optional voice chat."
+    />
+    <meta
+      name="twitter:image"
+      content="https://harkirat155.github.io/cc/icons/icon-512x512.svg"
+    />
+    <meta name="twitter:image:alt" content="CrissCross board-game grid icon" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": ["WebApplication", "Game"],
+        "@id": "https://harkirat155.github.io/cc/#app",
+        "name": "CrissCross",
+        "alternateName": "CrissCross Multiplayer Board Games",
+        "url": "https://harkirat155.github.io/cc/",
+        "description": "A free browser-based multiplayer board-game app for Tic-Tac-Toe, Connect Four, and Checkers with private rooms and public matchmaking.",
+        "image": "https://harkirat155.github.io/cc/icons/icon-512x512.svg",
+        "applicationCategory": "GameApplication",
+        "applicationSubCategory": "Multiplayer board game",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and a modern web browser.",
+        "isAccessibleForFree": true,
+        "inLanguage": "en-US",
+        "gamePlatform": "Web browser",
+        "genre": ["Board game", "Strategy game", "Multiplayer game"],
+        "playMode": "MultiPlayer",
+        "numberOfPlayers": {
+          "@type": "QuantitativeValue",
+          "minValue": 2,
+          "maxValue": 2
+        },
+        "featureList": [
+          "Private room codes for friends",
+          "Public matchmaking lobby",
+          "Turn-based Tic-Tac-Toe, Connect Four, and Checkers",
+          "Score tracking and optional voice chat"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Harkirat155",
+          "url": "https://github.com/Harkirat155"
+        },
+        "publisher": {
+          "@type": "Person",
+          "name": "Harkirat155",
+          "url": "https://github.com/Harkirat155"
+        },
+        "sameAs": ["https://github.com/Harkirat155/cc"]
+      }
+    </script>
     <!-- Load base styles early to avoid FOUC -->
     <link rel="stylesheet" href="/src/index.css" />
     <!-- App icons -->
@@ -84,20 +178,21 @@
     <!-- Keep a crawlable link for SEO, but hide it visually to avoid any FOUC or layout impact -->
     <footer class="sr-only">
       <a
-        href="https://github.com/harkirat155/crissCross"
+        href="https://github.com/Harkirat155/cc"
         rel="noopener noreferrer"
         target="_blank"
-        >Project on GitHub</a
+        >CrissCross source on GitHub</a
       >
     </footer>
     <noscript>
-      <!-- Fallback for users/crawlers without JS: simple, minimal link -->
+      <!-- Fallback for users/crawlers without JS: multiplayer gameplay requires JavaScript. -->
       <div class="text-center mt-8">
+        <p>CrissCross needs JavaScript for live multiplayer games.</p>
         <a
-          href="https://github.com/harkirat155/crissCross"
+          href="https://github.com/Harkirat155/cc"
           rel="noopener"
           target="_blank"
-          >Project on GitHub</a
+          >CrissCross source on GitHub</a
         >
       </div>
     </noscript>

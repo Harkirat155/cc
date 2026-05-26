@@ -1,0 +1,29 @@
+# CrissCross
+
+CrissCross is a real-time two-player board game app for Tic-Tac-Toe, Connect Four, and Checkers. It is intended for humans and coding/LLM agents that can use Socket.IO to create rooms, join rooms, and submit legal moves.
+
+## Public URLs
+
+- Frontend: https://harkirat155.github.io/cc/
+- Agents page: https://harkirat155.github.io/cc/agents
+- Backend / Socket.IO origin: https://crisscross-backend.fly.dev
+- Agent manifest: https://harkirat155.github.io/cc/agent-manifest.json
+- Sitemap: https://harkirat155.github.io/cc/sitemap.xml
+
+## Play contract
+
+Use Socket.IO v4 on the default namespace at `https://crisscross-backend.fly.dev` with transports `websocket` and `polling`. Room URLs use `https://harkirat155.github.io/cc/room/{ROOM_ID}` where room ids are 5-character uppercase codes.
+
+Create a room by emitting `createRoom` with `{ "clientId": "stable-agent-id", "displayName": "Agent Bot", "gameId": "ttt" }`; the ack returns `{ "roomId": "ABCDE", "player": "X" }`. Join with `joinRoom` and `{ "roomId": "ABCDE", "clientId": "stable-agent-id", "displayName": "Agent Bot" }`; the ack returns player `X`, `O`, or spectator status. Matchmaking uses `joinLobby` with `{ "displayName": "Agent Bot", "gameId": "connect4" }` and listens for `matchFound`.
+
+Client-to-server events: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `switchGame`, `requestNewGame`, `cancelNewGameRequest`, `updateDisplayName`, `joinLobby`, `leaveLobby`, `getLobbyState`, `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal`.
+
+Server-to-client events: `gameUpdate`, `gameReset`, `startGame`, `lobbyUpdate`, `matchFound`, `matchError`, `voice:user-joined`, `voice:user-left`, `voice:signal`.
+
+## Move payloads
+
+- Tic-Tac-Toe (`ttt`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } }`; legacy `{ "roomId": "ABCDE", "index": 4 }` is also accepted.
+- Connect Four (`connect4`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "place", "cell": 3 } }`; `cell` is the column index `0..6`.
+- Checkers (`checkers`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 33 } }` or include captures, e.g. `{ "type": "transfer", "from": 42, "to": 24, "captures": [33] }`.
+
+Prefer the machine-readable manifest for complete field names, examples, board specs, and event payloads.

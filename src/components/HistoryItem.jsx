@@ -1,7 +1,10 @@
 import React from "react";
 import { Tooltip } from "./ui/Tooltip";
 import ValueMark from "./marks/ValueMark";
-import { CircleDot, Clock3, Crown, RefreshCcw } from "lucide-react";
+import CircleDot from "lucide-react/dist/esm/icons/circle-dot.js";
+import Clock3 from "lucide-react/dist/esm/icons/clock-3.js";
+import Crown from "lucide-react/dist/esm/icons/crown.js";
+import RefreshCcw from "lucide-react/dist/esm/icons/refresh-ccw.js";
 
 const ICON_MAP = {
   win: Crown,
@@ -30,31 +33,31 @@ const HistoryItem = ({ entry, index, onSelect, active, actor, isLast }) => {
   return (
     <li className="relative pl-9">
       {!isLast && (
-        <span className="absolute left-[13px] top-10 bottom-[-16px] w-px bg-slate-200 dark:bg-slate-700" />
+        <span className="absolute left-[13px] top-10 bottom-[-16px] w-px bg-border" />
       )}
       <Tooltip content={tooltipContent} side="left" align="center">
         <button
           type="button"
           onClick={() => onSelect(index)}
-          className={`w-full rounded-xl border px-3 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-500 ${
+          className={`w-full rounded-2xl border px-3 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 ${
             active
-              ? "border-blue-300 bg-blue-50/90 shadow-sm dark:border-blue-700 dark:bg-blue-900/20"
-              : "border-transparent bg-stone-100/40 hover:border-stone-200 hover:bg-stone-100/70 dark:border-slate-800/40 dark:bg-slate-800/30 dark:hover:border-slate-700 dark:hover:bg-slate-800/60"
+              ? "border-foreground/15 bg-foreground/[0.06] shadow-sm"
+              : "border-foreground/5 bg-foreground/[0.03] hover:bg-foreground/[0.06]"
           }`}
           aria-label={tooltipContent}
         >
-          <div className="absolute left-0 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="absolute left-0 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-foreground/10 bg-card text-sm">
             {entry?.mark ? (
               <ValueMark value={entry.mark} />
             ) : (
-              <Icon size={14} className="text-slate-500 dark:text-slate-400" />
+              <Icon size={14} className="text-muted-foreground" />
             )}
           </div>
           <div className="ml-2 flex flex-col gap-1">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
               <span>{moveLabel}</span>
               {coordinateLabel && (
-                <span className="font-semibold text-slate-600 dark:text-slate-200">
+                <span className="font-semibold text-foreground/75">
                   {coordinateLabel}
                 </span>
               )}
@@ -64,19 +67,19 @@ const HistoryItem = ({ entry, index, onSelect, active, actor, isLast }) => {
                 <p
                   className={`text-sm font-semibold ${
                     actor?.isYou
-                      ? "text-blue-700 dark:text-blue-300"
-                      : "text-stone-700 dark:text-slate-100"
+                      ? "text-foreground"
+                      : "text-foreground/85"
                   }`}
                 >
                   {actor?.label || "System"}
                 </p>
                 {actor?.detail && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     {actor.detail}
                   </p>
                 )}
               </div>
-              <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+              <span className="shrink-0 text-xs text-muted-foreground">
                 {entry?.result}
               </span>
             </div>

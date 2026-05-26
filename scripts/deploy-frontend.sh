@@ -204,7 +204,11 @@ load_node_version() {
 ensure_dependencies() {
   if [[ ! -d "$ROOT_DIR/node_modules" ]]; then
     log "Installing dependencies"
-    npm ci
+    if [[ -f "$ROOT_DIR/package-lock.json" ]]; then
+      npm ci
+    else
+      npm install
+    fi
   fi
 }
 

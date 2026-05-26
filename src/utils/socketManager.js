@@ -27,7 +27,6 @@ function getSocketUrl() {
 export function getSocket() {
   if (!socket) {
     const url = getSocketUrl();
-    console.log("[SocketManager] Creating singleton socket to:", url);
 
     socket = io(url, {
       transports: ["websocket", "polling"],
@@ -39,9 +38,7 @@ export function getSocket() {
       timeout: 20000,
     });
 
-    // Log connection events
     socket.on("connect", () => {
-      console.log("[SocketManager] Connected:", socket.id);
       notifyListeners("connect", socket);
     });
 
@@ -51,22 +48,19 @@ export function getSocket() {
     });
 
     socket.on("disconnect", (reason) => {
-      console.log("[SocketManager] Disconnected:", reason);
       notifyListeners("disconnect", reason);
     });
 
     socket.io.on("reconnect_attempt", (attempt) => {
-      console.log("[SocketManager] Reconnect attempt:", attempt);
       notifyListeners("reconnect_attempt", attempt);
     });
 
     socket.io.on("reconnect", () => {
-      console.log("[SocketManager] Reconnected");
       notifyListeners("reconnect", socket);
     });
 
     socket.io.on("reconnect_failed", () => {
-      console.log("[SocketManager] Reconnect failed");
+      console.warn("[SocketManager] Reconnect failed");
       notifyListeners("reconnect_failed", null);
     });
   }
@@ -165,7 +159,6 @@ function notifyListeners(event, data) {
  */
 export function disconnectSocket() {
   if (socket) {
-    console.log("[SocketManager] Disconnecting socket");
     socket.disconnect();
     socket = null;
   }
@@ -176,7 +169,6 @@ export function disconnectSocket() {
  */
 export function reconnect() {
   if (socket && !socket.connected) {
-    console.log("[SocketManager] Forcing reconnect");
     socket.connect();
   }
 }

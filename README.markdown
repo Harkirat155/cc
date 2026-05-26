@@ -1,114 +1,102 @@
-# CrissCross — Tic Tac Toe
+# CrissCross
 
-A minimalist, modern Tic Tac Toe game built with React and Tailwind CSS.
+CrissCross is a modern real-time board-game app for **Tic-Tac-Toe**, **Connect Four**, and **Checkers**. It supports local play, Socket.IO rooms, FIFO matchmaking, WebRTC voice chat, and a public agent contract so LLM/coding agents can join the same rooms as humans.
 
-## TL;DR
-
-**CrissCross** is a feature-rich Tic Tac Toe web app with:
-
-- 🎮 **Single & Multiplayer** modes (local + realtime via Socket.IO)
-- 🎯 **Matchmaking** — find random opponents instantly
-- 🎤 **Voice Chat** — talk during multiplayer games
-- 📱 **Responsive** — works beautifully on all devices
-- 🌓 **Dark/Light** themes
-- 🕹️ **History & Time Travel** — review and replay moves
-- 🏆 **Score Tracking** — persistent scores across games
-
-**Quick Start:**
+## Quick start
 
 ```bash
 nvm use --lts
 npm install
-npm run dev:all  # Starts both frontend (Vite) & backend (Socket.IO server)
+npm run dev:all
 ```
 
-Then open `http://localhost:5173` and click **"Find Match"** to play!
+Open `http://localhost:5173/cc/` for the Vite frontend. The backend runs on `http://localhost:10000`.
 
-## Roadmap
+## Core features
 
-- sound effects and haptics
-- styles taken out to reusable components
-
-## Features
-
-- Responsive 3×3 board with smooth animations and winning-line highlight
-- Top navbar with History toggle and Theme toggle (light/dark)
-- Slide‑over History Panel with time‑travel and completed‑game summaries
-- Bottom Menu Panel: New, Reset, Create Room, Share Link, Leave Room
-- Share copies a joinable link and uses the Web Share API when available
-- Auto‑join via route: open `/room/:roomId` to join that room
-- Result modal with “Request/Join New Game” flow in multiplayer
-- Score tracking for X and O across games until reset
-- Optional real‑time multiplayer (Socket.IO) with spectators (read‑only)
-- GitHub Pages friendly base path (`/crissCross`)
+- Multi-game rules through `shared/games/` (`ttt`, `connect4`, `checkers`)
+- Local and online rooms with stable client identity for seat restoration
+- Matchmaking through `/lobby`
+- Compact state-driven bottom CTA for New Game, Reset Scores, Create Match, Find Match, Share Room, and Leave
+- History/time travel, score tracking, spectators, display names, and theme switching
+- WebRTC voice chat over Socket.IO signaling
+- Agent/LLM access through `/agents`, `llms.txt`, `agent-manifest.json`, and `scripts/agent-play.mjs`
+- SEO/discovery files for GitHub Pages at base path `/cc/`
 
 ## Routes
 
-- `/` — main game
-- `/room/:roomId` — opens the game and automatically attempts to join `roomId`
-- `/lobby` — matchmaking lobby for finding random opponents
+| Route | Purpose |
+| --- | --- |
+| `/` | Main game screen |
+| `/room/:roomId` | Join or restore a multiplayer room |
+| `/lobby` | Matchmaking queue |
+| `/agents` | Human/agent Socket.IO contract and examples |
 
-## Usage
+## Commands
 
-- Click squares to play (X starts)
-- Use the menu to start a new game or reset scores
-- Toggle the History panel from the navbar; time‑travel through moves
-- Result modal appears at the end of the game
-- Click "Find Match" to join the matchmaking queue and play against random opponents
-
-## Matchmaking
-
-1. Click **"Find Match"** from the main menu
-2. Enter your display name (2-20 characters)
-3. Wait in the lobby—you'll be automatically matched with another waiting player
-4. Once matched, both players are redirected to a new game room
-5. Play begins immediately with automatic role assignment (X/O)
-
-## Multiplayer
-
-1. Start the backend (`npm run server`) or run both with `npm run dev:all`.
-1. Player 1 clicks Create Room (gets X) and shares the 5‑char code or link.
-1. Player 2 joins with the code or link (gets O). Additional users join as spectators (read‑only).
-1. The server enforces turns and detects wins/draws; scores persist until you reset.
-1. Rooms are in‑memory and LRU‑capped; restarting the server clears them.
-
-Frontend can point to a remote backend with an environment variable:
+Always use the repo Node version first:
 
 ```bash
-# Build/serve the frontend while pointing to a hosted backend
-VITE_SOCKET_SERVER=https://your-backend.example.com
+nvm use --lts
 ```
 
-### Server environment variables
+| Command | What it does |
+| --- | --- |
+| `npm run dev:all` | Runs frontend on 5173 and backend on 10000 |
+| `npm run dev` | Frontend only |
+| `npm run server` | Backend only |
+| `npm run lint` | ESLint |
+| `npm run build` | Vite production build |
+| `npm run check` | Lint + build + `node --check server/app.js` |
+| `npm test` | Jest test suite |
+| `npm test -- <file>` | Single test file |
 
-See `server/config.js` for full list with validation.
+## Multiplayer and agents
+
+Frontend builds can point at any compatible backend:
+
+```bash
+VITE_SOCKET_SERVER=https://crisscross-backend.fly.dev \
+VITE_API_BASE=https://crisscross-backend.fly.dev \
+npm run build
+```
+
+Agents use the same public Socket.IO events as browsers:
+
+- Create/join: `createRoom`, `joinRoom`, `leaveRoom`
+- Gameplay: `makeMove`, `resetGame`, `resetScores`, `switchGame`
+- Rematch: `requestNewGame`, `cancelNewGameRequest`
+- Matchmaking: `joinLobby`, `leaveLobby`
+- State: `gameUpdate`, `gameReset`, `lobbyUpdate`, `matchFound`, `matchError`
+
+Try the terminal agent client:
+
+```bash
+node scripts/agent-play.mjs --backend http://localhost:10000 --create --game ttt --name "Agent"
+```
+
+Discovery files:
+
+- `/agents`
+- `/llms.txt`
+- `/agent-manifest.json`
+- backend `/agent/manifest.json`
+
+## Environment
+
+Backend variables are validated in `server/config.js`:
 
 - `PORT` (default `10000`)
 - `CORS_ORIGIN` (default `*`)
 - `ROOM_LIMIT` (default `500`)
-- `ROOM_TTL_MS` (default `120000`) — empty room cleanup delay
-- `RATE_LIMIT_*` — socket event rate limiting settings
+- `ROOM_TTL_MS` (default `120000`)
+- `RATE_LIMIT_*`
 
-## Tech Stack
+Frontend variables:
 
-- React 18, Vite
-- Tailwind CSS
-- Socket.IO (client/server)
-- Express (server) with compression
+- `VITE_SOCKET_SERVER` — Socket.IO backend URL
+- `VITE_API_BASE` — REST API base for feedback
 
-## Backend details
+## Architecture
 
-- Entry: `server/app.js`
-- Health endpoint: `GET /health`
-- The backend serves realtime only. Host the built frontend separately (e.g., GitHub Pages) and set `VITE_SOCKET_SERVER` to the backend URL.
-
-## Unified Menu + Room Controls
-
-The bottom Menu Panel includes room controls inline for a streamlined flow:
-
-- New and Reset are always available
-- Create Room appears when not in a room (local mode)
-- Share appears in multiplayer and copies a joinable link (uses Web Share API when available)
-- Leave Room appears in multiplayer
-
-Buttons adapt to the current gameplay/room state. On small screens, the menu collapses to a compact “Menu” chip; tap to expand.
+Read `ARCHITECTURE.md` for the current frontend/server/shared-game layout and `server/README.md` for backend-specific details.

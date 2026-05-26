@@ -1,13 +1,17 @@
 {
-  "name": "CrissCross: Tic Tac Toe",
+  "name": "CrissCross: Multiplayer Board Games",
   "short_name": "CrissCross",
-  "description": "A minimalist, multiplayer Tic Tac Toe game with a modern UI.",
+  "description": "Play Tic-Tac-Toe, Connect Four, and Checkers online with private rooms, public matchmaking, scores, and optional voice chat.",
+  "id": "/cc/",
   "start_url": "/cc/",
   "scope": "/cc/",
+  "lang": "en-US",
+  "dir": "ltr",
   "display": "standalone",
   "theme_color": "#3b82f6",
   "background_color": "#e5e7eb",
   "orientation": "portrait",
+  "categories": ["games", "entertainment", "social"],
   "icons": [
     {
       "src": "/cc/icons/icon-192x192.svg",

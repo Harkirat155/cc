@@ -4,32 +4,34 @@ Authoritative agent instructions for this repo. Keep concise; deep architecture 
 
 ## What this repo is
 
-CrissCross — real-time multiplayer Tic-Tac-Toe. Stack: React 18 + Vite (frontend, port 5173), Express + Socket.IO (backend, port 10000), Tailwind CSS, WebRTC voice chat (`simple-peer`), React Router. ESM everywhere (`"type": "module"`). Deployed to GitHub Pages at base `/cc/`.
-
-A planned refactor will generalize the game model into a pluggable `shared/games/` rules registry to host more two-player games (Connect Four, Gomoku, Checkers, Chess). See `/Users/singhard/.claude/plans/can-you-review-this-immutable-biscuit.md` if accessible, or ask before adding new games.
+CrissCross — real-time multiplayer board games: Tic-Tac-Toe, Connect Four, and Checkers. Stack: React 18 + Vite (frontend, port 5173), Express + Socket.IO (backend, port 10000), Tailwind CSS, WebRTC voice chat (`simple-peer`), React Router, and a shared `shared/games/` rules registry. ESM everywhere (`"type": "module"`). Deployed to GitHub Pages at base `/cc/`.
 
 ## Layout
 
 ```
 src/                    # React frontend
-├── App.jsx             # Routes: / & /room/:roomId → Game, /lobby → Lobby
+├── App.jsx             # Routes: / & /room/:roomId → Game, /lobby → Lobby, /agents → Agents
 ├── Game.jsx            # Main container
 ├── Lobby.jsx           # Matchmaking screen
+├── Agents.jsx          # Agent/LLM contract page
 ├── hooks/
 │   ├── useSocketGame.js   # SINGLE source of truth for socket + game state
 │   ├── useGameHistory.js  # Undo/replay history
 │   ├── useVoiceChat.js    # WebRTC voice
 │   └── useDisplayName.js
-├── components/         # GameBoard, BoardSquare, ValueMark, ScorePanel, Navbar, ResultModal, MenuPanel, HistoryPanel, FeedbackDialog, ...
+├── components/         # GameBoard, BoardSquare, ValueMark, ScorePanel, Navbar, MatchActionBar, HistoryPanel, FeedbackDialog, ...
 └── utils/              # board.js, socketManager.js, clientId.js, randomName.js, history.js
+
+shared/games/           # Rules registry for ttt/connect4/checkers
 
 server/                 # Node backend
 ├── app.js              # Express + Socket.IO bootstrap
+├── agentManifest.js    # Read-only agent manifest builder
 ├── socketHandlers.js   # Wires per-socket handlers
 ├── handlers/           # gameHandlers, roomHandlers, lobbyHandlers, voiceHandlers, validation
 ├── roomManager.js      # LRU Map<roomId, Room>, publish()
 ├── lobbyManager.js     # FIFO matchmaking
-├── gameLogic.js        # calcWinner, LINES, initialState, genCode
+├── gameLogic.js        # room-code compatibility helpers
 ├── config.js, logger.js, metrics.js, rateLimiter.js, roomGC.js, gracefulShutdown.js
 └── *.test.js           # Co-located Jest tests
 ```
@@ -56,7 +58,7 @@ Run `npm run check` before declaring a non-trivial change complete.
 ### Single source of socket/game state
 All socket events and game state live in `src/hooks/useSocketGame.js`. Components call actions from this hook — **never** create a parallel `io()` connection or duplicate state.
 
-There is one known duplication today: `useSocketGame.js:22-49` re-implements `LINES`/`calcWinner`/`initialLocalState` from `server/gameLogic.js` for offline local-mode play. **Do not extend this duplication** — the planned `shared/games/` module will collapse both into one importable rules engine. If you need to touch game rules, change both call-sites in lock-step and call this out in the PR description.
+Game rules live in `shared/games/` and are used by both frontend and backend. Do not add new rule logic directly to board components or socket handlers; add it to the registry and wire UI presentation through the existing game-aware helpers.
 
 ### Socket event names (client and server must agree)
 - Room: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `switchGame`, `requestNewGame`, `cancelNewGameRequest`, `updateDisplayName`
@@ -82,19 +84,25 @@ Every handler in `server/handlers/*.js`:
 - LRU eviction at `ROOM_LIMIT` (default 500).
 - Empty rooms GC'd after `ROOM_TTL_MS` (default 120s) by `roomGC.js`.
 
-### State shape (current, TTT-specific — will change)
+### State shape
 ```js
 room.state = {
-  board: Array(9),       // '' | 'X' | 'O'
-  turn: 'X' | 'O',
-  winner: null | 'X' | 'O' | 'draw',
-  winningLine: number[],
-  xScore: number, oScore: number,
+  gameId: 'ttt',
+  board: [],
+  turnSlot: 0,
+  winnerSlot: null,
+  status: 'active',
+  scores: [0, 0],
+  playerInfo: [],
+  boardSpec: { kind: 'grid', rows: 3, cols: 3 },
+  moveStyle: 'place',
   newGameRequester: socketId | null,
   newGameRequestedAt: ms | null,
 }
 room = { players: { X, O }, spectators, state, ... }
 ```
+
+Legacy TTT fields can still exist for compatibility. New game-aware code should prefer slots, `scores`, `playerInfo`, `boardSpec`, and `moveStyle`.
 
 ## Environment
 
@@ -115,7 +123,7 @@ Frontend (Vite):
 - **Styling**: Tailwind utility classes inline. Stone palette for surfaces (recent migration). Dark mode via `dark:` variants.
 - **Logging**: use `server/logger.js` with scoped loggers (`socketLog`, `roomLog`, etc.); do not `console.log` in server code.
 - **Testing**: Jest + `@testing-library/react`. Tests co-located. Mock the socket via `jest.fn()` and invoke registered handlers directly (see `socketHandlers.test.js`).
-- **Imports**: relative paths; no path aliases configured yet (will add `@shared` when `shared/games/` lands).
+- **Imports**: relative paths in app/server code; `@shared` aliases the shared rules package for frontend imports.
 
 ## Do not
 
@@ -125,7 +133,7 @@ Frontend (Vite):
 - Rename a socket event on one side only.
 - Use `console.log` in `server/*` — use `logger.js`.
 - Add a dependency without strong justification (deploy bundle and cold-start matter — see chunking in `vite.config.js`).
-- Hardcode `'X'/'O'` in new code beyond the current TTT surface. New game-aware code should anticipate the planned slot-indexed (`0|1`) abstraction.
+- Hardcode `'X'/'O'` in new game-aware code beyond compatibility surfaces. Prefer slot-indexed (`0|1`) state and `playerInfo`.
 - Use `git commit --no-verify`, `git push --force`, or `rm -rf` without explicit user approval.
 
 ## Risky / shared-state actions — confirm first

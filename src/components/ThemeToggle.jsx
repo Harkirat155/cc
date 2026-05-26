@@ -1,4 +1,3 @@
-/* eslint-env browser */
 import React, { useEffect, useState } from 'react';
 import { Tooltip } from './ui/Tooltip';
 
@@ -61,7 +60,7 @@ const VividMoon = ({ size = 20 }) => (
         <circle cx="19" cy="7" r="10" fill="#000" />
       </mask>
     </defs>
-    <circle cx="12" cy="12" r="9" fill="#ffffff" mask="url(#crescentMask)" />
+    <circle cx="12" cy="12" r="9" fill="currentColor" mask="url(#crescentMask)" />
   </svg>
 );
 
@@ -112,10 +111,7 @@ const ThemeToggle = ({ className = '' }) => {
         aria-label="Toggle theme"
         aria-pressed={theme === 'dark'}
         onClick={toggle}
-        className={`inline-flex items-center justify-center h-10 w-10 rounded-full border transition z-40 
-        bg-slate-900 text-white border-slate-800 hover:bg-slate-800 
-        dark:bg-white dark:text-slate-900 dark:border-slate-200 dark:hover:bg-slate-50 
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:focus-visible:ring-slate-600 ${className}`}
+        className={`z-40 inline-flex h-9 w-9 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] text-foreground/60 transition hover:bg-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 ${className}`}
       >
         {theme === 'dark' ? <VividSun size={20} /> : <VividMoon size={20} />}
       </button>

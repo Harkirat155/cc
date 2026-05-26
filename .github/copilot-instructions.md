@@ -1,76 +1,70 @@
 # Copilot Instructions
 
-CrissCross is a real-time multiplayer Tic Tac Toe app (React + Express + Socket.IO, bundled with Vite).
+CrissCross is a real-time multiplayer board-game app for Tic-Tac-Toe, Connect Four, and Checkers. It uses React + Vite on the frontend, Express + Socket.IO on the backend, Tailwind CSS for styling, and `shared/games/` for rules.
 
 ## Commands (always prefix with `nvm use --lts`)
-- `npm run dev:all` — **Primary dev command**: runs frontend (5173) + backend (10000) concurrently
-- `npm run server` — Backend only (Express + Socket.IO)
-- `npm run dev` — Frontend only (Vite)
-- `npm run lint` — ESLint (also `lint:frontend`, `lint:backend`)
-- `npm test` — Jest tests (co-located `.test.js` files)
 
-## Architecture Overview
+- `npm run dev:all` — primary dev command: frontend on 5173 + backend on 10000
+- `npm run server` — backend only
+- `npm run dev` — frontend only
+- `npm run lint` — ESLint
+- `npm run check` — lint + build + `node --check server/app.js`
+- `npm test` — Jest tests
+- `npm test -- <file>` — single test file
+
+## Architecture overview
+
+```text
+src/
+├── App.jsx                 # Routes: /, /room/:roomId, /lobby, /agents
+├── Game.jsx                # Main game shell
+├── Lobby.jsx               # Matchmaking page
+├── Agents.jsx              # Agent/LLM contract page
+├── hooks/useSocketGame.js  # Single source of socket + game state
+├── components/             # Board, score, navbar, history, CTA, result, feedback
+└── utils/
+
+shared/games/               # Rules registry for ttt/connect4/checkers
+
+server/
+├── app.js                  # Express + Socket.IO bootstrap
+├── agentManifest.js        # Backend agent manifest builder
+├── socketHandlers.js       # Socket handler registration
+├── handlers/               # Room/game/lobby/voice handlers
+├── lobbyManager.js         # FIFO matchmaking queue
+├── roomManager.js          # LRU rooms + publish()
+└── config.js               # Env validation
 ```
-src/                    # React frontend (Vite)
-├── App.jsx            # Routes: / (Game), /room/:roomId (Game), /lobby (Lobby)
-├── Game.jsx           # Main container, composes panels, handles feedback API
-├── hooks/useSocketGame.js  # ALL socket + game state lives here
-└── components/        # UI components (GameBoard, MenuPanel, HistoryPanel, etc.)
 
-server/                 # Node.js backend
-├── app.js             # Express entry + Socket.IO bootstrap
-├── socketHandlers.js  # Socket event handlers (thin delegates to managers)
-├── lobbyManager.js    # FIFO matchmaking queue
-├── roomManager.js     # LRU-capped Map<roomId, RoomData>, publish()
-├── config.js          # Centralized env config with validation
-└── gameLogic.js       # calcWinner(), genCode(), initialState()
-```
+## Key patterns
 
-## Key Patterns
+- All socket/game state lives in `src/hooks/useSocketGame.js`; never create parallel `io()` connections.
+- Game rules live in `shared/games/`; do not duplicate rules in UI components or server handlers.
+- Bottom match actions are derived by `src/utils/matchActions.js` and rendered by `MatchActionBar`.
+- Server handlers should validate inputs, look up room, `touch(roomId)`, mutate state through rules, then `publish(io, roomId)`.
+- Use `server/logger.js` in server code; no `console.log` in `server/`.
 
-### Socket Event Names (keep client+server in sync)
-- **Room**: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `switchGame`, `requestNewGame`, `cancelNewGameRequest`
-- **Lobby**: `joinLobby`, `leaveLobby` → broadcasts `lobbyUpdate`, `matchFound`, `matchError`
-- **Voice**: `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal` → broadcasts `voice:user-joined`, `voice:user-left`
-- **State**: server emits `gameUpdate` (room), `gameReset`, or `lobbyUpdate` (lobby)
+## Socket events
 
-### State Centralization
-All socket and game state lives in `useSocketGame.js`. Components call actions from this hook. Never create parallel socket connections.
+- Room: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `switchGame`, `requestNewGame`, `cancelNewGameRequest`, `updateDisplayName`
+- Lobby: `joinLobby`, `leaveLobby`, `getLobbyState` → `lobbyUpdate`, `matchFound`, `matchError`
+- Voice: `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal`
+- State: `gameUpdate`, `gameReset`
 
-### Client Identity & Seat Restoration
-`clientIdRef` in useSocketGame generates a stable ID stored in `sessionStorage`. Sent with `createRoom`/`joinRoom` to restore seat on refresh.
+## Environment
 
-### Room Lifecycle
-- 5-char codes via `genCode()` (excludes ambiguous chars: O/0/I/L)
-- LRU eviction when over `ROOM_LIMIT` (default 500)
-- Empty rooms garbage-collected after `ROOM_TTL_MS` (default 120s)
+Backend:
 
-### Input Validation (server)
-All handlers in `socketHandlers.js` validate with helpers: `validateRoomId()`, `validateDisplayName()`, `validateIndex()`. Follow this pattern for new events.
+- `PORT`, `CORS_ORIGIN`, `ROOM_LIMIT`, `ROOM_TTL_MS`, `RATE_LIMIT_*`
 
-## Environment Variables
-**Backend** (via `server/config.js`):
-- `PORT` (default 10000), `CORS_ORIGIN`, `ROOM_LIMIT`, `ROOM_TTL_MS`
-- `RATE_LIMIT_*` — socket event rate limiting
+Frontend:
 
-**Frontend** (Vite):
-- `VITE_SOCKET_SERVER` — backend URL (defaults to port 10000 of current origin)
-- `VITE_API_BASE` — REST API base (for feedback endpoint)
+- `VITE_SOCKET_SERVER`
+- `VITE_API_BASE`
 
-## Testing
-- **Jest** with `@testing-library/react` for components
-- Tests are co-located: `lobbyManager.test.js`, `FeedbackDialog.test.jsx`
-- Mock socket with `jest.fn()` and emit handlers manually (see `socketHandlers.test.js`)
-- Run single file: `npm test -- lobbyManager.test.js`
+## Do not
 
-## Conventions
-- **File size**: ~200 lines max; extract to hooks/utils/components
-- **Styling**: Tailwind CSS inline; dark mode via `dark:` variants
-- **Hooks**: Custom hooks in `src/hooks/`; utilities in `src/utils/`
-- **Logging**: Use `logger.js` (server) with scoped loggers like `socketLog`, `roomLog`
-
-## Do Not
-- Change package manager (npm) or Node version tool (nvm)
-- Change socket event names without updating both client and server
-- Add dependencies without strong justification
-- Bypass rate limiting or input validation patterns
+- Change package manager or Node tooling.
+- Rename socket events without updating client and server together.
+- Add dependencies without strong justification.
+- Bypass validation, rate limiting, or the shared game registry.

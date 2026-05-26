@@ -6,12 +6,18 @@ const Joyride = lazy(() =>
 
 const joyrideStyles = {
   options: {
-    primaryColor: "#6366f1",
-    arrowColor: "#1f2937",
-    backgroundColor: "#111827",
-    textColor: "#f9fafb",
-    overlayColor: "rgba(15, 23, 42, 0.55)",
+    primaryColor: "var(--foreground)",
+    arrowColor: "color-mix(in srgb, var(--card) 88%, transparent)",
+    backgroundColor: "color-mix(in srgb, var(--card) 88%, transparent)",
+    textColor: "var(--foreground)",
+    overlayColor: "color-mix(in srgb, var(--foreground) 16%, transparent)",
     zIndex: 1000,
+  },
+  tooltip: {
+    border: "1px solid var(--glass-border)",
+    borderRadius: "24px",
+    backdropFilter: "blur(24px)",
+    boxShadow: "0 24px 80px -40px rgba(0, 0, 0, 0.55)",
   },
   tooltipContainer: {
     textAlign: "left",
@@ -28,16 +34,17 @@ const joyrideStyles = {
     lineHeight: 1.6,
   },
   buttonNext: {
-    backgroundColor: "#6366f1",
+    backgroundColor: "var(--foreground)",
+    color: "var(--background)",
     borderRadius: "9999px",
     padding: "0.45rem 1.25rem",
   },
   buttonBack: {
-    color: "#94a3b8",
+    color: "var(--muted-foreground)",
     marginRight: "0.75rem",
   },
   buttonClose: {
-    color: "#94a3b8",
+    color: "var(--muted-foreground)",
   },
 };
 

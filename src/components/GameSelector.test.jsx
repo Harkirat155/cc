@@ -4,23 +4,11 @@ import { MemoryRouter, Routes, Route, useSearchParams } from "react-router-dom";
 import "@shared/games/index.js"; // registers ttt, connect4, checkers
 import GameSelector from "./GameSelector";
 
-// jsdom's window.location is locked-down; we can't spy on .reload().
-// Instead, swallow the "navigation not implemented" jsdom error so the URL
-// assertion is what proves the picker did its job.
-const originalError = console.error;
-beforeAll(() => {
-  console.error = (...args) => {
-    const first = args[0];
-    if (typeof first === "string" && first.includes("Not implemented: navigation")) return;
-    if (first && first.message && first.message.includes("Not implemented: navigation")) return;
-    originalError(...args);
-  };
-});
-afterAll(() => {
-  console.error = originalError;
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
-function Harness({ initialEntries = ["/"], probe }) {
+function Harness({ initialEntries = ["/"], probe, selectorProps = {} }) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
@@ -28,7 +16,11 @@ function Harness({ initialEntries = ["/"], probe }) {
           path="/"
           element={
             <>
-              <GameSelector isMultiplayer={false} currentGameId={null} />
+              <GameSelector
+                isMultiplayer={false}
+                currentGameId={null}
+                {...selectorProps}
+              />
               {probe ? <SearchProbe /> : null}
             </>
           }
@@ -50,7 +42,7 @@ describe("GameSelector", () => {
         <GameSelector isMultiplayer currentGameId="ttt" />
       </MemoryRouter>
     );
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("group", { name: /choose game/i })).toBeNull();
   });
 
   test("multiplayer selection calls onSwitchGame without changing URL", () => {
@@ -66,8 +58,7 @@ describe("GameSelector", () => {
       </MemoryRouter>
     );
 
-    const select = screen.getByRole("combobox", { name: /choose game/i });
-    fireEvent.change(select, { target: { value: "connect4" } });
+    fireEvent.click(screen.getByRole("button", { name: /connect four/i }));
 
     expect(onSwitchGame).toHaveBeenCalledWith("connect4");
     expect(screen.getByTestId("probe").textContent).toBe("ttt");
@@ -75,25 +66,93 @@ describe("GameSelector", () => {
 
   test("renders one option per registered game", () => {
     render(<Harness />);
-    const select = screen.getByRole("combobox", { name: /choose game/i });
-    const options = Array.from(select.querySelectorAll("option")).map(
-      (o) => o.value
-    );
-    expect(options).toEqual(expect.arrayContaining(["ttt", "connect4", "checkers"]));
+    const labels = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["Tic-Tac-Toe", "Connect Four", "Checkers"]));
   });
 
-  test("changing selection updates ?game= and triggers reload", () => {
-    render(<Harness probe />);
-    const select = screen.getByRole("combobox", { name: /choose game/i });
-    fireEvent.change(select, { target: { value: "checkers" } });
+  test("uses redesign sizing for desktop and mobile variants", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <GameSelector isMultiplayer={false} currentGameId="ttt" />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("group", { name: /choose game/i })).toHaveClass(
+      "hidden",
+      "sm:flex",
+      "items-center",
+      "p-1",
+      "bg-foreground/[0.03]",
+      "border",
+      "border-foreground/5",
+      "rounded-full"
+    );
+    expect(screen.getByRole("button", { name: /tic-tac-toe/i })).toHaveClass(
+      "px-4",
+      "py-1.5",
+      "text-xs",
+      "font-medium",
+      "rounded-full",
+      "transition-all"
+    );
+
+    rerender(
+      <MemoryRouter>
+        <GameSelector
+          variant="mobile"
+          isMultiplayer={false}
+          currentGameId="ttt"
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("group", { name: /choose game/i })).toHaveClass(
+      "sm:hidden",
+      "flex",
+      "items-center",
+      "p-1",
+      "bg-foreground/[0.03]",
+      "border",
+      "border-foreground/5",
+      "rounded-full",
+      "mb-8"
+    );
+    expect(screen.getByRole("button", { name: /tic-tac-toe/i })).toHaveClass(
+      "px-3",
+      "py-1.5",
+      "text-xs",
+      "font-medium",
+      "rounded-full",
+      "transition-all"
+    );
+  });
+
+  test("local selection calls onSwitchGame and updates ?game= without reload", () => {
+    const onSwitchGame = jest.fn();
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    render(
+      <Harness
+        probe
+        selectorProps={{ currentGameId: "ttt", onSwitchGame }}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /checkers/i }));
+
+    expect(onSwitchGame).toHaveBeenCalledWith("checkers");
     expect(screen.getByTestId("probe").textContent).toBe("checkers");
+    const navigationErrors = consoleError.mock.calls.filter((call) =>
+      call.some((arg) =>
+        String(arg?.message || arg).includes("Not implemented: navigation")
+      )
+    );
+    expect(navigationErrors).toHaveLength(0);
   });
 
   test("selecting the default game clears the ?game= param", () => {
     render(<Harness initialEntries={["/?game=checkers"]} probe />);
     expect(screen.getByTestId("probe").textContent).toBe("checkers");
-    const select = screen.getByRole("combobox", { name: /choose game/i });
-    fireEvent.change(select, { target: { value: "ttt" } });
+    fireEvent.click(screen.getByRole("button", { name: /tic-tac-toe/i }));
     expect(screen.getByTestId("probe").textContent).toBe("");
   });
 
@@ -103,7 +162,7 @@ describe("GameSelector", () => {
         <GameSelector isMultiplayer={false} currentGameId="connect4" />
       </MemoryRouter>
     );
-    const select = screen.getByRole("combobox", { name: /choose game/i });
-    expect(select.value).toBe("connect4");
+    const button = screen.getByRole("button", { name: /connect four/i });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
   });
 });
