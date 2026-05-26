@@ -51,21 +51,7 @@ jobs:
         if: steps.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-
-      - name: Ensure package-lock.json exists
-        if: steps.changes.outputs.frontend == 'true'
-        run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
-
-      - name: Setup npm cache
-        if: steps.changes.outputs.frontend == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '24'
 
       - name: Set backend URL
         if: steps.changes.outputs.frontend == 'true'
@@ -73,7 +59,7 @@ jobs:
 
       - name: Install Dependencies
         if: steps.changes.outputs.frontend == 'true'
-        run: npm ci
+        run: npm install
 
       - name: Build
         if: steps.changes.outputs.frontend == 'true'

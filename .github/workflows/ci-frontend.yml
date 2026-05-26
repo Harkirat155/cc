@@ -25,31 +25,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # First setup without cache so we can generate a lockfile if missing
-      - name: Set up Node.js (no cache)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-
-      - name: Ensure package-lock.json exists
-        run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
-
-      # Re-run setup-node to enable npm cache now that lockfile exists
-      - name: Setup npm cache
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '24'
 
       # PRs from forks cannot access secrets; use a safe placeholder
       - name: Set backend URL placeholder
         run: echo "VITE_SOCKET_SERVER=" >> $GITHUB_ENV
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Lint (if present)
         run: npm run lint --if-present
