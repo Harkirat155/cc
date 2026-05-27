@@ -1,0 +1,42 @@
+/node_modules
+/dist
+/build
+/.env
+/.env.deploy
+/.DS_Store
+
+/.vscode
+/.idea
+/.cache
+/.next
+/.nuxt
+/.sass-cache
+/.tmp
+/.yarn
+/.pnp
+/.yarn-cache
+/.yarn-integrity
+/.yarnrc
+/.yarnrc.yml
+/.eslintcache
+/.prettierignore
+/.stylelintcache
+/.git
+
+/yarn.lock
+/pnpm-lock.yaml
+
+first.md
+package-lock.json
+
+# Claude Code per-developer settings (committed: .claude/settings.json)
+/.claude/settings.local.json
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+Redesign for Modern Minimalism/*

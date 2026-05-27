@@ -1,0 +1,269 @@
+{
+  "schemaVersion": "1.0",
+  "name": "CrissCross",
+  "description": "Real-time two-player board games with Socket.IO rooms for Tic-Tac-Toe, Connect Four, and Checkers.",
+  "canonicalUrl": "https://harkirat155.github.io/cc/",
+  "frontend": {
+    "url": "https://harkirat155.github.io/cc/",
+    "basePath": "/cc/",
+    "stablePages": [
+      "https://harkirat155.github.io/cc/",
+      "https://harkirat155.github.io/cc/agents"
+    ],
+    "roomUrlTemplate": "https://harkirat155.github.io/cc/room/{roomId}",
+    "ephemeralPaths": [
+      "/cc/room/{roomId}",
+      "/cc/lobby"
+    ]
+  },
+  "backend": {
+    "url": "https://crisscross-backend.fly.dev",
+    "healthUrl": "https://crisscross-backend.fly.dev/health",
+    "feedbackUrl": "https://crisscross-backend.fly.dev/feedback"
+  },
+  "socketIo": {
+    "url": "https://crisscross-backend.fly.dev",
+    "namespace": "/",
+    "path": "/socket.io/",
+    "version": "4.x",
+    "transports": [
+      "websocket",
+      "polling"
+    ],
+    "roomId": {
+      "format": "5-character uppercase code",
+      "alphabet": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+      "example": "ABCDE"
+    },
+    "clientIdentity": {
+      "clientId": "Stable caller-generated string for seat restoration across reconnects or page refreshes.",
+      "displayName": "Human-readable name, 2-20 characters for lobby matchmaking."
+    }
+  },
+  "supportedGames": [
+    {
+      "id": "ttt",
+      "displayName": "Tic-Tac-Toe",
+      "players": 2,
+      "boardSpec": {
+        "kind": "grid",
+        "rows": 3,
+        "cols": 3
+      },
+      "playerInfo": [
+        { "slot": 0, "label": "X", "color": "sky" },
+        { "slot": 1, "label": "O", "color": "rose" }
+      ],
+      "moveStyle": "place",
+      "movePayload": {
+        "event": "makeMove",
+        "shape": { "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } },
+        "legacyShape": { "roomId": "ABCDE", "index": 4 },
+        "cellSemantics": "Flat board index 0..8, row-major."
+      }
+    },
+    {
+      "id": "connect4",
+      "displayName": "Connect Four",
+      "players": 2,
+      "boardSpec": {
+        "kind": "grid",
+        "rows": 6,
+        "cols": 7
+      },
+      "playerInfo": [
+        { "slot": 0, "label": "Red", "color": "red" },
+        { "slot": 1, "label": "Yellow", "color": "amber" }
+      ],
+      "moveStyle": "place",
+      "movePayload": {
+        "event": "makeMove",
+        "shape": { "roomId": "ABCDE", "move": { "type": "place", "cell": 3 } },
+        "cellSemantics": "Column index 0..6; the disc lands in the lowest empty row."
+      }
+    },
+    {
+      "id": "checkers",
+      "displayName": "Checkers",
+      "players": 2,
+      "boardSpec": {
+        "kind": "grid",
+        "rows": 8,
+        "cols": 8,
+        "dark": true
+      },
+      "playerInfo": [
+        { "slot": 0, "label": "R", "color": "red" },
+        { "slot": 1, "label": "Y", "color": "amber" }
+      ],
+      "moveStyle": "select-target",
+      "rulesNotes": [
+        "English-draughts-style dark-square movement.",
+        "Single jumps only; multi-jump chains and mandatory captures are not enforced.",
+        "Men promote to kings on the opponent back row."
+      ],
+      "movePayload": {
+        "event": "makeMove",
+        "stepShape": { "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 33 } },
+        "captureShape": { "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 24, "captures": [33] } },
+        "cellSemantics": "Flat board index 0..63, row-major. Captures must match a legal single jump."
+      }
+    }
+  ],
+  "events": {
+    "clientToServer": [
+      {
+        "name": "createRoom",
+        "payload": { "clientId": "agent-stable-id", "displayName": "Agent Bot", "gameId": "ttt" },
+        "ack": { "roomId": "ABCDE", "player": "X" }
+      },
+      {
+        "name": "joinRoom",
+        "payload": { "roomId": "ABCDE", "clientId": "agent-stable-id", "displayName": "Agent Bot" },
+        "ack": { "player": "O" }
+      },
+      {
+        "name": "leaveRoom",
+        "payload": { "roomId": "ABCDE", "clientId": "agent-stable-id" }
+      },
+      {
+        "name": "makeMove",
+        "payload": { "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } }
+      },
+      {
+        "name": "resetGame",
+        "payload": { "roomId": "ABCDE" }
+      },
+      {
+        "name": "resetScores",
+        "payload": { "roomId": "ABCDE" }
+      },
+      {
+        "name": "switchGame",
+        "payload": { "roomId": "ABCDE", "gameId": "connect4" },
+        "ack": { "success": true, "gameId": "connect4" }
+      },
+      {
+        "name": "requestNewGame",
+        "payload": { "roomId": "ABCDE" }
+      },
+      {
+        "name": "cancelNewGameRequest",
+        "payload": { "roomId": "ABCDE" }
+      },
+      {
+        "name": "updateDisplayName",
+        "payload": { "roomId": "ABCDE", "displayName": "Agent Bot" }
+      },
+      {
+        "name": "joinLobby",
+        "payload": { "displayName": "Agent Bot", "gameId": "ttt" },
+        "ack": { "success": true, "position": 0 }
+      },
+      {
+        "name": "leaveLobby",
+        "ack": { "success": true }
+      },
+      {
+        "name": "getLobbyState",
+        "ack": { "queue": [] }
+      },
+      {
+        "name": "voice:join",
+        "payload": { "roomId": "ABCDE", "muted": true }
+      },
+      {
+        "name": "voice:leave",
+        "payload": { "roomId": "ABCDE" }
+      },
+      {
+        "name": "voice:mute-state",
+        "payload": { "roomId": "ABCDE", "muted": true }
+      },
+      {
+        "name": "voice:signal",
+        "payload": { "roomId": "ABCDE", "targetId": "socket-id", "data": {} }
+      }
+    ],
+    "serverToClient": [
+      {
+        "name": "gameUpdate",
+        "payloadFields": [
+          "roomId",
+          "gameId",
+          "board",
+          "turn",
+          "turnSlot",
+          "winner",
+          "winnerSlot",
+          "status",
+          "winningLine",
+          "winningCells",
+          "xScore",
+          "oScore",
+          "scores",
+          "playerInfo",
+          "marks",
+          "boardSpec",
+          "moveStyle",
+          "lastMove",
+          "lastEvents",
+          "lastMoveBy",
+          "newGameRequester",
+          "newGameRequestedAt",
+          "roster",
+          "voiceRoster"
+        ]
+      },
+      {
+        "name": "gameReset",
+        "payload": { "roomId": "ABCDE", "gameId": "ttt", "reason": "gameSwitch" }
+      },
+      {
+        "name": "startGame"
+      },
+      {
+        "name": "lobbyUpdate",
+        "payload": { "queue": [], "timestamp": 0 }
+      },
+      {
+        "name": "matchFound",
+        "payload": { "roomId": "ABCDE", "player": "X", "opponent": "Opponent Name" }
+      },
+      {
+        "name": "matchError",
+        "payload": { "error": "Failed to create room" }
+      },
+      {
+        "name": "voice:user-joined",
+        "payload": { "socketId": "socket-id", "muted": true }
+      },
+      {
+        "name": "voice:user-left",
+        "payload": { "socketId": "socket-id" }
+      },
+      {
+        "name": "voice:signal",
+        "payload": { "fromId": "socket-id", "data": {} }
+      }
+    ]
+  },
+  "moveExamples": {
+    "tttCenter": { "event": "makeMove", "payload": { "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } } },
+    "tttLegacyCenter": { "event": "makeMove", "payload": { "roomId": "ABCDE", "index": 4 } },
+    "connect4ColumnFour": { "event": "makeMove", "payload": { "roomId": "ABCDE", "move": { "type": "place", "cell": 3 } } },
+    "checkersStep": { "event": "makeMove", "payload": { "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 33 } } },
+    "checkersCapture": { "event": "makeMove", "payload": { "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 24, "captures": [33] } } }
+  },
+  "discovery": {
+    "llmsTxt": "https://harkirat155.github.io/cc/llms.txt",
+    "sitemap": "https://harkirat155.github.io/cc/sitemap.xml",
+    "robots": "https://harkirat155.github.io/cc/robots.txt",
+    "manifest": "https://harkirat155.github.io/cc/agent-manifest.json"
+  },
+  "security": {
+    "secretsRequired": false,
+    "authenticationRequired": false,
+    "notes": "Do not include credentials in room payloads. Rooms are ephemeral public game sessions keyed by room id."
+  }
+}

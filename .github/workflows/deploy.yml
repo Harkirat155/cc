@@ -1,0 +1,83 @@
+name: Deploy React App to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for frontend changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'src/**'
+              - 'public/**'
+              - 'index.html'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'vite.config.js'
+              - 'tailwind.config.js'
+              - 'postcss.config.cjs'
+              - 'eslint.config.js'
+              - 'jest.config.js'
+              - '.github/workflows/deploy.yml'
+
+      - name: Skip build (no frontend changes)
+        if: steps.changes.outputs.frontend != 'true'
+        run: |
+          echo "⏭️  No frontend changes detected. Skipping build."
+          exit 0
+
+      - name: Set up Node.js
+        if: steps.changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set backend URL
+        if: steps.changes.outputs.frontend == 'true'
+        run: echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
+
+      - name: Install Dependencies
+        if: steps.changes.outputs.frontend == 'true'
+        run: npm install
+
+      - name: Build
+        if: steps.changes.outputs.frontend == 'true'
+        run: npm run build
+
+      - name: Upload Artifact
+        if: steps.changes.outputs.frontend == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

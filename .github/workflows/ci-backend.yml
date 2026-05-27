@@ -1,0 +1,42 @@
+name: CI Backend
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ci-backend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend
+  cancel-in-progress: true
+
+jobs:
+  validate-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint (if present)
+        run: npm run lint --if-present
+
+      - name: Server syntax check
+        run: node --check server/app.js
+
+      # Placeholder for server tests if/when added
+      - name: Run server tests (if present)
+        run: npm run test --if-present
