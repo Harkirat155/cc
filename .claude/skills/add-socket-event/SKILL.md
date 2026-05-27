@@ -61,7 +61,7 @@ Rules:
 - Use scoped loggers from `logger.js` (`socketLog.warn`, `roomLog.debug`); no `console.log`.
 - Respect existing rate limit middleware in `rateLimiter.js`; add the event to the appropriate bucket.
 
-Register the handler in `server/socketHandlers.js` (or its `handlers/index.js` aggregator) so it's wired on every connection.
+Register the handler in `server/socketHandlers.js` so it's wired on every connection.
 
 ## Step 3 — Server tests
 

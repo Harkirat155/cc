@@ -16,6 +16,7 @@ export default defineConfig({
     treeShaking: true, // Remove unused JS
   },
   build: {
+    modulePreload: false, // Let the inline loading shell paint before lazy route chunks compete.
     minify: 'esbuild', // Use esbuild for minification
     rollupOptions: {
       treeshake: true, // Remove unused code

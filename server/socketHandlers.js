@@ -6,12 +6,10 @@ import { lobbyManager, broadcastLobbyState } from './lobbyManager.js';
 import { socketLog as log } from './logger.js';
 import { createRateLimitMiddleware, clearRateLimit, startRateLimitCleanup } from './rateLimiter.js';
 
-import {
-  registerRoomHandlers,
-  registerGameHandlers,
-  registerVoiceHandlers,
-  registerLobbyHandlers,
-} from './handlers/index.js';
+import { registerRoomHandlers } from './handlers/roomHandlers.js';
+import { registerGameHandlers } from './handlers/gameHandlers.js';
+import { registerVoiceHandlers } from './handlers/voiceHandlers.js';
+import { registerLobbyHandlers } from './handlers/lobbyHandlers.js';
 
 /**
  * Register all socket event handlers

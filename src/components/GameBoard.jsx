@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import BoardFrame from "./BoardFrame";
 import BoardSquare from "./BoardSquare";
-import { ConnectPiece, EmptyConnectSlot, cx } from "./games/boardPresentation";
+import { ConnectPiece, EmptyConnectSlot } from "./games/boardPresentation";
+import { cx } from "./games/boardPresentationUtils";
 import { getGamePalette } from "./games/palette";
 import useReducedMotion from "../hooks/useReducedMotion";
 
@@ -9,6 +10,8 @@ const GRID_COLS = {
   3: "grid-cols-3",
   8: "grid-cols-8",
 };
+
+const EMPTY_LEGAL_TARGETS = [];
 
 function resolveGameId(boardSpec, moveStyle) {
   if (moveStyle === "select-target" || boardSpec?.dark) return "checkers";
@@ -26,7 +29,7 @@ const GameBoard = ({
   boardSpec,
   moveStyle = "place",
   selection = null,
-  legalTargets = [],
+  legalTargets = EMPTY_LEGAL_TARGETS,
 }) => {
   const colsClass = GRID_COLS[cols] || GRID_COLS[3];
   const isDark = Boolean(boardSpec?.dark);

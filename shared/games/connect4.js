@@ -15,6 +15,7 @@ const WIN_LEN = 4;
 const BOARD_SPEC = { kind: 'grid', rows: ROWS, cols: COLS };
 
 const SLOT_LABEL = ['R', 'Y'];
+const SLOT_BY_LABEL = new Map(SLOT_LABEL.map((label, slot) => [label, slot]));
 
 const idx = (r, c) => r * COLS + c;
 
@@ -70,7 +71,7 @@ function checkTerminal(state) {
     const [a, b, c, d] = line;
     const v = board[a];
     if (v && v === board[b] && v === board[c] && v === board[d]) {
-      const winnerSlot = SLOT_LABEL.indexOf(v);
+      const winnerSlot = SLOT_BY_LABEL.get(v);
       return { status: 'win', winner: winnerSlot, line };
     }
   }

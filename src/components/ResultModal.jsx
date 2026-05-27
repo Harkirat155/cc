@@ -19,7 +19,7 @@ const ResultModal = ({
     newGameRequester && socketId && newGameRequester === socketId
   );
   const someoneRequested = Boolean(newGameRequester);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   const opponentSeat = player === "X" ? "O" : "X";
   const opponentSocketId = roster?.[opponentSeat];

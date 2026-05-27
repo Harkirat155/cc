@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-// Use the prebuilt browser bundle to avoid Node stream polyfills issues
-import Peer from "simple-peer/simplepeer.min.js";
+
+let peerConstructorPromise = null;
+
+function loadPeerConstructor() {
+  if (!peerConstructorPromise) {
+    peerConstructorPromise = import("simple-peer/simplepeer.min.js").then(
+      (module) => module.default || module
+    );
+  }
+  return peerConstructorPromise;
+}
 
 // Manages one-to-many voice: when mic enabled, we publish our audio and set up peers to others in room.
 // When muted, we stop sending audio but we still receive others.
@@ -12,6 +21,7 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
   const [remoteAudioStreams, setRemoteAudioStreams] = useState({}); // peerId -> MediaStream
   const localStreamRef = useRef(null);
   const peersRef = useRef({});
+  const peerCreatesRef = useRef({});
   // Avoid stale muted value during async permission prompts
   const mutedRef = useRef(initialMuted);
 
@@ -45,50 +55,72 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
   }, []);
 
   // Create a peer connection to a target
-  const createPeer = useCallback((targetId, initiatorOverride = null) => {
-    const stream = localStreamRef.current || undefined;
-    // Deterministic initiator selection to avoid glare: lower socketId initiates
-    const defaultInitiator = typeof selfId === 'string' && typeof targetId === 'string' ? (selfId < targetId) : false;
-    const initiator = (initiatorOverride === null ? defaultInitiator : initiatorOverride);
-    const peer = new Peer({
-      initiator,
-      trickle: true,
-      stream,
-      config: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
+  const createPeer = useCallback(async (targetId, initiatorOverride = null) => {
+    const existingPeer = peersRef.current[targetId];
+    if (existingPeer && !existingPeer.destroyed) return existingPeer;
+    if (peerCreatesRef.current[targetId]) return peerCreatesRef.current[targetId];
+
+    const peerCreate = (async () => {
+      const Peer = await loadPeerConstructor();
+      const peerAfterLoad = peersRef.current[targetId];
+      if (peerAfterLoad && !peerAfterLoad.destroyed) return peerAfterLoad;
+
+      const stream = localStreamRef.current || undefined;
+      // Deterministic initiator selection to avoid glare: lower socketId initiates
+      const defaultInitiator = typeof selfId === 'string' && typeof targetId === 'string' ? (selfId < targetId) : false;
+      const initiator = (initiatorOverride === null ? defaultInitiator : initiatorOverride);
+      const peer = new Peer({
+        initiator,
+        trickle: true,
+        stream,
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
             // Twilio STUN URL must not include query params
             { urls: "stun:global.stun.twilio.com:3478" },
-        ],
-      },
-    });
-    peer.on("signal", (data) => {
-      if (!socket) return;
-      socket.emit("voice:signal", { roomId, targetId, data });
-    });
-    peer.on("stream", (remoteStream) => {
-      setStreamsMap((prev) => ({ ...prev, [targetId]: remoteStream }));
-    });
-    peer.on("close", () => {
-      // Remove from refs first so later loops don't touch a destroyed peer
-      if (peersRef.current[targetId]) {
-        delete peersRef.current[targetId];
+          ],
+        },
+      });
+      peer.on("signal", (data) => {
+        if (!socket) return;
+        socket.emit("voice:signal", { roomId, targetId, data });
+      });
+      peer.on("stream", (remoteStream) => {
+        setStreamsMap((prev) => ({ ...prev, [targetId]: remoteStream }));
+      });
+      peer.on("close", () => {
+        // Remove from refs first so later loops don't touch a destroyed peer
+        if (peersRef.current[targetId]) {
+          delete peersRef.current[targetId];
+        }
+        if (peerCreatesRef.current[targetId]) {
+          delete peerCreatesRef.current[targetId];
+        }
+        setPeersMap((prev) => {
+          const copy = { ...prev };
+          delete copy[targetId];
+          return copy;
+        });
+        setStreamsMap((prev) => {
+          const copy = { ...prev };
+          delete copy[targetId];
+          return copy;
+        });
+      });
+      peer.on("error", (err) => console.warn("peer error", targetId, err));
+      peersRef.current[targetId] = peer;
+      setConnectedPeers((prev) => ({ ...prev, [targetId]: peer }));
+      return peer;
+    })();
+
+    peerCreatesRef.current[targetId] = peerCreate;
+    try {
+      return await peerCreate;
+    } finally {
+      if (peerCreatesRef.current[targetId] === peerCreate) {
+        delete peerCreatesRef.current[targetId];
       }
-      setPeersMap((prev) => {
-        const copy = { ...prev };
-        delete copy[targetId];
-        return copy;
-      });
-      setStreamsMap((prev) => {
-        const copy = { ...prev };
-        delete copy[targetId];
-        return copy;
-      });
-    });
-    peer.on("error", (err) => console.warn("peer error", targetId, err));
-    peersRef.current[targetId] = peer;
-    setConnectedPeers((prev) => ({ ...prev, [targetId]: peer }));
-    return peer;
+    }
   }, [roomId, socket, selfId]);
 
   // Handle incoming signaling
@@ -96,16 +128,20 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     if (!socket) return;
     const onSignal = ({ from, data }) => {
       if (from === selfId) return;
-      let peer = peersRef.current[from];
-      if (!peer) {
-        // We received a signal first; ensure we are the non-initiator to accept it
-        peer = createPeer(from, false);
-      }
-      try {
-        peer.signal(data);
-      } catch (e) {
-        console.warn("signal apply error", e);
-      }
+      void (async () => {
+        let peer = peersRef.current[from];
+        if (!peer) {
+          // We received a signal first; ensure we are the non-initiator to accept it
+          peer = await createPeer(from, false);
+        }
+        try {
+          peer.signal(data);
+        } catch (e) {
+          console.warn("signal apply error", e);
+        }
+      })().catch((error) => {
+        console.warn("voice peer setup failed", error);
+      });
     };
     socket.on("voice:signal", onSignal);
     return () => {
@@ -169,13 +205,14 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
       if (roster?.X) ids.add(roster.X);
       if (roster?.O) ids.add(roster.O);
       for (const sid of roster?.spectators || []) ids.add(sid);
+      const peerCreates = [];
       for (const targetId of ids) {
         if (!targetId || targetId === selfId) continue;
-        if (!peersRef.current[targetId]) createPeer(targetId);
+        if (!peersRef.current[targetId]) peerCreates.push(createPeer(targetId));
       }
-    } catch {
-      // permission denied already handled by state
-      void 0;
+      await Promise.all(peerCreates);
+    } catch (error) {
+      console.warn("Unable to enable voice chat", error);
     }
   }, [getMedia, socket, roomId, roster, selfId, createPeer, setMutedState]);
 
@@ -235,7 +272,11 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     for (const sid of roster?.spectators || []) ids.add(sid);
     for (const targetId of ids) {
       if (!targetId || targetId === selfId) continue;
-      if (!peersRef.current[targetId]) createPeer(targetId);
+      if (!peersRef.current[targetId]) {
+        void createPeer(targetId).catch((error) => {
+          console.warn("voice peer setup failed", error);
+        });
+      }
     }
   }, [roster, socket, roomId, selfId, createPeer, micEnabled]);
 
@@ -244,7 +285,11 @@ export default function useVoiceChat({ socket, roomId, selfId, roster = {}, voic
     if (!socket || !roomId) return;
     for (const targetId of Object.keys(voiceRoster || {})) {
       if (!targetId || targetId === selfId) continue;
-      if (!peersRef.current[targetId]) createPeer(targetId);
+      if (!peersRef.current[targetId]) {
+        void createPeer(targetId).catch((error) => {
+          console.warn("voice peer setup failed", error);
+        });
+      }
     }
   }, [voiceRoster, socket, roomId, selfId, createPeer]);
 

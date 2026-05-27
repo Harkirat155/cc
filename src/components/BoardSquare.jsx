@@ -1,15 +1,12 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
 import useReducedMotion from "../hooks/useReducedMotion";
 import {
   ConnectPiece,
   EmptyConnectSlot,
   LegalTargetDot,
   Piece,
-  cx,
-  revealProps,
-  squareClasses,
 } from "./games/boardPresentation";
+import { cx, revealClasses, squareClasses } from "./games/boardPresentationUtils";
 import ValueMark from "./marks/ValueMark";
 
 function sameSquareValue(a, b) {
@@ -154,12 +151,15 @@ const BoardSquare = memo(function BoardSquare({
         />
       ) : (
         hasValue && (
-          <motion.span
-            {...revealProps(reducedMotion, isWinning ? 1.08 : 1)}
-            className="relative z-10 inline-flex leading-none"
+          <span
+            className={cx(
+              "relative z-10 inline-flex leading-none",
+              revealClasses(reducedMotion),
+              isWinning && "scale-[1.08]"
+            )}
           >
             <ValueMark value={value} playerInfo={playerInfo} palette={palette} />
-          </motion.span>
+          </span>
         )
       )}
       {pressed && (

@@ -9,6 +9,8 @@ import { Tooltip } from "./ui/Tooltip";
 import NavMenu from "./NavMenu";
 import GameSelector from "./GameSelector";
 
+const EMPTY_MENU_ITEMS = [];
+
 const Navbar = ({
   onToggleHistory,
   isHistoryOpen = false,
@@ -19,7 +21,7 @@ const Navbar = ({
   onToggleMic,
   connectionState = 'disconnected',
   menuPanel = null,
-  menuItems = [],
+  menuItems = EMPTY_MENU_ITEMS,
   currentGameId = null,
   onSwitchGame,
 }) => {
@@ -79,8 +81,7 @@ const Navbar = ({
         <div className="flex shrink-0 items-center gap-2" data-tour="panels">
           {isMultiplayer && (
             <Tooltip content={connectionLabel}>
-              <div
-                role="status"
+              <output
                 aria-label={connectionLabel}
                 className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-foreground/5 bg-foreground/[0.03] transition ${
                   connectionState === 'connected'
@@ -95,7 +96,7 @@ const Navbar = ({
                 ) : (
                   <WifiOff size={16} />
                 )}
-              </div>
+              </output>
             </Tooltip>
           )}
           {showVoiceControl && (

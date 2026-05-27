@@ -15,14 +15,16 @@ const WAITING_TIPS = [
   "📱 Share room links with friends for private matches",
 ];
 
+const EMPTY_LOBBY_QUEUE = [];
+
 /**
  * LobbyView - Matchmaking lobby interface
  * Single Responsibility: Display lobby UI and handle user interactions
  * Users are automatically placed in lobby with a generated name
  */
-const LobbyView = ({ 
-  lobbyQueue = [], 
-  isInLobby = false, 
+const LobbyView = ({
+  lobbyQueue = EMPTY_LOBBY_QUEUE,
+  isInLobby = false,
   onLeaveLobby,
   socketId,
   displayName = '',
@@ -37,7 +39,7 @@ const LobbyView = ({
   const userPosition = lobbyQueue.findIndex(p => p.socketId === socketId);
 
   // Current timestamp, updating every second
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   
   // Rotating tip index
   const [tipIndex, setTipIndex] = useState(0);

@@ -7,6 +7,8 @@ import Users from "lucide-react/dist/esm/icons/users.js";
 import ValueMark from "./marks/ValueMark";
 import { Tooltip } from "./ui/Tooltip";
 
+const EMPTY_VOICE_ROSTER = {};
+
 // Props:
 // - roster: { X: string|null, O: string|null, spectators: string[] }
 // - socketId: string|null
@@ -18,7 +20,7 @@ const PeoplePanel = ({
   socketId,
   isMultiplayer,
   roomId,
-  voiceRoster = {},
+  voiceRoster = EMPTY_VOICE_ROSTER,
   variant = "panel",
   className = "",
 }) => {

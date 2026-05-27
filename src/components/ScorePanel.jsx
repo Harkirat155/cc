@@ -109,7 +109,7 @@ const ScorePanel = ({
           {cards.map((card, index) => (
             <React.Fragment key={card.slot}>
               {index === 1 && (
-                <div className="text-xl font-thin tracking-[0.35em] text-foreground/40 sm:text-2xl">
+                <div className="text-xl font-thin tracking-[0.35em] text-foreground/65 sm:text-2xl">
                   VS
                 </div>
               )}

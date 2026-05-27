@@ -70,8 +70,8 @@ function markShapeClass() {
 
 function samePlayerInfo(a, b) {
   if (a === b) return true;
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  return a.every((player, index) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  return a.length === b.length && a.every((player, index) => {
     const next = b[index];
     return player?.slot === next?.slot && player?.label === next?.label && player?.color === next?.color;
   });

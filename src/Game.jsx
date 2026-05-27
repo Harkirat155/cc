@@ -97,8 +97,7 @@ const Game = () => {
     return turnSlot === 1 ? palette.p2.glow : palette.p1.glow;
   }, [gameState?.gameId, gameState?.playerInfo, gameState?.turn, gameState?.turnSlot]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  // Prevent auto-join when user is actively leaving a room from a room URL
-  const [suppressAutoJoin, setSuppressAutoJoin] = useState(false);
+  const suppressAutoJoinRef = useRef(false);
   const feedbackAbortRef = useRef(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackError, setFeedbackError] = useState("");
@@ -234,11 +233,11 @@ const Game = () => {
     const code = (paramRoomId || "").trim().toUpperCase();
     if (!code) return;
     // Only attempt auto-join if not already in a room
-    if (!isMultiplayer && !suppressAutoJoin) {
+    if (!isMultiplayer && !suppressAutoJoinRef.current) {
       joinRoom(code);
     }
     // If already in a different room, do nothing for now to avoid multi-room state
-  }, [paramRoomId, isMultiplayer, joinRoom, suppressAutoJoin]);
+  }, [paramRoomId, isMultiplayer, joinRoom]);
 
   // If room not found, redirect to root
   useEffect(() => {
@@ -249,8 +248,8 @@ const Game = () => {
 
   // When we navigate away from a room URL, re-enable auto-join for future shares
   useEffect(() => {
-    if (!paramRoomId && suppressAutoJoin) setSuppressAutoJoin(false);
-  }, [paramRoomId, suppressAutoJoin]);
+    if (!paramRoomId) suppressAutoJoinRef.current = false;
+  }, [paramRoomId]);
 
   // When a room is created (or joined manually), push the room URL so it matches the share link
   useEffect(() => {
@@ -374,7 +373,7 @@ const Game = () => {
         onCreateMatch={handleCreateMatch}
         onFindMatch={handleFindMatch}
         onLeaveRoom={async () => {
-          setSuppressAutoJoin(true);
+          suppressAutoJoinRef.current = true;
           await leaveRoom();
           navigate("/", { replace: true });
         }}
@@ -412,7 +411,7 @@ const Game = () => {
           }
           onAcceptRematch={resetGame}
           onLeaveRoom={async () => {
-            setSuppressAutoJoin(true);
+            suppressAutoJoinRef.current = true;
             await leaveRoom();
             navigate("/", { replace: true });
           }}

@@ -7,6 +7,10 @@ import RefreshCcw from "lucide-react/dist/esm/icons/refresh-ccw.js";
 import Users from "lucide-react/dist/esm/icons/users.js";
 import { indexToCoordinate } from "../utils/history";
 
+const EMPTY_HISTORY = [];
+const EMPTY_COMPLETED_GAMES = [];
+const EMPTY_ROSTER = {};
+
 const formatSequence = (sequence = []) =>
   sequence.map((step) => {
     if (typeof step !== "string" || step.length < 2) return step;
@@ -17,13 +21,13 @@ const formatSequence = (sequence = []) =>
   });
 
 const HistoryPanel = ({
-  history = [],
-  completedGames = [],
+  history = EMPTY_HISTORY,
+  completedGames = EMPTY_COMPLETED_GAMES,
   viewIndex = 0,
   jumpTo,
   resumeLatest,
   onClose,
-  roster = {},
+  roster = EMPTY_ROSTER,
   socketId,
   isMultiplayer,
   youAre,

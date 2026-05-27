@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import Check from "lucide-react/dist/esm/icons/check.js";
 import Pencil from "lucide-react/dist/esm/icons/pencil.js";
 import X from "lucide-react/dist/esm/icons/x.js";
@@ -43,8 +43,16 @@ const ScorePlayerCard = ({
   onEditName,
   winnerExists,
 }) => {
+  const inputRef = useRef(null);
   const occupantLabel = formatOccupant(occupant, fallbackLabel);
   const canEdit = Boolean(isYou && onEditName);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus({ preventScroll: true });
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
 
   return (
     <article
@@ -75,11 +83,11 @@ const ScorePlayerCard = ({
           {isEditing ? (
             <div className="flex items-center justify-center gap-1.5">
               <input
+                ref={inputRef}
                 type="text"
                 value={editValue}
                 onChange={(event) => onEditChange(event.target.value)}
                 maxLength={20}
-                autoFocus
                 className="h-8 w-24 rounded-full border border-input bg-input-background px-3 text-center text-xs font-medium text-foreground outline-none transition focus:ring-2 focus:ring-ring/50"
                 onKeyDown={(event) => {
                   if (event.key === "Enter") onEditSave();
