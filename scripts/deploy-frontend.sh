@@ -250,7 +250,7 @@ run_preflight_and_build() {
 
   if [[ "$RUN_TESTS" -eq 1 ]]; then
     log "Running npm test"
-    NODE_ENV=test npm test
+    env -u VITE_SOCKET_SERVER -u VITE_API_BASE NODE_ENV=test npm test
   else
     warn "Skipping npm test"
   fi
