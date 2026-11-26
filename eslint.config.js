@@ -15,6 +15,7 @@ export default [
       'build',
       '.vite',
       '.vercel',
+      '.delta',
       '**/*.min.js',
     ],
   },
