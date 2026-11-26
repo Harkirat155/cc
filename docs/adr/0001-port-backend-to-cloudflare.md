@@ -3,6 +3,9 @@
 - Status: Proposed (planning only; no code built yet)
 - Date: 2026-11-27
 - Supersedes: DEPLOY_BACKEND.md "Fly.io is the supported target"
+- Review (2026-11-27): a cross-family review (Grok) checked this ADR against the code. It added the seat-loss risk
+  and the seat token, the Fly deprecation window and manifest v2, billed-meter measurement, and split the bricks
+  (12 became 16). All seven findings were checked against the code and applied.
 
 ## Context
 
@@ -97,7 +100,7 @@ GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY, GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SHEETS_
    is far above a hobby game.
 3. **Sheets auth.** Yes in principle. A service-account JWT is RS256 over a PKCS8 key; Workers have WebCrypto
    `crypto.subtle.importKey("pkcs8")` + `sign("RSASSA-PKCS1-v1_5")`. Replace `googleapis` (Node-only, heavy)
-   with two `fetch` calls (token endpoint, then `values:append`). Not yet proven live; brick 8 proves it
+   with two `fetch` calls (token endpoint, then `values:append`). Not yet proven live; brick 10 proves it
    with a local stub and one manual real append. Use `ctx.waitUntil` so the 201 is not blocked.
 4. **CORS.** Default is `'*'` (`server/config.js:25`), reused by Socket.IO (app.js:178). The port locks it:
    `ALLOWED_ORIGINS` has no default; the Worker rejects a WebSocket upgrade whose `Origin` is not listed
@@ -143,8 +146,13 @@ Port the backend to **one Worker (TypeScript, Hono) plus two Durable Object clas
 code, WebSocket Hibernation, SQLite storage) and `Lobby` (singleton). Replace Socket.IO with a small JSON
 WebSocket protocol on both server and client (`src/utils/socketManager.js` becomes a thin client with ack
 by request id, reconnect and backoff). Move the game rules (`server/gameLogic.js`, `shared/`) unchanged; they
-are pure. Keep the Fly service as source of truth and rollback until cut-over; the frontend switches by
-`VITE_SOCKET_SERVER`/`VITE_API_BASE`. CORS is an explicit allow-list with no wildcard default.
+are pure. Keep the Fly service as source of truth and rollback until cut-over; the web app switches by
+`VITE_SOCKET_SERVER`/`VITE_API_BASE` only. Those two point at the Worker; the agent docs, `llms.txt` and the
+Agents page keep naming the Fly Socket.IO host. Fly stays up for a **14-day deprecation window** from cut-over, then the
+JSON protocol is published as agent manifest v2 (v1 is Socket.IO at Fly, `manifestVersion` '1.0',
+agentManifest.js:90). The client picks the shim when `VITE_SOCKET_SERVER` is a `wss://` URL, so no third flag.
+Seats: `matchFound` carries a one-time seat token, and every Room socket open sends `joinRoom` with `clientId`
+plus the token. CORS is an explicit allow-list with no wildcard default.
 
 Shape: `worker/src/index.ts` (routes, CORS, upgrade routing `/ws/room/:code`, `/ws/lobby`), `room.ts`,
 `lobby.ts`, `feedback.ts`, `wrangler.jsonc` (`new_sqlite_classes` migration, never `new_classes`, which would need
@@ -161,7 +169,8 @@ Paid). Tests: Vitest + `@cloudflare/vitest-pool-workers`.
 | `rooms` / `socketRooms` Maps, LRU (roomManager.js) | one DO per room code; state in DO SQLite so it survives hibernation; LRU cap dropped (DOs are isolated) |
 | room code generator + collision check | Worker picks code, asks `Room` DO `init` (fails if already set); retry |
 | `roomGC` interval (roomGC.js:15) | a single alarm per room, re-armed on activity; fires once at TTL then `deleteAll()` (alarm only while idle-waiting, accepted cost) |
-| `lobbyManager` singleton, `io.emit` broadcast | `Lobby` DO, queue in SQLite, 100 ms debounce via alarm; `matchFound` carries the new room code, clients then open the Room socket |
+| `lobbyManager` singleton, `io.emit` broadcast | `Lobby` DO, queue in SQLite, 100 ms debounce via alarm; `matchFound` carries the new room code, the player's seat and a one-time seat token; the `Room` DO binds the token; clients open the Room socket and send `joinRoom` |
+| `connectionStateRecovery` (app.js:186, 2 min) | dropped; replaced by `joinRoom` with `clientId` (+ token) on every socket open (the seat rebind of roomHandlers) |
 | `matchNotifier` socket ids | per-socket tags (`serializeAttachment`) |
 | rate limiter (rateLimiter.js:20) | per-connection counters in the DO (limit is per socket, so DO-local is exact); same 50/s, 30 s ban |
 | `roomPublisher` debounce timers | coalesce within one message turn; no timers where avoidable (timers block hibernation) |
@@ -169,7 +178,7 @@ Paid). Tests: Vitest + `@cloudflare/vitest-pool-workers`.
 | `metrics.js`, `/metrics`, `/health` | Worker handler; counters in the Lobby DO or dropped; `/metrics` becomes allow-listed or removed (open today) |
 | `feedbackStore` ring | DO SQLite table in `Lobby`, trimmed to 200 |
 | `googleapis` JWT | WebCrypto RS256 + `fetch` (answer 3) |
-| `agentManifest` | Worker route; backend URL from `new URL(req.url)`; document the WS protocol |
+| `agentManifest` | Worker route; backend URL from `new URL(req.url)`; publish the JSON protocol as manifest v2 after cut-over (v1 stays on Fly for the window) |
 | `gracefulShutdown`, `logger` | delete; Workers Logs |
 | `Dockerfile`, `fly.toml`, DEPLOY_BACKEND.md | delete after cut-over; `wrangler deploy` doc |
 | `process.env` | `env` bindings; secrets via `wrangler secret put` |
@@ -190,10 +199,17 @@ Paid). Tests: Vitest + `@cloudflare/vitest-pool-workers`.
 Positive: no always-on machine, free plan, idle rooms cost nothing, CORS finally locked, state survives eviction.
 
 Negative:
-- **The wire contract breaks**: `socket.io-client` on the Agents page and any third-party agent stops
-  working; the manifest and docs change. Frontend and backend must cut over together (flag the client build).
+- **The agent wire contract breaks**: `socket.io-client` agents pinned to the Fly host
+  (`src/Agents.jsx:6`, `public/llms.txt:9-19`, `public/agent-manifest.json:19-31`) must move to the JSON
+  protocol in manifest v2. The web app and the agents cut over separately: the app flips first with
+  `VITE_SOCKET_SERVER`/`VITE_API_BASE`; agents get 14 days on Fly.
+- **Fly stays up for 14 days after cut-over, and Fly costs money while the owner wants nothing paid.** Fourteen
+  days is the shortest window that is honest to agents polling the manifest rarely; a shorter one breaks them
+  unannounced. Cost is one 256 MB shared machine for two weeks (recalled, not fetched; check the invoice
+  estimate before cut-over). Owner can shorten it, at the price of breaking agents sooner.
+- Socket.IO's 2-minute state recovery is gone. Reconnect now relies on `joinRoom` with `clientId` and a token.
 - Alarms and timers prevent hibernation, so room TTL and lobby debounce cost duration; budget is large but
-  measure it (brick 9).
+  measure it (brick 12).
 - Free-plan daily limits are hard failures at 00:00 UTC; need a visible "busy" state in the client.
 - Two implementations coexist during the port; tests on shared pure logic mitigate this.
 - No persistence guarantee beyond DO storage; same as today (rooms are ephemeral).
@@ -207,29 +223,57 @@ Negative:
    upgrade with a bad `Origin` gets 403; curls for each.
 3. **`POST /feedback`** validation and responses (without Sheets). Proof: parity cases for 400/201 against
    app.js:103-170 expectations; curls for happy and bad rating.
-4. **Protocol spec + client shim.** `docs/ws-protocol.md` with all 17+12 events as frames, and the
-   `socketManager.js` replacement with ack-by-id. Proof: Jest test with a fake WebSocket for ack, timeout,
-   reconnect.
-5. **`Room` DO: create/join/leave/update name.** Proof: workers-pool test with two sockets; state survives a
-   forced hibernation (evict and resume).
-6. **`Room` DO: moves, reset, switchGame, new-game requests, scores, rate limit.** Reuse `gameLogic.js`.
-   Proof: port the cases from `handlers/gameHandlers.test.js` and `socketHandlers.test.js`.
-7. **`Lobby` DO + `matchFound`.** Proof: two sockets matched into a Room; queue cap; port
-   `lobbyManager.test.js`.
-8. **Voice relay + Google Sheets via WebCrypto.** Proof: relay test between two tags; Sheets request stubbed
-   and checked for a valid RS256 signature with a test key; one manual real append by the owner.
-9. **Room TTL alarm and measurements.** Proof: test that an idle room is deleted; record requests and GB-s
-   for a scripted 100-game run against `wrangler dev` (baseline vs the sizing above).
-10. **Frontend switch behind `VITE_SOCKET_SERVER` + Agents page and manifest update.** Proof: Playwright
-    two-browser game and lobby match against the Worker; saved curls.
-11. **Cut-over and rollback rehearsal.** Deploy, flip `BACKEND_URL`, flip back. Proof: both directions play a
-    full game; owner signs off.
-12. **Decommission (14 quiet days).** Remove `fly.toml`, `Dockerfile`, rewrite DEPLOY_BACKEND.md, mark Accepted.
+4. **Protocol spec + client shim, behind the flag.** `docs/ws-protocol.md` with all 17+12 events as frames,
+   and the `socketManager.js` replacement with ack-by-id. It is used only when `VITE_SOCKET_SERVER` is a
+   `wss://` URL, so the default build is unchanged. Proof: Jest test with a fake WebSocket for ack, timeout,
+   reconnect; a test that the spec's event names equal the 17 client and 12 server events registered in the
+   server code (a missing event fails it).
+5. **`Room` DO: create/join/leave/update name, seats.** Proof: workers-pool test with two sockets; state
+   survives a forced hibernation; the clientId seat rebind ported from `server/socketHandlers.test.js:36`
+   (same clientId cannot hold X and O after a reconnect).
+6. **`Room` DO: moves, reset, switchGame, new-game requests, scores.** Reuse `gameLogic.js`. Proof: port the
+   cases from `handlers/gameHandlers.test.js`.
+7. **Rate limit in the `Room` DO.** Same 50/s, 30 s ban, `error` frame with `RATE_LIMITED` and `retryAfter`
+   (rateLimiter.js:113). The existing tests never emit the error. Proof: a burst of 60 frames in one second
+   gets the error frame, is banned, and is allowed again after 30 s (fake clock).
+8. **`Lobby` DO + `matchFound` with seat token.** Proof: two sockets matched into a Room; each opens the Room
+   socket, sends `joinRoom` with its token, and holds the seat `matchFound` named (X or O); a reused token is
+   refused; queue cap; port `lobbyManager.test.js`.
+9. **Voice relay.** Proof: relay test between two tags for `voice:signal`; `voiceRoster` in the `gameUpdate`
+   after join, leave and mute (voiceHandlers.js:27, 41, 58).
+10. **Google Sheets via WebCrypto.** Proof: Sheets request stubbed and checked for a valid RS256 signature
+    with a test key; one manual real append by the owner.
+11. **Room TTL alarm.** Proof: test that an idle room is deleted and an active one is not.
+12. **Measurements.** Run a scripted 100-game run against `wrangler dev` and count frames locally; apply the
+    20:1 ratio in the report (wrangler dev reports local counts, not the billed meter). Read GB-s from a
+    deployed Worker's analytics (workers.dev, free). Proof: report with baseline vs the sizing above.
+13. **Client protocol switch.** Point `VITE_SOCKET_SERVER` and `VITE_API_BASE` at the Worker in a build; the
+    client sends `joinRoom` with `clientId` and token on every Room socket open (the app never does after
+    `matchFound` today: Game.jsx:236, useSocketGame.js:160). This PR adds the Playwright runner (not in
+    package.json). Proof: Playwright two-browser game and lobby match against the Worker; saved curls.
+14. **Agent docs and manifest v2.** `Agents.jsx`, `llms.txt`, `agent-manifest.json`, `agentManifest.js`:
+    publish the JSON protocol as `manifestVersion` '2.0', with the Fly Socket.IO host listed as deprecated
+    with its end date. Proof: a test that the manifest's events equal the spec; a scripted agent plays a
+    game over plain WebSocket against the Worker.
+15. **Cut-over and rollback rehearsal.** Deploy, flip the two `VITE_` vars, flip back. Fly stays up. Proof:
+    both directions play a full game; owner signs off.
+16. **Decommission after the 14-day window** (and 14 quiet days on Fly). Remove `fly.toml`, `Dockerfile`,
+    rewrite DEPLOY_BACKEND.md, mark Accepted.
 
 ## Top risks
 
-1. The contract rewrite (4-7) is the bulk of the work; any missed ack or event breaks play silently. Mitigate
+1. The contract rewrite (4-10) is the bulk of the work; any missed ack or event breaks play silently. Mitigate
    with the protocol spec as a checked list of all 29 events.
 2. Hibernation: in-memory state lost on eviction, and alarms/timers keep objects awake. Mitigate by storing
    everything in SQLite and testing eviction in brick 5.
 3. Free daily caps (100 k requests, 13,000 GB-s) fail hard; unverified card requirement at signup.
+4. **Seat loss after matchmaking.** The server seats both lobby sockets itself (lobbyHandlers.js:123-128) and
+   the client never emits `joinRoom` after `matchFound` (handleMatchFound sets `roomId` and `player` only,
+   socketHandlers.js:125-131; auto-join is skipped, Game.jsx:236). Socket.IO's connection state recovery (2
+   min, app.js:186) keeps that seat across reconnects, and a DO port loses it. Mitigate: one-time seat token
+   in `matchFound`, bound by the Room DO, and `joinRoom` with `clientId` on every socket open. Brick 8
+   proves the seat `matchFound` named.
+5. **Agents break on cut-over.** Mitigated by the 14-day Fly window and manifest v2; the cost is Fly money
+   for two weeks.
+6. **Measuring on the wrong meter.** `wrangler dev` shows local counts only; brick 12 applies 20:1 and reads
+   GB-s from a deployed Worker.
