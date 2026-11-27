@@ -1,3 +1,7 @@
+import { fileURLToPath } from 'node:url';
+
+const viteMetaEnv = fileURLToPath(new URL('./jest.viteMetaEnv.cjs', import.meta.url));
+
 export default {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['./jest.setup.js'],
@@ -6,7 +10,7 @@ export default {
     '^@shared/(.*)$': '<rootDir>/shared/$1',
   },
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['@babel/preset-env', '@babel/preset-react'] }],
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['@babel/preset-env', '@babel/preset-react'], plugins: [viteMetaEnv] }],
   },
   transformIgnorePatterns: ['/node_modules/(?!lucide-react/)'],
   // Default ignore is only node_modules. Setting this replaces it, so keep both.

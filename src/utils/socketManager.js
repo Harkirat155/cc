@@ -5,6 +5,7 @@
  * caused by component mount/unmount cycles in React Strict Mode.
  */
 import { io } from "socket.io-client";
+import { WsSocket, isWsUrl } from "./wsSocket.js";
 
 let socket = null;
 const listeners = new Set();
@@ -28,7 +29,8 @@ export function getSocket() {
   if (!socket) {
     const url = getSocketUrl();
 
-    socket = io(url, {
+    // Flag: a ws:// or wss:// VITE_SOCKET_SERVER selects the ADR 0001 WebSocket shim; anything else is Socket.IO.
+    socket = isWsUrl(url) ? new WsSocket(url) : io(url, {
       transports: ["websocket", "polling"],
       autoConnect: true,
       reconnection: true,
