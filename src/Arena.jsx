@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 import { liveUrl } from "./Live";
-import { watchRooms } from "./arenaWatch";
+import { roomFor, watchRooms } from "./arenaWatch";
 
 const REFRESH_MS = 30_000;
 
@@ -77,17 +77,17 @@ function Arena() {
             <table className="mt-2 w-full text-left text-sm">
               <thead className="text-foreground/60"><tr><th className="py-1 pr-2">#</th><th className="pr-2">Bot</th><th className="pr-2">Rating</th><th className="pr-2">Games</th><th className="pr-2">W</th><th className="pr-2">D</th><th>L</th></tr></thead>
               <tbody>
-                {games[id].map((b, i) => (
+                {games[id].map((b, i) => { const room = roomFor(rooms, id, b.name); return (
                   <tr key={b.name} className="border-t border-foreground/10">
                     <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">
                       {b.name}
-                      {rooms.has(b.name.toLowerCase()) && (
-                        <Link to={`/room/${rooms.get(b.name.toLowerCase())}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
+                      {room && (
+                        <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
                       )}
                     </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>
-                ))}
+                ); })}
               </tbody>
             </table>
           </section>

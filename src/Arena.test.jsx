@@ -33,11 +33,11 @@ describe("Arena page", () => {
   });
 
   it("links a row to the room of a live player with the same name, and says only that a player has that name", async () => {
-    const arena = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }, { name: "Grace Bot", rating: 1200, games: 1, wins: 0, draws: 1, losses: 0 }] } };
-    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [{ roomId: "r9", players: ["ada bot", "Sam"] }] } : arena) }));
+    const arena = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }, { name: 42, rating: 1, games: 0, wins: 0, draws: 0, losses: 0 }, { name: "Grace Bot", rating: 1200, games: 1, wins: 0, draws: 1, losses: 0 }] } };
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [{ roomId: "r9 /?", gameId: "connect4", players: ["ada bot", "Sam"] }, { roomId: "r8", gameId: "ttt", players: ["Grace Bot", "Sam"] }] } : arena) }));
     show();
     const link = await screen.findByRole("link", { name: "A player named Ada Bot is in a game · Watch" });
-    expect(link.getAttribute("href")).toBe("/room/r9");
+    expect(link.getAttribute("href")).toBe("/room/r9%20%2F%3F");
     expect(screen.queryByRole("link", { name: /Grace Bot/ })).toBeNull();
   });
 
