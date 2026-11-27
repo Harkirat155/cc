@@ -74,6 +74,12 @@ app.get("/ws/room/:roomId", async (c) => {
   return c.json({ error: "Unable to create room, please try again" }, 503);
 });
 
+// Lobby socket: one singleton DO, the same name feedback uses.
+app.get("/ws/lobby", async (c) => {
+  if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") return c.text("expected websocket", 426);
+  return c.env.LOBBY.getByName("lobby").fetch(c.req.raw);
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

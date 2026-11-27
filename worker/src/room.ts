@@ -22,7 +22,11 @@ interface RoomState {
   lastMoveBy: number | null;
   newGameRequester: string | null;
   newGameRequestedAt: number | null;
+  // One-time seat tokens from Lobby.reserveSeats (brick 8): token -> seat and expiry (ms epoch).
+  seatTokens: Record<string, { seat: Seat; exp: number }>;
 }
+// Express kept a matched seat across a reconnect for 2 min (connectionStateRecovery, app.js:186).
+const TOKEN_TTL_MS = 120_000;
 interface Att {
   sid: string;
   joined: boolean;
@@ -50,6 +54,7 @@ const fresh = (roomId: string): RoomState => ({
   lastMoveBy: null,
   newGameRequester: null,
   newGameRequestedAt: null,
+  seatTokens: {},
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.lastMoveBy = null; };
@@ -75,6 +80,21 @@ export class Room extends DurableObject {
   async init(roomId: string): Promise<boolean> {
     if (this.s) return false;
     this.s = fresh(roomId);
+    await this.save();
+    return true;
+  }
+
+  // Lobby calls this for a match (setupMatchedRoom, lobbyHandlers.js:60): the room exists with both
+  // names and the game, and each seat is claimable once by its token through joinRoom. False = code taken.
+  async reserveSeats(roomId: string, gameId: string, seats: { seat: Seat; token: string; name: string }[]): Promise<boolean> {
+    if (!(await this.init(roomId))) return false;
+    const s = this.s!;
+    s.created = true;
+    if (s.gameId !== gameId) { s.gameId = gameId; s.state = getRules(gameId).createInitialState(); }
+    for (const q of seats) {
+      s.names[q.seat] = q.name;
+      s.seatTokens[q.token] = { seat: q.seat, exp: Date.now() + TOKEN_TTL_MS };
+    }
     await this.save();
     return true;
   }
@@ -107,7 +127,6 @@ export class Room extends DurableObject {
     const ack = (body: unknown) => {
       if (Number.isInteger(id)) ws.send(JSON.stringify({ t: "ack", id, d: body }));
     };
-    // TODO(brick 8): bind and check the seat token in joinRoom.
     // TODO(brick 11): touch/TTL alarm on every game event, as touch() does in gameHandlers.js.
     switch (t) {
       case "createRoom": ack(await this.createRoom(ws, data)); break;
@@ -173,9 +192,35 @@ export class Room extends DurableObject {
     const name = validateDisplayName(p.displayName);
     let role: Seat | "spectator" | null = null;
 
-    // 1) rebind by clientId
+    // Expired tokens are dropped when seen, so storage does not grow and their seat opens up.
+    const now = Date.now();
+    const expired = Object.keys(s.seatTokens).filter((k) => now > s.seatTokens[k].exp);
+    for (const k of expired) delete s.seatTokens[k];
+    if (expired.length) await this.save();
     const mapped = clientId ? s.seatByClient[clientId] : undefined;
-    if (mapped === "X" || mapped === "O") {
+
+    // 0) seat token from matchFound: exactly the seat it names, once. A clientId that already owns a
+    // seat rebinds below and ignores the token, so a retry after a lost ack succeeds.
+    if (p.token !== undefined) {
+      const tok = typeof p.token === "string" ? s.seatTokens[p.token] : undefined;
+      if (!clientId) return { error: "clientId required with seat token" };
+      if (mapped) {
+        if (tok && tok.seat !== mapped) return { error: "Already seated" };
+        if (tok) delete s.seatTokens[p.token as string];
+      } else {
+        if (!tok) return { error: "Invalid or used seat token" };
+        const other = tok.seat === "X" ? "O" : "X";
+        if (s.players[other] === sid) return { error: "Already seated" };
+        if (s.players[tok.seat] && s.players[tok.seat] !== sid) return { error: "Seat taken" };
+        delete s.seatTokens[p.token as string];
+        s.players[tok.seat] = sid;
+        s.seatByClient[clientId] = tok.seat;
+        if (name) s.names[tok.seat] = name;
+        role = tok.seat;
+      }
+    }
+    // 1) rebind by clientId
+    if (!role && (mapped === "X" || mapped === "O")) {
       if (!s.players[mapped] || s.players[mapped] === sid) {
         s.players[mapped] = sid;
         if (name) s.names[mapped] = name;
@@ -189,15 +234,17 @@ export class Room extends DurableObject {
       if (s.players.X === sid) { role = "X"; if (name) s.names.X = name; }
       else if (s.players.O === sid) { role = "O"; if (name) s.names.O = name; }
     }
+    // A seat with an unclaimed matchFound token is not open to a tokenless join.
+    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k);
     // 3) open seat. A clientId that owns a seat is never given the other one.
     if (!role) {
       // A clientId that already owns a seat (held by a live socket, so rebind skipped it) never gets the other one.
       // Express would double-seat here (roomHandlers.js:121 has the guard only on the O branch); this is deliberately safer.
       if (mapped) {
         role = "spectator";
-      } else if (!s.players.X) {
+      } else if (!s.players.X && !held("X")) {
         s.players.X = sid; role = "X"; if (clientId) s.seatByClient[clientId] = "X"; s.names.X = name;
-      } else if (!s.players.O) {
+      } else if (!s.players.O && !held("O")) {
         s.players.O = sid; role = "O"; if (clientId) s.seatByClient[clientId] = "O"; s.names.O = name;
       } else {
         role = "spectator";
