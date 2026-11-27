@@ -9,8 +9,8 @@ const FRONTEND_ROOM_URL_FORMAT = 'https://harkirat155.github.io/cc/room/{roomId}
 
 const EVENTS = {
   clientToServer: [
-    { name: 'createRoom', ack: true, payloadFields: ['clientId', 'displayName', 'gameId', 'listPublicly'], ackFields: ['player', 'roomId'] },
-    { name: 'joinRoom', ack: true, payloadFields: ['clientId', 'displayName', 'roomId', 'token'], ackFields: ['player'] },
+    { name: 'createRoom', ack: true, payloadFields: ['botKey', 'clientId', 'displayName', 'gameId', 'listPublicly'], ackFields: ['player', 'roomId'] },
+    { name: 'joinRoom', ack: true, payloadFields: ['botKey', 'clientId', 'displayName', 'roomId', 'token'], ackFields: ['player'] },
     { name: 'updateDisplayName', ack: false, payloadFields: ['displayName', 'roomId'] },
     { name: 'leaveRoom', ack: true, payloadFields: ['clientId', 'roomId'], ackFields: ['ok'] },
     { name: 'makeMove', ack: false, payloadFields: ['index', 'move', 'roomId'] },

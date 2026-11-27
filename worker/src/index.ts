@@ -87,6 +87,15 @@ app.get("/api/live", async (c) => {
   return c.json({ games }, 200, { "Cache-Control": "public, max-age=5" });
 });
 
+// Agent Arena (docs/arena.md): register a bot name once for a secret key, read the public rated leaderboard.
+app.post("/api/bots", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const r = await c.env.LOBBY.getByName("lobby").registerBot((body as { name?: unknown } | null)?.name, c.req.header("CF-Connecting-IP") ?? "unknown");
+  return c.json(r.body, r.status as 201 | 400 | 409 | 429, { "Cache-Control": "no-store" });
+});
+
+app.get("/api/arena", async (c) => c.json({ games: await c.env.LOBBY.getByName("lobby").listArena() }, 200, { "Cache-Control": "public, max-age=10" }));
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

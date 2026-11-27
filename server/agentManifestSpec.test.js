@@ -71,7 +71,7 @@ describe('agent manifest v2 events equal docs/ws-protocol.md', () => {
     expect(expected.filter((e) => e.direction === 'server->client')).toHaveLength(12);
     expect(expected.find((e) => e.name === 'server:shutdown')).toBeUndefined(); // Express only
     expect(expected.find((e) => e.name === 'joinRoom')).toEqual({
-      name: 'joinRoom', direction: 'client->server', ack: true, fields: ['clientId', 'displayName', 'roomId', 'token'],
+      name: 'joinRoom', direction: 'client->server', ack: true, fields: ['botKey', 'clientId', 'displayName', 'roomId', 'token'],
       ackFields: ['player'], rosterFields: undefined,
     });
     expect(expected.find((e) => e.name === 'createRoom').ackFields).toEqual(['player', 'roomId']);

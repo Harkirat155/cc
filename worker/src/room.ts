@@ -35,6 +35,12 @@ interface RoomState {
   listed: boolean;
   moves: number;
   startedAt: number | null;
+  // Agent Arena: registered bot name per sid, set when a socket presents a valid botKey. A seat's sid changes
+  // on reconnect, so a bot presents its key again on every join. Settled: this game's result was already rated.
+  botBySid: Record<string, string>;
+  settled: boolean;
+  // Who is rated for the current game, frozen when its first move lands: later key changes or a substitute do not count.
+  rated: { id: string; X: string | null; O: string | null; sidX: string | null; sidO: string | null } | null;
 }
 // voice:signal payload cap, serialized. Express had none beyond the Socket.IO 1 MB frame.
 const MAX_SIGNAL_BYTES = 64 * 1024;
@@ -78,6 +84,9 @@ const fresh = (roomId: string): RoomState => ({
   listed: false,
   moves: 0,
   startedAt: null,
+  botBySid: {},
+  settled: false,
+  rated: null,
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearOffer = (s: RoomState) => { s.drawOfferer = null; };
@@ -231,6 +240,32 @@ export class Room extends DurableObject {
     } catch { this.reported = null; }
   }
 
+  // Agent Arena. undefined: no key presented; false: key not registered; else the bot's registered name.
+  private async bot(key: unknown): Promise<{ name: string | null } | { error: string }> {
+    if (key === undefined || key === null) return { name: null };
+    if (typeof key !== "string" || !key) return { error: "Invalid bot key" };
+    try {
+      const name = await this.lobby().verifyBot(key);
+      return name ? { name } : { error: "Invalid bot key" };
+    } catch { return { error: "Arena unavailable, try again" }; }
+  }
+
+  // Rate a finished game once: two seated players, a move played, at least one registered bot, and not the
+  // same bot on both sides. Everyone else is the fixed guest pool and is never stored. Best-effort like report().
+  private settle(s: RoomState) {
+    if (s.state?.status === "active") { s.settled = false; return; }
+    const st = s.state?.status;
+    if (s.settled || (st !== "win" && st !== "draw") || s.moves < 1 || !s.rated) return;
+    const { id, X: x, O: o, sidX, sidO } = s.rated;
+    s.settled = true;
+    void this.save();
+    // A different sid in an occupied seat is a substitute: it does not inherit the result. An empty seat is fine.
+    if ((s.players.X && s.players.X !== sidX) || (s.players.O && s.players.O !== sidO)) return;
+    if ((!x && !o) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
+    const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
+    try { this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score).catch(() => {})); } catch { /* the leaderboard must never break the broadcast */ }
+  }
+
   private ttl() {
     return envInt((this.env as Record<string, unknown>).ROOM_TTL_MS, 120_000, 10_000, 3_600_000);
   }
@@ -270,11 +305,14 @@ export class Room extends DurableObject {
   private async createRoom(ws: WebSocket, p: Msg) {
     const s = this.s;
     if (!s || s.created) return { error: "Unable to create room, please try again" };
+    const bot = await this.bot(p.botKey);
+    if ("error" in bot) return bot;
     const clientId = typeof p.clientId === "string" && p.clientId ? p.clientId : null;
     const sid = this.att(ws).sid;
     s.created = true;
     s.listed = p.listPublicly === true;
     s.players.X = sid;
+    if (bot.name) s.botBySid[sid] = bot.name;
     s.names.X = validateDisplayName(p.displayName);
     const gameId = validateGameId(p.gameId); // roomManager.js:81 falls back to ttt for an unknown id
     if (gameId && gameId !== s.gameId) { s.gameId = gameId; s.state = getRules(gameId).createInitialState(); }
@@ -291,6 +329,9 @@ export class Room extends DurableObject {
     const s = this.s;
     if (!s?.created || s.roomId !== validateRoomId(p.roomId)) return { error: "Room not found" };
     const sid = this.att(ws).sid;
+    const bot = await this.bot(p.botKey);
+    if ("error" in bot) return bot;
+    if (!bot.name) delete s.botBySid[sid];
     // A seat held by a sid with no live socket is stale (eviction can close sockets without a close event).
     const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
     for (const k of ["X", "O"] as const) if (s.players[k] && !live.has(s.players[k]!)) s.players[k] = null;
@@ -362,6 +403,7 @@ export class Room extends DurableObject {
     } else {
       s.spectators = s.spectators.filter((x) => x !== sid);
     }
+    if (bot.name && role !== "spectator") s.botBySid[sid] = bot.name;
     this.setJoined(ws, true);
     await this.save();
     this.after.push(() => {
@@ -447,7 +489,11 @@ export class Room extends DurableObject {
       : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
-    if (!s.moves) s.startedAt = Date.now();
+    if (!s.moves) {
+      s.startedAt = Date.now();
+      const { X, O } = s.players;
+      s.rated = { id: crypto.randomUUID(), X: (X && s.botBySid[X]) || null, O: (O && s.botBySid[O]) || null, sidX: X, sidO: O };
+    }
     s.moves++;
     clearOffer(s);
     await this.save();
@@ -465,6 +511,7 @@ export class Room extends DurableObject {
       clearLast(s);
       s.moves = 0;
       s.startedAt = null;
+      s.rated = null;
     }, ws);
     if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
   }
@@ -515,6 +562,7 @@ export class Room extends DurableObject {
     clearLast(s);
     s.moves = 0;
     s.startedAt = null;
+    s.rated = null;
     await this.save();
     this.publish(ws);
     this.broadcast({ t: "gameReset", d: { roomId: s.roomId, gameId, reason: "gameSwitch" } });
@@ -568,6 +616,7 @@ export class Room extends DurableObject {
   private free(s: RoomState, sid: string): boolean {
     let changed = false;
     for (const k of ["X", "O"] as const) if (s.players[k] === sid) { s.players[k] = null; changed = true; }
+    delete s.botBySid[sid];
     if (changed && s.drawOfferer === sid) clearOffer(s); // a rejoin gets a new sid and could accept its own offer
     const n = s.spectators.length;
     s.spectators = s.spectators.filter((x) => x !== sid);
@@ -633,6 +682,7 @@ export class Room extends DurableObject {
     for (const k of ghosts) { delete s.voice[k]; this.others("", { t: "voice:user-left", d: { socketId: k } }); }
     if (ghosts.length) void this.save();
     this.report(s);
+    this.settle(s);
     const nameOf = (k: Seat) => {
       const sid = s.players[k];
       return !sid ? null : (s.names[k] ?? (sid.length > 8 ? `${sid.slice(0, 5)}…` : sid));
