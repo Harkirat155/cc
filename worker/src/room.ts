@@ -146,9 +146,13 @@ export class Room extends DurableObject {
     }
     // 3) open seat. A clientId that owns a seat is never given the other one.
     if (!role) {
-      if (!s.players.X) {
+      // A clientId that already owns a seat (held by a live socket, so rebind skipped it) never gets the other one.
+      // Express would double-seat here (roomHandlers.js:121 has the guard only on the O branch); this is deliberately safer.
+      if (mapped) {
+        role = "spectator";
+      } else if (!s.players.X) {
         s.players.X = sid; role = "X"; if (clientId) s.seatByClient[clientId] = "X"; s.names.X = name;
-      } else if (!s.players.O && !mapped) {
+      } else if (!s.players.O) {
         s.players.O = sid; role = "O"; if (clientId) s.seatByClient[clientId] = "O"; s.names.O = name;
       } else {
         role = "spectator";
@@ -186,8 +190,12 @@ export class Room extends DurableObject {
     if (!s?.created || s.roomId !== validateRoomId(p.roomId)) return { error: "Room not found" };
     const clientId = typeof p.clientId === "string" ? p.clientId : null;
     const changed = this.free(s, this.att(ws).sid);
+    const hadSeat = !!clientId && clientId in s.seatByClient;
     if (clientId) delete s.seatByClient[clientId];
-    if (!changed) return { error: "Not in room" };
+    if (!changed) {
+      if (hadSeat) await this.save(); // the reservation delete must survive hibernation
+      return { error: "Not in room" };
+    }
     this.setJoined(ws, false);
     await this.save();
     this.after.push(() => this.publish(ws));

@@ -43,6 +43,8 @@ class Client {
   }
 }
 
+const rooms = () => (env as unknown as { ROOM: DurableObjectNamespace<Room> }).ROOM;
+
 async function open(path: string): Promise<Client> {
   const r = await app.fetch(new Request(`http://x${path}`, { headers: { Upgrade: "websocket" } }), env);
   expect(r.status).toBe(101);
@@ -148,6 +150,17 @@ describe("seat rebind (server/socketHandlers.test.js:36)", () => {
     expect(await a2.call("joinRoom", { roomId: ack.roomId, clientId: "c1" })).toEqual({ player: "X" });
   });
 
+  it("a clientId that owns O is not also given a vacated X by a second socket", async () => {
+    const { a, ack } = await newRoom("c1");
+    const b = await open(`/ws/room/${ack.roomId}`);
+    await b.call("joinRoom", { roomId: ack.roomId, clientId: "c2" });
+    await a.call("leaveRoom", { roomId: ack.roomId }); // X is now empty, c2 still owns O on a live socket
+    const b2 = await open(`/ws/room/${ack.roomId}`);
+    expect(await b2.call("joinRoom", { roomId: ack.roomId, clientId: "c2" })).toEqual({ player: "spectator" });
+    const stored = await runInDurableObject(rooms().getByName(ack.roomId), async (_o, state) => state.storage.get<any>("room"));
+    expect(stored.seatByClient.c2).toBe("O");
+  });
+
   it("explicit leave frees the clientId reservation", async () => {
     const { a, ack } = await newRoom("c1");
     await a.call("leaveRoom", { roomId: ack.roomId, clientId: "c1" });
@@ -156,9 +169,23 @@ describe("seat rebind (server/socketHandlers.test.js:36)", () => {
   });
 });
 
-const rooms = () => (env as unknown as { ROOM: DurableObjectNamespace<Room> }).ROOM;
-
 describe("persistence", () => {
+  it("a leaveRoom that only deletes a clientId reservation is saved across eviction", async () => {
+    const { a, ack } = await newRoom("c1");
+    const stub = rooms().getByName(ack.roomId);
+    a.close();
+    for (let i = 0; i < 100; i++) {
+      const st = await runInDurableObject(stub, async (_o, state) => state.storage.get<any>("room"));
+      if (!st.players.X) break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const x = await open(`/ws/room/${ack.roomId}`);
+    expect(await x.call("leaveRoom", { roomId: ack.roomId, clientId: "c1" })).toEqual({ error: "Not in room" });
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+    const stored = await runInDurableObject(stub, async (_o, state) => state.storage.get<any>("room"));
+    expect(stored.seatByClient.c1).toBeUndefined();
+  });
+
   it("keeps seats and names in storage", async () => {
     const { ack } = await newRoom("c1", "Alice");
     const b = await open(`/ws/room/${ack.roomId}`);
