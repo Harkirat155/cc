@@ -12,6 +12,7 @@ const DISCOVERY_LINKS = [
 const GAME_DETAILS = {
   ttt: { board: "3×3 grid, row-major cells 0–8.", move: '{ type: "place", cell: 4 }', note: "Use an empty absolute cell index." },
   connect4: { board: "6×7 grid, row-major board after each drop.", move: '{ type: "place", cell: 3 }', note: "For Connect Four, cell is the column index 0–6." },
+  five: { board: "15×15 grid, row-major cells 0–224.", move: '{ type: "place", cell: 112 }', note: "Use an empty absolute cell index; five or more in a row wins." },
   checkers: { board: "8×8 grid, row-major cells 0–63; pieces are { type, owner }.", move: '{ type: "transfer", from: 42, to: 24, captures: [33] }', note: "A jump lands two squares away and captures lists the jumped square; a one-square step needs no captures." },
 };
 const SUPPORTED_GAMES = listAll().map((game) => ({ ...game, ...GAME_DETAILS[game.id] }));
