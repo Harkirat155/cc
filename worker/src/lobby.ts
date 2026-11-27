@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { validateGameId } from "./validation";
+import { genCode, validateGameId } from "./validation";
 import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from "./feedbackStore";
 
 type Msg = Record<string, unknown>;
@@ -48,6 +48,30 @@ export class Lobby extends DurableObject {
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + 100);
   }
 
+  // matchPlayers + handleMatch (lobbyManager.js:111, lobbyHandlers.js:104): the two longest-waiting
+  // players get a fresh Room and a one-time seat token each; the first (and its game) is X.
+  private async match() {
+    const sql = this.ctx.storage.sql;
+    const [p1, p2] = sql.exec<QRow>("SELECT sid, name, game_id, joined_at FROM queue ORDER BY seq LIMIT 2").toArray();
+    if (!p2) return;
+    sql.exec("DELETE FROM queue WHERE sid IN (?, ?)", p1.sid, p2.sid);
+    await this.touched();
+    const seats = [{ seat: "X" as const, token: crypto.randomUUID(), name: p1.name }, { seat: "O" as const, token: crypto.randomUUID(), name: p2.name }];
+    const players = [p1, p2];
+    let roomId: string | null = null;
+    const env = this.env as unknown as { ROOM: DurableObjectNamespace<import("./room").Room> };
+    for (let i = 0; i < 10 && !roomId; i++) {
+      const code = genCode();
+      if (await env.ROOM.getByName(code).reserveSeats(code, p1.game_id, seats)) roomId = code;
+    }
+    const to = (sid: string, frame: object) => {
+      for (const w of this.ctx.getWebSockets()) if ((w.deserializeAttachment() as Att).sid === sid) try { w.send(JSON.stringify(frame)); } catch { /* closing */ }
+    };
+    players.forEach((p, i) => to(p.sid, roomId
+      ? { t: "matchFound", d: { roomId, player: seats[i].seat, token: seats[i].token, opponent: players[1 - i].name } }
+      : { t: "matchError", d: { error: "Failed to create room" } }));
+  }
+
   async alarm() {
     const text = JSON.stringify({ t: "lobbyUpdate", d: { queue: this.queueState(), timestamp: Date.now() } });
     for (const w of this.ctx.getWebSockets()) try { w.send(text); } catch { /* closing */ }
@@ -66,6 +90,7 @@ export class Lobby extends DurableObject {
         const r = this.enqueue(sid, data.displayName, data.gameId);
         if (r.success) await this.touched();
         ack(r.success ? { success: true, position: r.position } : r);
+        if (r.success) await this.match();
         break;
       }
       case "leaveLobby": {
