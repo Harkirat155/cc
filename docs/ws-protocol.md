@@ -120,7 +120,7 @@ Source: server/handlers/voiceHandlers.js:62
 All server frames are unacked and carry no `id`.
 
 ### `gameUpdate`
-`{"t":"gameUpdate","d":{...}}` to the room, batched per tick. `d` is the full room state: `board`, `turn`, `winner`, `winningLine`, `xScore`, `oScore`, `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
+`{"t":"gameUpdate","d":{...}}` to the room. Express batches per tick; the Worker sends one after each handled frame. `d` is the full room state: `board`, `turn`, `winner`, `winningLine`, `xScore`, `oScore`, `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
 Source: server/roomPublisher.js:146, :183
 
 ### `gameReset`
@@ -164,5 +164,6 @@ Source: server/handlers/voiceHandlers.js:66
 Source: server/rateLimiter.js:113
 
 ### `server:shutdown`
+Express (Fly) host only; the Worker never sends it.
 `{"t":"server:shutdown","d":{"message":"Server is restarting"}}` to all sockets.
 Source: server/app.js:213

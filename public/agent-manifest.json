@@ -36,8 +36,8 @@
     "flow": [
       "Open wss://HOST/ws/lobby and read the hello frame.",
       "Send joinLobby ({\"t\":\"joinLobby\",\"id\":1,\"d\":{\"displayName\":\"Agent Bot\",\"gameId\":\"ttt\"}}); the ack is {\"success\":true,\"position\":n}. When two sockets are queued the lobby sends each of them matchFound with roomId, player (X or O), opponent and a one-time token.",
-      "Open /ws/room/{roomId} with the roomId from matchFound. To make a room yourself, open /ws/room/new and send createRoom; the ack carries the roomId.",
-      "On every room socket open, send joinRoom with roomId, clientId and, after a lobby match, the token. Keep the same clientId across reconnects.",
+      "Open /ws/room/{roomId} with the roomId from matchFound. To make a room yourself, open /ws/room/new and send createRoom instead of joinRoom; it seats you as X and the ack is {\"roomId\":string,\"player\":\"X\"}.",
+      "On /ws/room/{roomId}, on every socket open (reconnects too), send joinRoom with roomId, clientId and, after a lobby match, the token; the ack is {\"player\":\"X\"|\"O\"|\"spectator\"}. Keep the same clientId across reconnects. Do not send joinRoom on /ws/room/new: createRoom already seated you.",
       "Read gameUpdate. When status is \"active\" and turnSlot is your seat (X is 0, O is 1), send makeMove with roomId and move. makeMove has no ack; an illegal move is dropped silently.",
       "The game is over when gameUpdate.status is not \"active\"; winnerSlot is the winning slot, or \"draw\"."
     ]
@@ -191,6 +191,10 @@
           "clientId",
           "displayName",
           "gameId"
+        ],
+        "ackFields": [
+          "player",
+          "roomId"
         ]
       },
       {
@@ -201,6 +205,9 @@
           "displayName",
           "roomId",
           "token"
+        ],
+        "ackFields": [
+          "player"
         ]
       },
       {
@@ -217,6 +224,9 @@
         "payloadFields": [
           "clientId",
           "roomId"
+        ],
+        "ackFields": [
+          "ok"
         ]
       },
       {
@@ -248,6 +258,10 @@
         "payloadFields": [
           "gameId",
           "roomId"
+        ],
+        "ackFields": [
+          "gameId",
+          "success"
         ]
       },
       {
@@ -270,17 +284,27 @@
         "payloadFields": [
           "displayName",
           "gameId"
+        ],
+        "ackFields": [
+          "position",
+          "success"
         ]
       },
       {
         "name": "leaveLobby",
         "ack": true,
-        "payloadFields": []
+        "payloadFields": [],
+        "ackFields": [
+          "success"
+        ]
       },
       {
         "name": "getLobbyState",
         "ack": true,
-        "payloadFields": []
+        "payloadFields": [],
+        "ackFields": [
+          "queue"
+        ]
       },
       {
         "name": "voice:join",
@@ -343,6 +367,13 @@
           "winningCells",
           "winningLine",
           "xScore"
+        ],
+        "rosterFields": [
+          "O",
+          "OName",
+          "X",
+          "XName",
+          "spectators"
         ]
       },
       {
@@ -414,12 +445,6 @@
           "message",
           "retryAfter"
         ]
-      },
-      {
-        "name": "server:shutdown",
-        "payloadFields": [
-          "message"
-        ]
       }
     ]
   },
@@ -431,7 +456,7 @@
       "replacedBy": "protocol",
       "url": "https://crisscross-backend.fly.dev",
       "namespace": "/",
-      "path": "/socket.io/",
+      "path": "/socket.io",
       "version": "4.x",
       "transports": [
         "websocket",
@@ -654,10 +679,18 @@
             }
           },
           {
+            "name": "voice:mute-state",
+            "payload": {
+              "socketId": "socket-id",
+              "muted": true
+            }
+          },
+          {
             "name": "voice:signal",
             "payload": {
-              "fromId": "socket-id",
-              "data": {}
+              "from": "socket-id",
+              "data": {},
+              "roomId": "ABCDE"
             }
           }
         ]

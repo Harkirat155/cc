@@ -42,7 +42,12 @@ function specEvents() {
         const line = section.split('\n').find((l) => l.includes('full room state:'));
         fields = [...line.split('full room state:')[1].matchAll(/`([^`]+)`/g)].map((m) => m[1].split(':')[0]);
       }
-      events.push({ name, direction, ack: direction === 'client->server' && /"id":n/.test(frame), fields: fields.sort() });
+      const ackBody = section.match(/Ack: `(\{[^`]*\})`/)?.[1];
+      const ackFields = ackBody ? topLevelKeys(ackBody, 0).sort() : undefined;
+      const roster = section.match(/`roster:\{([^}]*)\}`/)?.[1];
+      const rosterFields = roster ? roster.split(',').map((k) => k.split(':')[0]).sort() : undefined;
+      if (direction === 'server->client' && /Express \(Fly\) host only/.test(section)) continue; // the manifest is the Worker protocol
+      events.push({ name, direction, ack: direction === 'client->server' && /"id":n/.test(frame), fields: fields.sort(), ackFields, rosterFields });
     }
   }
   return events;
@@ -50,7 +55,10 @@ function specEvents() {
 
 const req = { get: () => undefined, protocol: 'https' };
 const normalize = (events, direction) =>
-  events.map((e) => ({ name: e.name, direction, ack: Boolean(e.ack), fields: [...e.payloadFields].sort() }));
+  events.map((e) => ({
+    name: e.name, direction, ack: Boolean(e.ack), fields: [...e.payloadFields].sort(),
+    ackFields: e.ackFields && [...e.ackFields].sort(), rosterFields: e.rosterFields && [...e.rosterFields].sort(),
+  }));
 const fromManifest = (m) =>
   [...normalize(m.events.clientToServer, 'client->server'), ...normalize(m.events.serverToClient, 'server->client')];
 const byName = (list) => [...list].sort((a, b) => (a.direction + a.name).localeCompare(b.direction + b.name));
@@ -58,13 +66,16 @@ const byName = (list) => [...list].sort((a, b) => (a.direction + a.name).localeC
 describe('agent manifest v2 events equal docs/ws-protocol.md', () => {
   const expected = byName(specEvents());
 
-  test('the spec parser finds the 17 + 12 events', () => {
+  test('the spec parser finds the 17 + 11 Worker events with ack bodies and roster subfields', () => {
     expect(expected.filter((e) => e.direction === 'client->server')).toHaveLength(17);
-    expect(expected.filter((e) => e.direction === 'server->client')).toHaveLength(12);
+    expect(expected.filter((e) => e.direction === 'server->client')).toHaveLength(11);
+    expect(expected.find((e) => e.name === 'server:shutdown')).toBeUndefined(); // Express only
     expect(expected.find((e) => e.name === 'joinRoom')).toEqual({
       name: 'joinRoom', direction: 'client->server', ack: true, fields: ['clientId', 'displayName', 'roomId', 'token'],
+      ackFields: ['player'], rosterFields: undefined,
     });
-    expect(expected.find((e) => e.name === 'gameUpdate').fields).toContain('roster');
+    expect(expected.find((e) => e.name === 'createRoom').ackFields).toEqual(['player', 'roomId']);
+    expect(expected.find((e) => e.name === 'gameUpdate').rosterFields).toEqual(['O', 'OName', 'X', 'XName', 'spectators']);
   });
 
   test('buildAgentManifest publishes manifestVersion 2.0 with exactly those events', () => {
@@ -77,6 +88,23 @@ describe('agent manifest v2 events equal docs/ws-protocol.md', () => {
     const file = JSON.parse(readFileSync(join(root, 'public/agent-manifest.json'), 'utf8'));
     expect(file.manifestVersion).toBe('2.0');
     expect(byName(fromManifest(file))).toEqual(expected);
+  });
+
+  test('the file and the Express builder agree on the Socket.IO description', () => {
+    const file = JSON.parse(readFileSync(join(root, 'public/agent-manifest.json'), 'utf8')).deprecated.socketIo;
+    const built = buildAgentManifest(req).deprecated.socketIo;
+    for (const k of ['status', 'manifestVersion', 'sunset', 'replacedBy', 'url', 'namespace', 'path', 'transports']) {
+      expect({ [k]: built[k] }).toEqual({ [k]: file[k] });
+    }
+    // eventContract (builder) vs events (file): every contract event is in the file, with the same payload and ack keys.
+    const fileEvents = [...file.events.clientToServer, ...file.events.serverToClient];
+    for (const [name, c] of Object.entries(built.eventContract)) {
+      const f = fileEvents.find((e) => e.name === name && (c.direction === 'client->server') === file.events.clientToServer.includes(e));
+      expect(f).toBeDefined();
+      if (c.payload && f.payload) expect(Object.keys(f.payload).sort()).toEqual(Object.keys(c.payload).sort());
+      if (c.payload && f.payloadFields) expect(f.payloadFields).toEqual(expect.arrayContaining(Object.keys(c.payload))); // the builder shows a sample
+      expect(Object.keys(f.ack || {}).sort()).toEqual(Object.keys(c.ack || {}).sort());
+    }
   });
 
   test('both manifests name the same Worker host and list Socket.IO as deprecated with a sunset', () => {

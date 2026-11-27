@@ -9,26 +9,26 @@ const FRONTEND_ROOM_URL_FORMAT = 'https://harkirat155.github.io/cc/room/{roomId}
 
 const EVENTS = {
   clientToServer: [
-    { name: 'createRoom', ack: true, payloadFields: ['clientId', 'displayName', 'gameId'] },
-    { name: 'joinRoom', ack: true, payloadFields: ['clientId', 'displayName', 'roomId', 'token'] },
+    { name: 'createRoom', ack: true, payloadFields: ['clientId', 'displayName', 'gameId'], ackFields: ['player', 'roomId'] },
+    { name: 'joinRoom', ack: true, payloadFields: ['clientId', 'displayName', 'roomId', 'token'], ackFields: ['player'] },
     { name: 'updateDisplayName', ack: false, payloadFields: ['displayName', 'roomId'] },
-    { name: 'leaveRoom', ack: true, payloadFields: ['clientId', 'roomId'] },
+    { name: 'leaveRoom', ack: true, payloadFields: ['clientId', 'roomId'], ackFields: ['ok'] },
     { name: 'makeMove', ack: false, payloadFields: ['index', 'move', 'roomId'] },
     { name: 'resetGame', ack: false, payloadFields: ['roomId'] },
     { name: 'resetScores', ack: false, payloadFields: ['roomId'] },
-    { name: 'switchGame', ack: true, payloadFields: ['gameId', 'roomId'] },
+    { name: 'switchGame', ack: true, payloadFields: ['gameId', 'roomId'], ackFields: ['gameId', 'success'] },
     { name: 'requestNewGame', ack: false, payloadFields: ['roomId'] },
     { name: 'cancelNewGameRequest', ack: false, payloadFields: ['roomId'] },
-    { name: 'joinLobby', ack: true, payloadFields: ['displayName', 'gameId'] },
-    { name: 'leaveLobby', ack: true, payloadFields: [] },
-    { name: 'getLobbyState', ack: true, payloadFields: [] },
+    { name: 'joinLobby', ack: true, payloadFields: ['displayName', 'gameId'], ackFields: ['position', 'success'] },
+    { name: 'leaveLobby', ack: true, payloadFields: [], ackFields: ['success'] },
+    { name: 'getLobbyState', ack: true, payloadFields: [], ackFields: ['queue'] },
     { name: 'voice:join', ack: false, payloadFields: ['muted', 'roomId'] },
     { name: 'voice:leave', ack: false, payloadFields: ['roomId'] },
     { name: 'voice:mute-state', ack: false, payloadFields: ['muted', 'roomId'] },
     { name: 'voice:signal', ack: false, payloadFields: ['data', 'roomId', 'targetId'] },
   ],
   serverToClient: [
-    { name: 'gameUpdate', payloadFields: ['board', 'boardSpec', 'gameId', 'lastEvents', 'lastMove', 'lastMoveBy', 'marks', 'moveStyle', 'newGameRequestedAt', 'newGameRequester', 'oScore', 'playerInfo', 'roomId', 'roster', 'scores', 'status', 'turn', 'turnSlot', 'voiceRoster', 'winner', 'winnerSlot', 'winningCells', 'winningLine', 'xScore'] },
+    { name: 'gameUpdate', payloadFields: ['board', 'boardSpec', 'gameId', 'lastEvents', 'lastMove', 'lastMoveBy', 'marks', 'moveStyle', 'newGameRequestedAt', 'newGameRequester', 'oScore', 'playerInfo', 'roomId', 'roster', 'scores', 'status', 'turn', 'turnSlot', 'voiceRoster', 'winner', 'winnerSlot', 'winningCells', 'winningLine', 'xScore'], rosterFields: ['O', 'OName', 'X', 'XName', 'spectators'] },
     { name: 'gameReset', payloadFields: ['gameId', 'reason', 'roomId'] },
     { name: 'startGame', payloadFields: [] },
     { name: 'lobbyUpdate', payloadFields: ['queue', 'timestamp'] },
@@ -39,7 +39,6 @@ const EVENTS = {
     { name: 'voice:mute-state', payloadFields: ['muted', 'socketId'] },
     { name: 'voice:signal', payloadFields: ['data', 'from', 'roomId'] },
     { name: 'error', payloadFields: ['code', 'message', 'retryAfter'] },
-    { name: 'server:shutdown', payloadFields: ['message'] },
   ],
 };
 
@@ -58,8 +57,8 @@ const PROTOCOL = {
   flow: [
     'Open wss://HOST/ws/lobby and read the hello frame.',
     'Send joinLobby ({"t":"joinLobby","id":1,"d":{"displayName":"Agent Bot","gameId":"ttt"}}); the ack is {"success":true,"position":n}. When two sockets are queued the lobby sends each of them matchFound with roomId, player (X or O), opponent and a one-time token.',
-    'Open /ws/room/{roomId} with the roomId from matchFound. To make a room yourself, open /ws/room/new and send createRoom; the ack carries the roomId.',
-    'On every room socket open, send joinRoom with roomId, clientId and, after a lobby match, the token. Keep the same clientId across reconnects.',
+    'Open /ws/room/{roomId} with the roomId from matchFound. To make a room yourself, open /ws/room/new and send createRoom instead of joinRoom; it seats you as X and the ack is {"roomId":string,"player":"X"}.',
+    'On /ws/room/{roomId}, on every socket open (reconnects too), send joinRoom with roomId, clientId and, after a lobby match, the token; the ack is {"player":"X"|"O"|"spectator"}. Keep the same clientId across reconnects. Do not send joinRoom on /ws/room/new: createRoom already seated you.',
     'Read gameUpdate. When status is "active" and turnSlot is your seat (X is 0, O is 1), send makeMove with roomId and move. makeMove has no ack; an illegal move is dropped silently.',
     'The game is over when gameUpdate.status is not "active"; winnerSlot is the winning slot, or "draw".',
   ],
@@ -101,7 +100,6 @@ const SOCKET_EVENT_CONTRACT = {
     description: 'Apply a legal move for the seated player whose turn it is.',
     payload: {
       roomId: 'ABCDE',
-      index: 0,
       move: { type: 'place', cell: 0 },
     },
   },
