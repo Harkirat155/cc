@@ -29,6 +29,7 @@ export class Lobby extends DurableObject {
     // Agent Arena (docs/arena.md). Only the SHA-256 of a bot's key and of a registering IP is stored, never either value.
     sql.exec("CREATE TABLE IF NOT EXISTS bots (name TEXT NOT NULL, name_lc TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS bot_reg (ip_hash TEXT NOT NULL, at INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS settled_games (id TEXT PRIMARY KEY)");
     sql.exec("CREATE TABLE IF NOT EXISTS ratings (name_lc TEXT NOT NULL, game_id TEXT NOT NULL, rating REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, draws INTEGER NOT NULL, losses INTEGER NOT NULL, PRIMARY KEY (name_lc, game_id))");
   }
 
@@ -36,13 +37,18 @@ export class Lobby extends DurableObject {
     if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
     const sql = this.ctx.storage.sql;
     const now = Date.now();
-    const ipHash = await sha256(`ip:${ip}`);
+    const [ipHash, raw] = [await sha256(`ip:${ip}`), crypto.getRandomValues(new Uint8Array(24))];
+    const key = `ccb_${[...raw].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+    const keyHash = await sha256(key); // every await is above: the checks and the inserts below run uninterrupted
     sql.exec("DELETE FROM bot_reg WHERE at < ?", now - 3_600_000);
     if (sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM bot_reg WHERE ip_hash = ?", ipHash).one().n >= REG_PER_HOUR) return { status: 429, body: { error: "too many registrations from this address, try again in an hour" } };
     if (sql.exec("SELECT 1 FROM bots WHERE name_lc = ?", name.toLowerCase()).toArray().length) return { status: 409, body: { error: "name already taken" } };
-    const raw = crypto.getRandomValues(new Uint8Array(24));
-    const key = `ccb_${[...raw].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
-    sql.exec("INSERT INTO bots (name, name_lc, key_hash, created_at) VALUES (?, ?, ?, ?)", name, name.toLowerCase(), await sha256(key), now);
+    try {
+      sql.exec("INSERT INTO bots (name, name_lc, key_hash, created_at) VALUES (?, ?, ?, ?)", name, name.toLowerCase(), keyHash, now);
+    } catch (e) {
+      if (/UNIQUE|PRIMARY KEY|constraint/i.test(String(e))) return { status: 409, body: { error: "name already taken" } };
+      throw e;
+    }
     sql.exec("INSERT INTO bot_reg (ip_hash, at) VALUES (?, ?)", ipHash, now);
     return { status: 201, body: { name, key } };
   }
@@ -55,8 +61,9 @@ export class Lobby extends DurableObject {
 
   // One finished game. `a` and `b` are registered bot names or null (guest, fixed at ELO_START and never stored);
   // `score` is a's result: 1 win, 0.5 draw, 0 loss. Both sides use the ratings from before the game.
-  recordGame(gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): void {
+  recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): void {
     const sql = this.ctx.storage.sql;
+    if (sql.exec("INSERT OR IGNORE INTO settled_games (id) VALUES (?)", id).rowsWritten === 0) return; // already rated
     const get = (n: string | null) => (n ? sql.exec<{ rating: number }>("SELECT rating FROM ratings WHERE name_lc = ? AND game_id = ?", n.toLowerCase(), gameId).toArray()[0]?.rating ?? ELO_START : ELO_START);
     const [ra, rb] = [get(a), get(b)];
     const exp = 1 / (1 + 10 ** ((rb - ra) / 400));

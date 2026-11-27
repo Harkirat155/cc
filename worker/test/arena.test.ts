@@ -16,7 +16,7 @@ const until = async (pred: (a: Record<string, any[]>) => boolean) => {
 };
 const bot = async (name: string) => ((await (await register(name)).json()) as { key: string }).key;
 
-beforeEach(async () => { await sql((s) => { s.exec("DELETE FROM bots"); s.exec("DELETE FROM ratings"); s.exec("DELETE FROM bot_reg"); }); });
+beforeEach(async () => { await sql((s) => { s.exec("DELETE FROM bots"); s.exec("DELETE FROM ratings"); s.exec("DELETE FROM bot_reg"); s.exec("DELETE FROM settled_games"); }); });
 
 // A bot (or null = anonymous) creates a room, an opponent joins, X plays one move, then `loser` resigns.
 async function game(x: { name: string; key?: string }, o: { name: string; key?: string }, loser: "X" | "O", gameId = "ttt") {
@@ -124,6 +124,103 @@ describe("rated games", () => {
     const a = await open("/ws/room/new");
     const r = await a.call("createRoom", { clientId: "w", displayName: "W", botKey: "ccb_nope" });
     expect(r).toEqual({ error: "Invalid bot key" });
+  });
+});
+
+const quiet = async () => { await new Promise((r) => setTimeout(r, 100)); return (await arena()).games; };
+const room = (roomId: string): any => (env as any).ROOM.getByName(roomId);
+const botBySid = (roomId: string): Promise<Record<string, string>> => (runInDurableObject as any)(room(roomId), async (o: any) => ({ ...o.s.botBySid }));
+
+describe("rating identity is frozen at the first move", () => {
+  it("ignores a key presented only after the game started", async () => {
+    const key = await bot("Late");
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: "la", displayName: "G" });
+    const b = await open(`/ws/room/${roomId}`);
+    await b.call("joinRoom", { roomId, clientId: "lb", displayName: "G2" });
+    a.send("makeMove", { roomId, index: 4 });
+    await a.update(1);
+    expect((await b.call("joinRoom", { roomId, clientId: "lb", botKey: key })).player).toBe("O");
+    a.send("resign", { roomId });
+    expect(await quiet()).toEqual({});
+  });
+
+  it("does not let a substitute in a vacated seat inherit the result", async () => {
+    const ka = await bot("SubA");
+    const kb = await bot("SubB");
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: "sa", displayName: "A", botKey: ka });
+    const b = await open(`/ws/room/${roomId}`);
+    await b.call("joinRoom", { roomId, clientId: "sb", displayName: "G" });
+    a.send("makeMove", { roomId, index: 4 });
+    await a.update(1);
+    b.close();
+    const c = await open(`/ws/room/${roomId}`);
+    expect((await c.call("joinRoom", { roomId, clientId: "sc", botKey: kb })).player).toBe("O");
+    c.send("resign", { roomId });
+    expect(await quiet()).toEqual({});
+  });
+
+  it("takes a fresh snapshot for the game after a reset", async () => {
+    const key = await bot("Rematch");
+    const g = await game({ name: "Rematch", key }, { name: "Human" }, "O");
+    await until((a) => a.ttt?.[0]?.games === 1);
+    g.a.send("resetGame", { roomId: g.roomId });
+    await g.a.wait((f) => f.t === "gameReset");
+    await g.a.call("joinRoom", { roomId: g.roomId, clientId: "x" }); // keyless rejoin: no longer a bot
+    g.a.send("makeMove", { roomId: g.roomId, index: 4 }); // whoever has the turn moves; the other is dropped
+    g.b.send("makeMove", { roomId: g.roomId, index: 0 });
+    await new Promise((r) => setTimeout(r, 50));
+    g.b.send("resign", { roomId: g.roomId });
+    expect((await quiet()).ttt[0].games).toBe(1);
+  });
+});
+
+describe("botBySid hygiene", () => {
+  it("records a seated bot only, drops it on a keyless join and when the seat is freed", async () => {
+    const key = await bot("Seat");
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: "ha", displayName: "G" });
+    const b = await open(`/ws/room/${roomId}`);
+    await b.call("joinRoom", { roomId, clientId: "hb", botKey: key });
+    const c = await open(`/ws/room/${roomId}`);
+    expect((await c.call("joinRoom", { roomId, clientId: "hc", botKey: key })).player).toBe("spectator");
+    expect(Object.values(await botBySid(roomId))).toEqual(["Seat"]);
+    await b.call("joinRoom", { roomId, clientId: "hb" });
+    expect(await botBySid(roomId)).toEqual({});
+    await b.call("joinRoom", { roomId, clientId: "hb", botKey: key });
+    expect(Object.values(await botBySid(roomId))).toEqual(["Seat"]);
+    b.close();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await botBySid(roomId)).toEqual({});
+  });
+
+  it("says the arena is unavailable, not that the key is invalid, when the lookup fails", async () => {
+    const key = await bot("Down");
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: "da", displayName: "G" });
+    await (runInDurableObject as any)(room(roomId), async (o: any) => { o.lobby = () => ({ verifyBot: async () => { throw new Error("rpc"); } }); });
+    const b = await open(`/ws/room/${roomId}`);
+    expect(await b.call("joinRoom", { roomId, clientId: "db", botKey: key })).toEqual({ error: "Arena unavailable, try again" });
+    expect(await b.call("joinRoom", { roomId, clientId: "db", botKey: 5 })).toEqual({ error: "Invalid bot key" });
+  });
+});
+
+describe("lobby integrity", () => {
+  it("lets exactly one of many concurrent registrations of a name win, the rest get 409", async () => {
+    const s = (await Promise.all(Array.from({ length: 6 }, () => register("Racer")))).map((r) => r.status).sort();
+    expect(s).toEqual([201, 409, 409, 409, 409, 409]);
+  });
+
+  it("caps concurrent registrations from one IP at the hourly limit", async () => {
+    const s = (await Promise.all(Array.from({ length: 6 }, (_, i) => register(`Ip${i}`, "7.7.7.7")))).map((r) => r.status).sort();
+    expect(s).toEqual([201, 201, 201, 429, 429, 429]);
+  });
+
+  it("rates a settlement id once, however often it is recorded", async () => {
+    await bot("Idem");
+    await (runInDurableObject as any)((env as any).LOBBY.getByName("lobby"), async (o: Lobby) => { o.recordGame("g1", "ttt", "Idem", null, 1); o.recordGame("g1", "ttt", "Idem", null, 1); });
+    expect((await arena()).games.ttt[0]).toMatchObject({ rating: 1216, games: 1 });
   });
 });
 

@@ -14,6 +14,10 @@ A bot playing itself (same name both sides) is not rated. Rating is not proof of
 farm wins against a guest that resigns, so read it as "plays on this server", not as a ranking you can trust
 at small game counts. (Known limit; the kill rule for this bet is "no outside bot in 4 weeks".)
 
+Who is rated is frozen when a game's first move lands (each seat's bot or guest); keys presented later, or a
+substitute who takes a vacated seat, do not change that game. Known limit: a bot that disconnects mid-game
+is not rated for that game (its reconnect gets a new socket id, and there is no forfeit yet).
+
 ## Register
 
 Name: 3-24 characters of `A-Za-z0-9`, space, `_`, `-`; unique ignoring case; 3 registrations per IP per hour.
