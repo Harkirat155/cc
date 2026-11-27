@@ -239,8 +239,8 @@ export class Room extends DurableObject {
     const occupied = !!((s.players.X && live.has(s.players.X)) || (s.players.O && live.has(s.players.O)) || s.spectators.some((x) => live.has(x)));
     const due = Math.max(s.lastTouched + this.ttl(), ...Object.values(s.seatTokens).map((q) => q.exp));
     if (occupied || Date.now() <= due || s.abandonAt) {
-      const next = occupied ? Date.now() + this.ttl() : Math.max(due, Date.now());
-      await this.ctx.storage.setAlarm(s.abandonAt ? Math.min(next, s.abandonAt) : next);
+      const next = occupied ? Date.now() + this.ttl() : Date.now() <= due ? due : Infinity; // GC due: wait for the grace
+      await this.ctx.storage.setAlarm(Math.min(next, s.abandonAt ?? Infinity));
       this.armed = true;
       return;
     }
@@ -462,16 +462,17 @@ export class Room extends DurableObject {
         role = "spectator";
       }
     }
+    // A held seat goes back only to the rated bot itself (its botKey), never to a clientId alone.
+    if (role === "X" && s.abandonAt) {
+      if (bot.name && bot.name === s.rated?.X) { s.abandonAt = null; if (s.rated) s.rated.sidX = sid; }
+      else { if (s.players.X === sid) s.players.X = null; role = "spectator"; }
+    }
     if (role === "spectator") {
       if (!s.spectators.includes(sid)) s.spectators.push(sid);
     } else {
       s.spectators = s.spectators.filter((x) => x !== sid);
     }
     if (bot.name && role !== "spectator") s.botBySid[sid] = bot.name;
-    if (role === "X" && s.abandonAt) { // the departed bot is back: resume, and the new sid is the rated seat
-      s.abandonAt = null;
-      if (s.rated) s.rated.sidX = sid;
-    }
     this.setJoined(ws, true);
     await this.save();
     this.after.push(() => {

@@ -219,13 +219,13 @@ describe("no dodging a loss", () => {
     expect(bots(await rows(2))).toMatchObject({ games: 1, losses: 1 });
   });
 
-  it("resumes on the same clientId without a key", async () => {
+  it("gives the held seat back only on the bot's key, not on its clientId alone", async () => {
     const { a, roomId } = await played();
     a.close();
     await new Promise((r) => setTimeout(r, 50));
     const b = await open(`/ws/room/${roomId}`);
-    expect((await b.call("joinRoom", { roomId, clientId: `c${ipN}` })).player).toBe("X");
-    expect((await held(roomId)).abandonAt).toBeNull();
+    expect((await b.call("joinRoom", { roomId, clientId: `c${ipN}` })).player).toBe("spectator");
+    expect((await held(roomId)).abandonAt).not.toBeNull();
   });
 
   it("rates a rematch as a new game", async () => {
