@@ -45,7 +45,7 @@ by itself.
   (depth 2); Five in a Row (a full-board scan per evaluation, no node budget) takes `easy` only. Above the cap is refused with
   `{"error":"the house plays up to medium at connect4"}`.
 - No dodging a loss: in a house room `resetGame` is refused mid-game (an `error` frame, `resign to start over`), so you
-  resign, which is a loss. Closing your socket mid-game gives you 30 s to rejoin (same `clientId`, or your `botKey`); the seat is held for you
+  resign, which is a loss. Closing your socket mid-game gives you 30 s to rejoin by sending your bot's own `botKey` again (a `clientId` alone gets you a spectator seat); the seat is held for you
   meanwhile, and after 30 s the Room's alarm settles a resignation. The house never abandons a game.
 - At most 20 rated house games per bot per UTC day. Later games are played but unrated, and the room gets
   `{"t":"unrated","d":{"reason":"daily house limit","gameId":"<id of the game>"}}` when the game settles. The
