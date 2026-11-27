@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { validateDisplayName, validateGameId, validateIndex, validateRoomId } from "./validation";
 import { get as getRules } from "../../shared/games/registry.js";
 import { SLOT_TO_MARK } from "../../shared/games/ttt.js";
+import { chooseMove } from "../../shared/ai/bot.js";
 
 type Seat = "X" | "O";
 // Mirrors the room fields of server/roomManager.js:83-98 that bricks 5 touches. Socket ids are
@@ -41,7 +42,26 @@ interface RoomState {
   settled: boolean;
   // Who is rated for the current game, frozen when its first move lands: later key changes or a substitute do not count.
   rated: { id: string; X: string | null; O: string | null; sidX: string | null; sidO: string | null } | null;
+  // The house level when seat O is played by the Room itself (createRoom vsHouse), else null.
+  house: HouseLevel | null;
 }
+// The house (docs/arena.md): the Room plays seat O with shared/ai/bot.js. workerd freezes Date.now() during CPU
+// work, so bot.js's own 300 ms deadline never fires on hard; measured with a frozen clock, hard took 4.7 s a move on
+// Connect Four and far longer on Five in a Row. So the compute cap is the level: hard only where the search is
+// trivial (ttt), medium (depth 2) elsewhere. Anything above the cap is refused, never silently downgraded.
+export const HOUSE_SID = "house"; // not a socket: it can never be live, so it is exempt from the stale-seat sweep
+const HOUSE_LEVELS = ["easy", "medium", "hard"] as const;
+type HouseLevel = (typeof HOUSE_LEVELS)[number];
+export const houseName = (l: string) => `House (${l})`;
+const houseMax = (gameId: string): HouseLevel => (gameId === "ttt" ? "hard" : "medium");
+const mulberry32 = (a: number) => () => {
+  a = (a + 0x6d2b79f5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+// Same room, same position, same reply: the seed is the room code and the move count.
+const seed = (id: string, n: number) => [...id].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, n);
 // voice:signal payload cap, serialized. Express had none beyond the Socket.IO 1 MB frame.
 const MAX_SIGNAL_BYTES = 64 * 1024;
 // Express kept a matched seat across a reconnect for 2 min (connectionStateRecovery, app.js:186).
@@ -87,6 +107,7 @@ const fresh = (roomId: string): RoomState => ({
   botBySid: {},
   settled: false,
   rated: null,
+  house: null,
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearOffer = (s: RoomState) => { s.drawOfferer = null; };
@@ -261,7 +282,7 @@ export class Room extends DurableObject {
     void this.save();
     // A different sid in an occupied seat is a substitute: it does not inherit the result. An empty seat is fine.
     if ((s.players.X && s.players.X !== sidX) || (s.players.O && s.players.O !== sidO)) return;
-    if ((!x && !o) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
+    if ((!x && !o) || (s.house && (!x || !o)) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
     const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
     try { this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score).catch(() => {})); } catch { /* the leaderboard must never break the broadcast */ }
   }
@@ -307,20 +328,33 @@ export class Room extends DurableObject {
     if (!s || s.created) return { error: "Unable to create room, please try again" };
     const bot = await this.bot(p.botKey);
     if ("error" in bot) return bot;
+    const gameId = validateGameId(p.gameId); // roomManager.js:81 falls back to ttt for an unknown id
+    let house: HouseLevel | null = null;
+    if (p.vsHouse !== undefined) {
+      house = HOUSE_LEVELS.find((l) => l === p.vsHouse) ?? null;
+      if (!house) return { error: "vsHouse must be easy, medium or hard" };
+      if (!bot.name) return { error: "vsHouse needs a botKey" }; // a guest would feed the house a rating
+      if (HOUSE_LEVELS.indexOf(house) > HOUSE_LEVELS.indexOf(houseMax(gameId ?? "ttt"))) return { error: `the house plays up to ${houseMax(gameId ?? "ttt")} at ${gameId ?? "ttt"}` };
+    }
     const clientId = typeof p.clientId === "string" && p.clientId ? p.clientId : null;
     const sid = this.att(ws).sid;
     s.created = true;
-    s.listed = p.listPublicly === true;
+    s.listed = p.listPublicly === true && !house; // a house room is never public
     s.players.X = sid;
     if (bot.name) s.botBySid[sid] = bot.name;
     s.names.X = validateDisplayName(p.displayName);
-    const gameId = validateGameId(p.gameId); // roomManager.js:81 falls back to ttt for an unknown id
+    if (house) {
+      s.house = house;
+      s.players.O = HOUSE_SID;
+      s.names.O = houseName(house);
+      s.botBySid[HOUSE_SID] = houseName(house);
+    }
     if (gameId && gameId !== s.gameId) { s.gameId = gameId; s.state = getRules(gameId).createInitialState(); }
     if (clientId) s.seatByClient[clientId] = "X";
     this.setJoined(ws, true);
     await this.save();
     this.after.push(() => this.publish(ws));
-    return { roomId: s.roomId, player: "X" };
+    return house ? { roomId: s.roomId, player: "X", house: houseName(house) } : { roomId: s.roomId, player: "X" };
   }
 
   // server/handlers/roomHandlers.js:65-151.
@@ -334,7 +368,7 @@ export class Room extends DurableObject {
     if (!bot.name) delete s.botBySid[sid];
     // A seat held by a sid with no live socket is stale (eviction can close sockets without a close event).
     const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
-    for (const k of ["X", "O"] as const) if (s.players[k] && !live.has(s.players[k]!)) s.players[k] = null;
+    for (const k of ["X", "O"] as const) if (s.players[k] && s.players[k] !== HOUSE_SID && !live.has(s.players[k]!)) s.players[k] = null;
     s.spectators = s.spectators.filter((x) => live.has(x));
     const clientId = typeof p.clientId === "string" && p.clientId ? p.clientId : null;
     const name = validateDisplayName(p.displayName);
@@ -475,12 +509,26 @@ export class Room extends DurableObject {
     const slot = this.slot(s, ws);
     if (slot === -1) return;
     const move = p.move || (validateIndex(p.index) ? { type: "place", cell: p.index } : null);
-    if (!move) return;
+    if (!move || !this.play(s, slot, move)) return;
+    this.houseReply(s);
+    await this.save();
+    this.publish(ws);
+  }
+
+  // The house answers in the same turn, so the bot sees one gameUpdate carrying both moves (lastMove is the house's).
+  private houseReply(s: RoomState) {
+    if (!s.house || s.state?.status !== "active" || s.state.turn !== 1 || s.players.O !== HOUSE_SID) return;
+    const move = chooseMove(getRules(s.gameId), s.state, 1, s.house, mulberry32(seed(s.roomId, s.moves)));
+    if (move) this.play(s, 1, move);
+  }
+
+  // Apply a move for `slot` and update the room-level fields. False: illegal, nothing changed.
+  private play(s: RoomState, slot: 0 | 1, move: unknown): boolean {
     let result;
     try {
       result = getRules(s.gameId).applyMove(s.state, move as any, slot);
     } catch {
-      return;
+      return false;
     }
     s.state = result.state;
     const m = move as any;
@@ -496,8 +544,7 @@ export class Room extends DurableObject {
     }
     s.moves++;
     clearOffer(s);
-    await this.save();
-    this.publish(ws);
+    return true;
   }
 
   // gameHandlers.js:108. The slot that moved last does not start the next game (nextStarterSlot).
@@ -512,6 +559,7 @@ export class Room extends DurableObject {
       s.moves = 0;
       s.startedAt = null;
       s.rated = null;
+      this.houseReply(s);
     }, ws);
     if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
   }
@@ -554,6 +602,7 @@ export class Room extends DurableObject {
     const s = this.room(id);
     if (!s) return { success: false, error: "Room not found" };
     if (this.slot(s, ws) < 0) return { success: false, error: "Only seated players can switch games" };
+    if (s.house) return { success: false, error: "Not available against the house" };
     if (s.gameId === gameId) return { success: true, gameId };
     s.gameId = gameId;
     s.state = getRules(gameId).createInitialState();

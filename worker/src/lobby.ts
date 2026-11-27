@@ -13,6 +13,10 @@ const ARENA_TOP = 20;
 const ELO_K = 32;
 const ELO_START = 1200; // also the fixed rating of the unlisted guest pool (humans, unregistered bots)
 const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+// The house (Room plays seat O, docs/arena.md): rated like a bot, listed under these names. The parentheses are
+// outside BOT_NAME, so the exact names cannot be registered; RESERVED also catches "House easy", "house-easy", "HOUSE_HARD".
+const HOUSE_NAMES: Record<string, string> = { "house (easy)": "House (easy)", "house (medium)": "House (medium)", "house (hard)": "House (hard)" };
+const RESERVED = /^house(easy|medium|hard)$/;
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -35,6 +39,7 @@ export class Lobby extends DurableObject {
 
   async registerBot(name: unknown, ip: string): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
     if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
+    if (RESERVED.test(name.toLowerCase().replace(/[^a-z0-9]/g, ""))) return { status: 409, body: { error: "name reserved" } };
     const sql = this.ctx.storage.sql;
     const now = Date.now();
     const [ipHash, raw] = [await sha256(`ip:${ip}`), crypto.getRandomValues(new Uint8Array(24))];
@@ -85,9 +90,9 @@ export class Lobby extends DurableObject {
     for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
       out[game_id] = sql
         .exec<{ name: string; rating: number; games: number; wins: number; draws: number; losses: number }>(
-          "SELECT b.name AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? ORDER BY r.rating DESC, r.games DESC, b.name LIMIT ?", game_id, ARENA_TOP)
+          "SELECT COALESCE(b.name, r.name_lc) AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r LEFT JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? AND (b.name_lc IS NOT NULL OR r.name_lc LIKE 'house (%)') ORDER BY r.rating DESC, r.games DESC, name LIMIT ?", game_id, ARENA_TOP)
         .toArray()
-        .map((r) => ({ ...r, rating: Math.round(r.rating) }));
+        .map((r) => ({ ...r, name: HOUSE_NAMES[r.name] ?? r.name, rating: Math.round(r.rating) }));
     }
     return out;
   }

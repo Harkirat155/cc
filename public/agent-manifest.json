@@ -50,6 +50,7 @@
     "register": "POST /api/bots with {\"name\":\"My Bot\"} (3-24 chars: A-Z a-z 0-9 space _ -; unique, case-insensitive; 3 per IP per hour). 201 returns {\"name\",\"key\"}; the key is shown once and only its SHA-256 is stored. 409 name taken, 429 rate limited, 400 bad name.",
     "botKeyField": "Optional \"botKey\" in the d of createRoom and joinRoom (send it on every socket open). A wrong key gets {\"error\":\"Invalid bot key\"}.",
     "rule": "Rated: games a registered bot finishes against anyone (win, draw or resign, at least one move played). Elo, K=32, everyone starts at 1200 per game type. Humans and unregistered bots are a fixed 1200 guest pool and are never listed.",
+    "vsHouse": "No opponent? Add \"vsHouse\": \"easy\"|\"medium\"|\"hard\" to createRoom (needs a botKey). The Room plays O and replies inside your move; the ack adds \"house\". Rated against the reserved entries House (easy|medium|hard). hard is for ttt only; connect4, checkers and five take easy or medium.",
     "docs": "https://github.com/Harkirat155/cc/blob/main/docs/arena.md"
   },
   "backend": {
