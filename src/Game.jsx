@@ -15,6 +15,8 @@ import Walkthrough from "./components/Walkthrough";
 import ScorePanel from "./components/ScorePanel";
 import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
+import OpponentControl from "./components/OpponentControl";
+import useOpponent from "./hooks/useOpponent";
 import { getGamePalette } from "./components/games/palette";
 
 const Game = () => {
@@ -25,6 +27,7 @@ const Game = () => {
   // gameId='connect4'. Unknown values fall through and the server picks the
   // default ('ttt'), so this is safe to feed user input.
   const requestedGameId = searchParams.get("game") || null;
+  const { opponent, botSlot, setOpponent } = useOpponent();
   const {
     run: runWalkthrough,
     steps: walkthroughSteps,
@@ -64,7 +67,7 @@ const Game = () => {
     connectionState,
     displayName,
     updateDisplayName,
-  } = useSocketGame();
+  } = useSocketGame({ botSlot, botLevel: opponent.level });
   // Voice chat hook
   const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
     useVoiceChat({
@@ -330,6 +333,9 @@ const Game = () => {
             currentGameId={gameState?.gameId}
             onSwitchGame={!isMultiplayer || player ? switchGame : null}
           />
+          {!isMultiplayer && (
+            <OpponentControl opponent={opponent} onChange={setOpponent} />
+          )}
           <ScorePanel
             gameState={gameState}
             roster={roster}

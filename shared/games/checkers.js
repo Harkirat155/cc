@@ -202,6 +202,20 @@ function checkTerminal(state) {
   return { status: 'active', winner: null, line: [] };
 }
 
+// Heuristic for the computer opponent: material (kings worth more) plus a small
+// advancement bonus for men. Positive favours `slot`.
+function evaluate(state, slot) {
+  let score = 0;
+  for (let i = 0; i < state.board.length; i++) {
+    const p = state.board[i];
+    if (!p || typeof p !== 'object') continue;
+    const [r] = rc(i);
+    const value = p.type === 'king' ? 160 : 100 + 4 * (p.owner === 0 ? ROWS - 1 - r : r);
+    score += p.owner === slot ? value : -value;
+  }
+  return score;
+}
+
 function describeMove(move) {
   if (move.type !== 'transfer') return '';
   const captures = (move.captures || []).length;
@@ -224,6 +238,7 @@ const checkers = {
   applyMove,
   checkTerminal,
   describeMove,
+  evaluate,
 };
 
 export default checkers;

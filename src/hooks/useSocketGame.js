@@ -19,6 +19,9 @@ import {
 import "@shared/games/index.js"; // register built-in games on import
 import { get as getGameRules } from "@shared/games/registry.js";
 import { markToSlot } from "@shared/games/ttt.js";
+import { chooseMove } from "@shared/ai/bot.js";
+
+export const BOT_DELAY_MS = 400;
 
 // Local fallback uses the SAME rules engine the server uses. No duplicate
 // LINES/calcWinner here — that drift bug is gone. The UI still consumes the
@@ -103,7 +106,7 @@ function buildInitialLocalState(gameIdOverride) {
   return toLegacyLocalShape(getGameRules(gameId).createInitialState(), gameId);
 }
 
-export default function useSocketGame() {
+export default function useSocketGame({ botSlot = null, botLevel = "medium" } = {}) {
   const [gameState, setGameState] = useState(buildInitialLocalState);
   const [roomId, setRoomId] = useState(null);
   const [player, setPlayer] = useState(null);
@@ -399,6 +402,9 @@ export default function useSocketGame() {
         return;
       }
 
+      // The computer owns its own turns.
+      if (botSlot !== null && gameState.turnSlot === botSlot) return;
+
       // Local select-target flow.
       if (usesSelection && rules) {
         setGameState((current) => {
@@ -495,8 +501,39 @@ export default function useSocketGame() {
         return newState;
       });
     },
-    [isMultiplayer, player, playerSlot, roomId, gameState, selection, legalTargets, reconstructState, recordMove, resumeLatest]
+    [isMultiplayer, player, playerSlot, roomId, gameState, selection, legalTargets, reconstructState, recordMove, resumeLatest, botSlot]
   );
+
+  // Computer opponent (local screen only): plays its turn after a short delay.
+  useEffect(() => {
+    if (isMultiplayer || botSlot === null || gameState.winner) return undefined;
+    if (gameState.turnSlot !== botSlot || !gameState.__internal) return undefined;
+    const timer = setTimeout(() => {
+      const gameId = gameState.gameId || DEFAULT_GAME_ID;
+      const rules = getGameRules(gameId);
+      const move = chooseMove(rules, gameState.__internal, botSlot, botLevel);
+      if (!move) return;
+      let result;
+      try { result = rules.applyMove(gameState.__internal, move, botSlot); } catch { return; }
+      let nextInternal = result.state;
+      if (nextInternal.status === "win") {
+        const scores = [...(gameState.__internal.scores || [0, 0])];
+        scores[nextInternal.winner] = (scores[nextInternal.winner] || 0) + 1;
+        nextInternal = { ...nextInternal, scores };
+      }
+      const next = toLegacyLocalShape(nextInternal, gameId);
+      const text = next.winner
+        ? next.winner === "draw" ? "Draw" : `${next.winner} wins`
+        : `${next.turn}'s turn`;
+      recordMove(next.board.slice(), text, next.winner ? (next.winner === "draw" ? "draw" : "win") : "move", {
+        move, events: result.events, slot: botSlot,
+      });
+      setSelection(null);
+      if (next.winner) setShowModal(true);
+      setGameState(next);
+    }, BOT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isMultiplayer, botSlot, botLevel, gameState, recordMove]);
 
   const resetGame = useCallback(() => {
     finalizeCurrentGame(gameState.winner);
