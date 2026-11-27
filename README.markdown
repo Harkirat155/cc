@@ -100,3 +100,10 @@ Frontend variables:
 ## Architecture
 
 Read `ARCHITECTURE.md` for the current frontend/server/shared-game layout and `server/README.md` for backend-specific details.
+
+## Usage counts
+The site sends anonymous counts to [tally](https://tally.harkirat-hira.workers.dev): one `view` per load, and one event per finished game (`vs_computer`, `local_game`, `online_game`, `finished_<game>`). Counts only: no cookies, no IPs, no identifiers. Read them:
+
+```sh
+curl -s 'https://tally.harkirat-hira.workers.dev/stats?p=cc&days=7'
+```

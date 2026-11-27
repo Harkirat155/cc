@@ -18,6 +18,7 @@ import FeedbackDialog from "./components/FeedbackDialog";
 import OpponentControl from "./components/OpponentControl";
 import useOpponent from "./hooks/useOpponent";
 import { getGamePalette } from "./components/games/palette";
+import { tally } from "./lib/tally";
 
 const Game = () => {
   const navigate = useNavigate();
@@ -68,6 +69,16 @@ const Game = () => {
     displayName,
     updateDisplayName,
   } = useSocketGame({ botSlot, botLevel: opponent.level });
+
+  // Usage counts for the progress board (tally: counts only, no identifiers).
+  useEffect(() => { tally("cc", "view"); }, []);
+  const finishedGameId = gameState?.winner ? gameState.gameId || "ttt" : null;
+  const finishedMode = isMultiplayer ? "online_game" : botSlot !== null ? "vs_computer" : "local_game";
+  useEffect(() => {
+    if (!finishedGameId) return;
+    tally("cc", finishedMode);
+    tally("cc", `finished_${finishedGameId}`);
+  }, [finishedGameId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Voice chat hook
   const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
     useVoiceChat({
