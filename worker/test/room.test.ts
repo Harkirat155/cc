@@ -441,4 +441,11 @@ describe("rate limit", () => {
     mv(a, 4);
     await a.wait((f) => f.t === "gameUpdate" && f.d.board[4] === "X", n);
   }, 10_000);
+
+  it("counts frames that are not JSON, as Express counts every event", async () => {
+    const { a } = await pair();
+    const n = a.frames.length;
+    for (let i = 0; i < 60; i++) a.ws.send("not json");
+    expect((await a.wait((f) => f.t === "error", n)).d.code).toBe("RATE_LIMITED");
+  });
 });

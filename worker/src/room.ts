@@ -88,6 +88,12 @@ export class Room extends DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    // Every frame counts, parseable or not, as every Socket.IO event does in rateLimiter.js.
+    const retryAfter = this.limited(ws);
+    if (retryAfter) {
+      ws.send(JSON.stringify({ t: "error", d: { code: "RATE_LIMITED", message: `Too many requests. Retry after ${retryAfter}s`, retryAfter } }));
+      return;
+    }
     if (typeof raw !== "string") return;
     let f: unknown;
     try {
@@ -96,11 +102,6 @@ export class Room extends DurableObject {
       return;
     }
     if (!f || typeof f !== "object") return;
-    const retryAfter = this.limited(ws);
-    if (retryAfter) {
-      ws.send(JSON.stringify({ t: "error", d: { code: "RATE_LIMITED", message: `Too many requests. Retry after ${retryAfter}s`, retryAfter } }));
-      return;
-    }
     const { t, id, d } = f as { t?: unknown; id?: unknown; d?: unknown };
     const data: Msg = d && typeof d === "object" ? (d as Msg) : {};
     const ack = (body: unknown) => {
