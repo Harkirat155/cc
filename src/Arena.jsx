@@ -120,7 +120,7 @@ function Arena() {
                       )}
                       {open === `${id}/${b.name}` && (() => { const r = recent[`${id}/${b.name}`]; return (
                         <div id={`recent-${id}-${encodeURIComponent(b.name)}`} aria-live="polite" className="mt-1 text-xs font-normal text-foreground/70">
-                          {r === "error" ? <p role="alert">Could not load this bot's games</p>
+                          {r === "error" ? <p role="alert">{"Could not load this bot's games"}</p>
                             : !r || r === "loading" ? <p>Loading…</p>
                             : r.games.length === 0 ? <p>No rated games recorded since {SINCE}</p>
                             : <ul>{r.games.map((g, i) => <li key={i}>{`${VERB[g.result] ?? g.result} vs ${g.opponent} · ${names[g.gameId] || g.gameId} · ${g.ratingAfter}`}</li>)}</ul>}
