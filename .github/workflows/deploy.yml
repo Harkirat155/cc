@@ -23,6 +23,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      # deploy runs only when this job built and uploaded the Pages artifact
+      built: ${{ steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,6 +92,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    if: needs.build.outputs.built == 'true'
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
