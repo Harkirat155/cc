@@ -3,6 +3,7 @@ import { Lobby } from "./lobby";
 import { cors } from "./cors";
 import { Room } from "./room";
 import { feedback } from "./feedback";
+import { genCode, validateRoomId } from "./validation";
 
 export { Lobby, Room };
 
@@ -54,6 +55,24 @@ app.get("/health", (c) => {
 });
 
 app.route("/", feedback);
+
+// Room socket (docs/ws-protocol.md). "new" has the Worker pick a free code (ADR 0001 substitution table);
+// the client then sends createRoom. Any other segment is an existing room code.
+app.get("/ws/room/:roomId", async (c) => {
+  if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") return c.text("expected websocket", 426);
+  const raw = c.req.param("roomId");
+  if (raw !== "new") {
+    const id = validateRoomId(raw);
+    if (!id) return c.json({ error: "Invalid room ID" }, 400);
+    return c.env.ROOM.getByName(id).fetch(c.req.raw);
+  }
+  for (let i = 0; i < 10; i++) {
+    const id = genCode();
+    const stub = c.env.ROOM.getByName(id);
+    if (await stub.init(id)) return stub.fetch(c.req.raw);
+  }
+  return c.json({ error: "Unable to create room, please try again" }, 503);
+});
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
