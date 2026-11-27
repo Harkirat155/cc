@@ -20,6 +20,10 @@ Every frame is one JSON text message: `{"t":"<event>","id"?:n,"d"?:{...}}`.
 - `id` (integer, client-chosen, unique per socket): present only on a frame that wants an ack.
 - Ack frame, server to client, once per acked request: `{"t":"ack","id":n,"d":{...}}`. `d` is exactly the
   object the Socket.IO ack callback received (`{"error":"..."}` on failure). Not an event; it has no section.
+- `hello`, Worker only: `{"t":"hello","d":{"sid":string}}` is the first frame the server sends on every socket
+  (Room and Lobby), before any ack or event. `sid` is that socket's server id, the one in `roster`,
+  `voiceRoster` and the lobby queue's `socketId`. The shim sets `socket.id` to it and does not pass it to app
+  listeners; each route swap opens a new socket and so a new `sid`. Not an Express event, so it has no section.
 - No ack is ever sent for a frame without `id`. A client times out an ack on its own clock.
 - Seat token (new in v2): `matchFound.d.token` is one-time. Every Room socket open sends `joinRoom` with
   `clientId` plus that `token`; the Room binds it once.

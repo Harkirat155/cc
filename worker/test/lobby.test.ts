@@ -10,6 +10,14 @@ const clear = () => runInDurableObject(lobby(), async (_o, st) => { st.storage.s
 const lobbyOf = () => open("/ws/lobby");
 
 describe("Lobby queue (server/lobbyManager.test.js)", () => {
+  it("sends hello with the socket's sid as the first frame, and the queue lists that sid", async () => {
+    await clear();
+    const a = await lobbyOf();
+    await a.call("joinLobby", { displayName: "Alice" });
+    expect(a.frames[0]).toEqual({ t: "hello", d: { sid: expect.any(String) } });
+    expect((await a.call("getLobbyState")).queue[0].socketId).toBe(a.frames[0].d.sid);
+  });
+
   it("validates the display name and defaults the game", async () => {
     await clear();
     const a = await lobbyOf();

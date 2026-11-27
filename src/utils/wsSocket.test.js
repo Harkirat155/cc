@@ -220,3 +220,22 @@ describe("route swaps under real timing (review of #51)", () => {
     expect(last().sent.map((f) => f.t)).toEqual(["joinLobby"]);
   });
 });
+
+describe("hello frame", () => {
+  test("sets socket.id and is not emitted; a swap adopts the new socket's sid", () => {
+    const s = make(); last().open();
+    const onHello = jest.fn(); s.on("hello", onHello);
+    const lobby = last();
+    expect(s.id).toMatch(/^c-/);
+    lobby.recv({ t: "hello", d: { sid: "lobby-sid" } });
+    expect(s.id).toBe("lobby-sid");
+    expect(onHello).not.toHaveBeenCalled();
+    s.emit("joinRoom", { roomId: "ABCDE" });
+    last().open();
+    expect(s.id).toBe("lobby-sid"); // until the Room's hello arrives
+    lobby.recv({ t: "hello", d: { sid: "stale" } });
+    expect(s.id).toBe("lobby-sid"); // a replaced socket's hello is ignored
+    last().recv({ t: "hello", d: { sid: "room-sid" } });
+    expect(s.id).toBe("room-sid");
+  });
+});

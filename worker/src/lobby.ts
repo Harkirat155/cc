@@ -138,7 +138,9 @@ export class Lobby extends DurableObject {
     if (req.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("expected websocket", { status: 426 });
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ sid: crypto.randomUUID() } satisfies Att);
+    const sid = crypto.randomUUID();
+    server.serializeAttachment({ sid } satisfies Att);
+    server.send(JSON.stringify({ t: "hello", d: { sid } }));
     return new Response(null, { status: 101, webSocket: client });
   }
 }

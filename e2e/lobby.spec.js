@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { square, youAre, twoPlayers, expect } from "./helpers.js";
+import { square, youAre, youBadge, twoPlayers, expect } from "./helpers.js";
 
 // The seat each frame names: matchFound on the lobby socket, then the Room's ack to joinRoom.
 const seats = (page) => {
@@ -36,9 +36,11 @@ test("two browsers matched through the lobby hold opposite seats and see each ot
     return square(o, 2, 2).isDisabled();
   }).toBe(true);
   await expect(youAre(x, "X").first()).toBeVisible();
+  await expect(youBadge(x)).toHaveCount(1);
   await expect(youAre(o, "X")).toHaveCount(0);
 
   await square(o, 3, 3).click();
   await expect(youAre(o, "O").first()).toBeVisible();
+  await expect(youBadge(o)).toHaveCount(1);
   await expect(square(x, 3, 3)).toBeDisabled(); // X sees O's reply
 });
