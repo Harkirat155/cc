@@ -96,6 +96,27 @@ app.post("/api/bots", async (c) => {
 
 app.get("/api/arena", async (c) => c.json({ games: await c.env.LOBBY.getByName("lobby").listArena() }, 200, { "Cache-Control": "public, max-age=10" }));
 
+// Rating badge for a bot's README (docs/arena.md): a flat SVG, no storage. Unknown bot or no games: grey "unrated", still 200.
+const BADGE_GAMES: Record<string, string> = { ttt: "Tic-Tac-Toe", connect4: "Connect Four", checkers: "Checkers", five: "Five in a Row" };
+const XML: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" };
+const xml = (s: string) => s.replace(/[<>&"']/g, (ch) => XML[ch]);
+app.get("/api/arena/badge/:file", async (c) => {
+  const game = c.req.query("game") ?? "";
+  if (!Object.hasOwn(BADGE_GAMES, game)) return c.json({ error: "game must be ttt, connect4, checkers or five" }, 400);
+  const m = /^(.+)\.svg$/i.exec(c.req.param("file")); // Hono already percent-decodes the param (a malformed escape stays raw)
+  if (!m) return c.json({ error: "not found" }, 404);
+  const name = m[1];
+  const r = name.length <= 24 ? await c.env.LOBBY.getByName("lobby").ratingOf(name, game) : null;
+  const left = `CrissCross ${BADGE_GAMES[game]}`;
+  const right = r ? String(r.rating) : "unrated";
+  const title = `${r ? `${r.name}: ${right}` : "Unrated"} in ${BADGE_GAMES[game]} on CrissCross. A rating is "plays on this server", not proof of strength.`;
+  const [lw, rw] = [left.length * 6.5 + 12, right.length * 6.5 + 12];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lw + rw}" height="20" role="img" aria-label="${xml(left)}: ${xml(right)}"><title>${xml(title)}</title>` +
+    `<rect width="${lw}" height="20" fill="#555"/><rect x="${lw}" width="${rw}" height="20" fill="${r ? "#4c1" : "#9f9f9f"}"/>` +
+    `<g fill="#fff" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" text-anchor="middle"><text x="${lw / 2}" y="14">${xml(left)}</text><text x="${lw + rw / 2}" y="14">${xml(right)}</text></g></svg>`;
+  return c.body(svg, 200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": `public, max-age=${r ? 300 : 60}` });
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

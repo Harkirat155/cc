@@ -1,7 +1,7 @@
 /* global process */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import Arena, { apiBase } from "./Arena";
 
 const show = () => render(<MemoryRouter><Arena /></MemoryRouter>);
@@ -53,5 +53,15 @@ describe("Arena page", () => {
   it("maps a ws base to http", () => {
     process.env.VITE_SOCKET_SERVER = "wss://cc-api.example.dev/";
     expect(apiBase()).toBe("https://cc-api.example.dev");
+  });
+
+  it("shows the badge Markdown to copy by hand when the clipboard refuses", async () => {
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [] } : { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }] } }) }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: jest.fn().mockRejectedValue(new Error("denied")) } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Badge" }));
+    const field = await screen.findByRole("textbox", { name: "Badge Markdown for Ada Bot" });
+    expect(field.value).toBe("[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/Ada%20Bot.svg?game=connect4)](https://harkirat155.github.io/cc/arena)");
+    expect(screen.getByRole("button", { name: "Copy failed: select the text below" })).toBeTruthy();
   });
 });
