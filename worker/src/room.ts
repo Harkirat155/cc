@@ -55,7 +55,12 @@ export class Room extends DurableObject {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       const st = (await ctx.storage.get<RoomState>("room")) ?? null;
-      this.s = st && { ...fresh(st.roomId), ...st }; // rooms stored before brick 6 have no game state
+      if (st && (!st.state || typeof st.state !== "object")) {
+        // Rooms stored before brick 6 have no game state and an unvalidated gameId (brick 5 createRoom).
+        st.gameId = validateGameId(st.gameId) ?? "ttt";
+        st.state = getRules(st.gameId).createInitialState();
+      }
+      this.s = st && { ...fresh(st.roomId), ...st };
     });
   }
 

@@ -393,4 +393,26 @@ describe("game: hibernation", () => {
     expect(w.board).toEqual(["X", "X", "", "O", "", "", "", "", ""]);
     expect(w).toMatchObject({ turn: "O", turnSlot: 1, lastMoveBy: 0 });
   });
+
+  // Brick 5 stored createRoom's gameId unvalidated and no game state (c69e01d room.ts:109).
+  it.each([
+    ["connect4", "connect4", 42],
+    ["nope", "ttt", 9],
+  ])("wakes a pre-brick-6 room stored with gameId %s as %s with a %i-cell board", async (stored, gameId, cells) => {
+    const { a, ack } = await newRoom("c1");
+    const stub = rooms().getByName(ack.roomId);
+    await runInDurableObject(stub, async (_o, state) => {
+      const room = await state.storage.get<any>("room");
+      delete room.state;
+      room.gameId = stored;
+      await state.storage.put("room", room);
+    });
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+    const b = await open(`/ws/room/${ack.roomId}`);
+    await b.call("joinRoom", { roomId: ack.roomId, clientId: "c2" });
+    const w = await b.update();
+    expect(w.gameId).toBe(gameId);
+    expect(w.board).toHaveLength(cells);
+    a.close();
+  });
 });
