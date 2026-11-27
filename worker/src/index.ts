@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { Lobby } from "./lobby";
 import { cors } from "./cors";
 import { Room } from "./room";
+import { feedback } from "./feedback";
 
 export { Lobby, Room };
 
@@ -51,6 +52,8 @@ app.get("/health", (c) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.route("/", feedback);
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
