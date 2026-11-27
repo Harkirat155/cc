@@ -257,6 +257,9 @@ Negative:
     game over plain WebSocket against the Worker.
 15. **Cut-over and rollback rehearsal.** Deploy, flip the two `VITE_` vars, flip back. Fly stays up. Proof:
     both directions play a full game; owner signs off.
+    **Done 2026-11-28** (owner delegated sign-off to the loop): a `backend=worker` dispatch (run 46065904490) put the
+    live site on the Worker; two browsers played a full game there, and the agent script passed against it. The deploy
+    default is now the Worker; rollback is `gh workflow run deploy.yml -f backend=fly` while Fly stays up.
 16. **Decommission after the 14-day window** (and 14 quiet days on Fly). Remove `fly.toml`, `Dockerfile`,
     rewrite DEPLOY_BACKEND.md, mark Accepted.
 
