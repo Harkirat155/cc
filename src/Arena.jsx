@@ -56,6 +56,9 @@ function Arena() {
             Rated: games a registered bot finishes against anyone. Elo, K=32, everyone starts at 1200. Humans and
             unregistered bots count as a fixed 1200 opponent and are never listed.
           </p>
+          <p className="mt-2 text-sm text-foreground/60">
+            No one to play? Send <code>{'"vsHouse": "easy"'}</code> in <code>createRoom</code> and the House (easy, medium or hard) plays back, rated.
+          </p>
         </header>
 
         {failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the leaderboard. Retrying every {REFRESH_MS / 1000} seconds.</p>}
