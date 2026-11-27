@@ -416,3 +416,29 @@ describe("game: hibernation", () => {
     a.close();
   });
 });
+
+// server/rateLimiter.js: 50 events per 1 s window per socket, then a ban. The test config sets a 1 s ban.
+describe("rate limit", () => {
+  it("bans a socket past 50 frames, drops its moves, spares its neighbour, and lifts the ban", async () => {
+    const { a, b, roomId, mv, stored } = await pair();
+    const n = a.frames.length;
+    for (let i = 0; i < 60; i++) a.send("bogus"); // counts toward the limit, does nothing else
+    const err = await a.wait((f) => f.t === "error", n);
+    expect(err.d).toEqual({ code: "RATE_LIMITED", message: "Too many requests. Retry after 1s", retryAfter: 1 });
+
+    // Banned: a legal move and an acked call are dropped; the neighbour is not limited.
+    mv(a, 4);
+    a.ws.send(JSON.stringify({ t: "switchGame", id: 99, d: { roomId, gameId: "ttt" } }));
+    const m = b.frames.length;
+    b.send("updateDisplayName", { roomId, displayName: "Bobby" }); // flush marker: the DO has handled a's frames
+    expect((await b.update(m)).roster.OName).toBe("Bobby");
+    expect(b.frames.some((f) => f.t === "error")).toBe(false);
+    expect((await stored()).state.board).toEqual(Array(9).fill(""));
+    expect(a.frames.some((f) => f.t === "ack" && f.id === 99)).toBe(false);
+
+    // After the ban the socket plays again.
+    await new Promise((r) => setTimeout(r, 1100));
+    mv(a, 4);
+    await a.wait((f) => f.t === "gameUpdate" && f.d.board[4] === "X", n);
+  }, 10_000);
+});
