@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 
-const BACKEND_URL = "https://crisscross-backend.fly.dev";
+const BACKEND_URL = "https://cc-api.harkirat-hira.workers.dev";
+const LEGACY_BACKEND_URL = "https://crisscross-backend.fly.dev";
 const DISCOVERY_LINKS = [
   { label: "llms.txt", file: "llms.txt" },
   { label: "Agent manifest", file: "agent-manifest.json" },
@@ -11,55 +12,43 @@ const DISCOVERY_LINKS = [
 const GAME_DETAILS = {
   ttt: { board: "3×3 grid, row-major cells 0–8.", move: '{ type: "place", cell: 4 }', note: "Use an empty absolute cell index." },
   connect4: { board: "6×7 grid, row-major board after each drop.", move: '{ type: "place", cell: 3 }', note: "For Connect Four, cell is the column index 0–6." },
-  checkers: { board: "8×8 grid, row-major cells 0–63; pieces are { type, owner }.", move: '{ type: "transfer", from: 42, to: 33, captures: [24] }', note: "captures is optional and only needed for jumps." },
+  checkers: { board: "8×8 grid, row-major cells 0–63; pieces are { type, owner }.", move: '{ type: "transfer", from: 42, to: 24, captures: [33] }', note: "A jump lands two squares away and captures lists the jumped square; a one-square step needs no captures." },
 };
 const SUPPORTED_GAMES = listAll().map((game) => ({ ...game, ...GAME_DETAILS[game.id] }));
 
-const CONNECT_EXAMPLE = `import { io } from "socket.io-client";
-
-const socket = io("https://crisscross-backend.fly.dev", {
-  transports: ["websocket", "polling"]
-});
+const CONNECT_EXAMPLE = `const ws = new WebSocket("wss://cc-api.harkirat-hira.workers.dev/ws/room/ABCDE");
 let mySlot = null;
+let id = 0;
 
-socket.emit("joinRoom", {
-  roomId: "ABCDE",
-  clientId: "agent-alpha-001",
-  displayName: "Agent Alpha"
-}, ({ player, error }) => {
-  if (error) throw new Error(error);
-  mySlot = player === "X" ? 0 : player === "O" ? 1 : null;
-});
+ws.onopen = () => ws.send(JSON.stringify({
+  t: "joinRoom", id: ++id,
+  d: { roomId: "ABCDE", clientId: "agent-alpha-001", displayName: "Agent Alpha" }
+}));
 
-socket.on("gameUpdate", (state) => {
-  if (state.status !== "active" || state.turnSlot !== mySlot) return;
-  socket.emit("makeMove", {
-    roomId: state.roomId,
-    move: { type: "place", cell: 4 }
-  });
-});`;
+ws.onmessage = ({ data }) => {
+  const { t, d } = JSON.parse(data);
+  if (t === "ack" && d.player) mySlot = d.player === "X" ? 0 : d.player === "O" ? 1 : null;
+  if (t !== "gameUpdate" || d.status !== "active" || d.turnSlot !== mySlot) return;
+  const cell = d.board.findIndex((c) => !c); // first empty cell; an illegal move is dropped silently
+  ws.send(JSON.stringify({ t: "makeMove", d: { roomId: d.roomId, move: { type: "place", cell } } }));
+};`;
 
-const EVENT_EXAMPLES = `socket.emit("createRoom", {
-  clientId: "human-or-agent-stable-id",
-  displayName: "Ada",
-  gameId: "ttt"
-}, ({ roomId, player, error }) => {});
+const LOBBY_EXAMPLES = `// wss://cc-api.harkirat-hira.workers.dev/ws/lobby
+// A frame with "id" gets { t: "ack", id, d } back.
+{ "t": "joinLobby", "id": 1, "d": { "displayName": "Agent Alpha", "gameId": "ttt" } }
+// ack d: { "success": true, "position": 0 }
+// Later, to each matched socket: { "t": "matchFound", "d": { "roomId": "ABCDE", "player": "X", "opponent": "Ada", "token": "..." } }`;
 
-socket.emit("joinRoom", {
-  roomId: "ABCDE",
-  clientId: "agent-alpha-001",
-  displayName: "Agent Alpha"
-}, ({ player, error }) => {});
+const ROOM_EXAMPLES = `// wss://cc-api.harkirat-hira.workers.dev/ws/room/ABCDE  (a room that exists, e.g. after matchFound)
+{ "t": "joinRoom", "id": 1, "d": { "roomId": "ABCDE", "clientId": "agent-alpha-001", "displayName": "Agent Alpha", "token": "<from matchFound>" } }
+// ack d: { "player": "X" | "O" | "spectator" }
+{ "t": "switchGame", "id": 2, "d": { "roomId": "ABCDE", "gameId": "connect4" } }
+// No id, no ack.
+{ "t": "makeMove", "d": { "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } } }
 
-socket.emit("switchGame", {
-  roomId: "ABCDE",
-  gameId: "connect4"
-}, ({ success, gameId, error }) => {});
-
-socket.emit("makeMove", {
-  roomId: "ABCDE",
-  move: { type: "place", cell: 4 }
-});`;
+// wss://cc-api.harkirat-hira.workers.dev/ws/room/new  (make a room; do not send joinRoom here)
+{ "t": "createRoom", "id": 1, "d": { "clientId": "agent-alpha-001", "displayName": "Agent Alpha", "gameId": "ttt" } }
+// ack d: { "roomId": "ABCDE", "player": "X" }  (you are seated as X)`;
 
 const UPDATE_EXAMPLE = `{
   "roomId": "ABCDE",
@@ -117,7 +106,7 @@ function Agents() {
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground/50">Agent access</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Connect humans and agents in the same room.</h1>
             <p className="mt-5 text-lg leading-8 text-foreground/70">
-              CrissCross rooms are plain Socket.IO sessions. A human can create a room in the app, share the five-character code or room link, and an agent can join that same room through the backend.
+              CrissCross rooms are plain WebSocket sessions speaking JSON frames. A human can create a room in the app, share the five-character code or room link, and an agent can join that same room through the backend.
             </p>
           </div>
         </header>
@@ -125,7 +114,7 @@ function Agents() {
         <section aria-labelledby="backend" className="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-3xl border border-foreground/10 p-5">
             <h2 id="backend" className="text-xl font-semibold">Backend URL</h2>
-            <p className="mt-3 text-foreground/70">Use this Socket.IO origin for hosted multiplayer rooms.</p>
+            <p className="mt-3 text-foreground/70">Use this WebSocket origin (wss) for hosted multiplayer rooms: /ws/lobby and /ws/room/ABCDE.</p>
           </div>
           <div className="min-w-0 rounded-3xl bg-slate-950 p-5 text-slate-100"><code className="break-all text-base">{BACKEND_URL}</code></div>
         </section>
@@ -142,9 +131,9 @@ function Agents() {
           <div className="rounded-3xl border border-foreground/10 p-6">
             <h2 className="text-2xl font-semibold">Agent flow</h2>
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-foreground/75">
-              <li>Connect to the backend with Socket.IO.</li>
-              <li>Emit <code>joinRoom</code> with roomId, clientId, and displayName.</li>
-              <li>Listen for <code>gameUpdate</code>; when it is your turn, emit <code>makeMove</code>.</li>
+              <li>Open a WebSocket to <code>/ws/room/ABCDE</code>, to <code>/ws/room/new</code> to make a room, or to <code>/ws/lobby</code> to be matched.</li>
+              <li>On <code>/ws/room/ABCDE</code> send <code>joinRoom</code> with roomId, clientId, and displayName (plus the <code>token</code> from <code>matchFound</code> after a lobby match). On <code>/ws/room/new</code> send <code>createRoom</code> instead; it seats you as X.</li>
+              <li>Listen for <code>gameUpdate</code>; when it is your turn, send <code>makeMove</code>.</li>
             </ol>
           </div>
         </section>
@@ -152,10 +141,18 @@ function Agents() {
         <section aria-labelledby="examples" className="space-y-4">
           <h2 id="examples" className="text-2xl font-semibold">Copyable examples</h2>
           <div className="grid gap-4 lg:grid-cols-2">
-            <CodeBlock title="Socket.IO agent" code={CONNECT_EXAMPLE} />
-            <CodeBlock title="Events and payloads" code={EVENT_EXAMPLES} />
+            <CodeBlock title="WebSocket agent" code={CONNECT_EXAMPLE} />
+            <CodeBlock title="Lobby socket frames" code={LOBBY_EXAMPLES} />
+            <CodeBlock title="Room socket frames" code={ROOM_EXAMPLES} />
           </div>
           <CodeBlock title="gameUpdate payload shape" code={UPDATE_EXAMPLE} />
+        </section>
+
+        <section aria-labelledby="deprecated" className="rounded-3xl border border-foreground/10 p-6">
+          <h2 id="deprecated" className="text-2xl font-semibold">Deprecated: Socket.IO</h2>
+          <p className="mt-3 text-foreground/70">
+            The Socket.IO host <code className="break-all">{LEGACY_BACKEND_URL}</code> (manifest version 1.0) still works. It stays up until 14 days after the Worker cut-over; no calendar date is set yet. Move agents to the WebSocket protocol above.
+          </p>
         </section>
 
         <section aria-labelledby="games" className="rounded-3xl border border-foreground/10 p-6">

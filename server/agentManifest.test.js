@@ -98,21 +98,27 @@ describe('GET /agent/manifest.json', () => {
 
     expect(response.body).toMatchObject({
       name: 'CrissCross Agent Manifest',
-      manifestVersion: '1.0',
+      manifestVersion: '2.0',
       app: {
         name: 'CrissCross',
         packageName: 'crisscross-tictactoe',
         version: '1.0.0',
       },
-      backend: {
-        detectedUrl: 'https://agent.example.test',
-        productionUrl: 'https://crisscross-backend.fly.dev',
+      protocol: {
+        type: 'websocket-json',
+        url: 'https://cc-api.harkirat-hira.workers.dev',
+        routes: { lobby: '/ws/lobby', room: '/ws/room/{roomId}', newRoom: '/ws/room/new' },
       },
-      socket: {
-        serverUrl: 'https://agent.example.test',
-        namespace: '/',
-        path: '/socket.io',
-        transports: ['websocket', 'polling'],
+      deprecated: {
+        socketIo: {
+          status: 'deprecated',
+          sunset: expect.stringContaining('14 days after the Worker cut-over'),
+          url: 'https://crisscross-backend.fly.dev',
+          detectedUrl: 'https://agent.example.test',
+          namespace: '/',
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+        },
       },
       roomUrlFormat: 'https://harkirat155.github.io/cc/room/{roomId}',
     });
@@ -143,7 +149,7 @@ describe('GET /agent/manifest.json', () => {
       ])
     );
 
-    expect(Object.keys(response.body.eventContract)).toEqual(
+    expect(Object.keys(response.body.deprecated.socketIo.eventContract)).toEqual(
       expect.arrayContaining([
         'createRoom',
         'joinRoom',
@@ -154,6 +160,7 @@ describe('GET /agent/manifest.json', () => {
         'joinLobby',
       ])
     );
+    expect(response.body.events.clientToServer.map((e) => e.name)).toContain('makeMove');
     expect(response.body.notes.join(' ')).toContain('rate limits');
     expect(response.body.notes.join(' ')).toContain('non-privileged');
   });

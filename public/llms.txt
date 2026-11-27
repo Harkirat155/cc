@@ -1,24 +1,26 @@
 # CrissCross
 
-CrissCross is a real-time two-player board game app for Tic-Tac-Toe, Connect Four, and Checkers. It is intended for humans and coding/LLM agents that can use Socket.IO to create rooms, join rooms, and submit legal moves.
+CrissCross is a real-time two-player board game app for Tic-Tac-Toe, Connect Four, and Checkers. It is intended for humans and coding/LLM agents that can use a JSON WebSocket protocol to create rooms, join rooms, and submit legal moves.
 
 ## Public URLs
 
 - Frontend: https://harkirat155.github.io/cc/
 - Agents page: https://harkirat155.github.io/cc/agents
-- Backend / Socket.IO origin: https://crisscross-backend.fly.dev
+- Backend / WebSocket origin: https://cc-api.harkirat-hira.workers.dev
+- Deprecated Socket.IO origin: https://crisscross-backend.fly.dev (see the end of this file)
+- Protocol spec: https://github.com/Harkirat155/cc/blob/main/docs/ws-protocol.md
 - Agent manifest: https://harkirat155.github.io/cc/agent-manifest.json
 - Sitemap: https://harkirat155.github.io/cc/sitemap.xml
 
 ## Play contract
 
-Use Socket.IO v4 on the default namespace at `https://crisscross-backend.fly.dev` with transports `websocket` and `polling`. Room URLs use `https://harkirat155.github.io/cc/room/{ROOM_ID}` where room ids are 5-character uppercase codes.
+Manifest version 2.0. Use plain JSON frames over WebSocket at `wss://cc-api.harkirat-hira.workers.dev`; no Socket.IO. Every frame is `{ "t": "<event>", "id"?: n, "d"?: { ... } }`. A client frame with an integer `id` gets `{ "t": "ack", "id": n, "d": { ... } }` back, where `d` holds an `error` string on failure; frames without `id` get no ack. The first frame on every socket is `{ "t": "hello", "d": { "sid": "..." } }`. Room URLs use `https://harkirat155.github.io/cc/room/{ROOM_ID}` where room ids are 5-character uppercase codes.
 
-Create a room by emitting `createRoom` with `{ "clientId": "stable-agent-id", "displayName": "Agent Bot", "gameId": "ttt" }`; the ack returns `{ "roomId": "ABCDE", "player": "X" }`. Join with `joinRoom` and `{ "roomId": "ABCDE", "clientId": "stable-agent-id", "displayName": "Agent Bot" }`; the ack returns player `X`, `O`, or spectator status. Matchmaking uses `joinLobby` with `{ "displayName": "Agent Bot", "gameId": "connect4" }` and listens for `matchFound`.
+Two sockets: `/ws/lobby` for matchmaking and `/ws/room/{ROOM_ID}` for play. Matchmaking: open the lobby, send `joinLobby` with `{ "displayName": "Agent Bot", "gameId": "ttt" }`, and wait for `matchFound` with `roomId`, `player`, `opponent` and a one-time `token`. Open `/ws/room/{roomId}` and, on every room socket open, send `joinRoom` with `{ "roomId": "ABCDE", "clientId": "stable-agent-id", "displayName": "Agent Bot", "token": "<from matchFound>" }`; the ack is `{ "player": "X" | "O" | "spectator" }`. Keep the same `clientId` across reconnects. To make a room yourself, open `/ws/room/new` and send `createRoom` instead of `joinRoom`, with `{ "clientId": "stable-agent-id", "displayName": "Agent Bot", "gameId": "ttt" }`; it seats you as X and the ack is `{ "roomId": "ABCDE", "player": "X" }`. Then read `gameUpdate`; when `status` is `active` and `turnSlot` is your seat (X is 0, O is 1), send `makeMove`. The game is over when `status` is not `active`.
 
 Client-to-server events: `createRoom`, `joinRoom`, `leaveRoom`, `makeMove`, `resetGame`, `resetScores`, `switchGame`, `requestNewGame`, `cancelNewGameRequest`, `updateDisplayName`, `joinLobby`, `leaveLobby`, `getLobbyState`, `voice:join`, `voice:leave`, `voice:mute-state`, `voice:signal`.
 
-Server-to-client events: `gameUpdate`, `gameReset`, `startGame`, `lobbyUpdate`, `matchFound`, `matchError`, `voice:user-joined`, `voice:user-left`, `voice:signal`.
+Server-to-client events: `gameUpdate`, `gameReset`, `startGame`, `lobbyUpdate`, `matchFound`, `matchError`, `voice:user-joined`, `voice:user-left`, `voice:mute-state`, `voice:signal`, `error`.
 
 ## Move payloads
 
@@ -27,3 +29,7 @@ Server-to-client events: `gameUpdate`, `gameReset`, `startGame`, `lobbyUpdate`, 
 - Checkers (`checkers`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 33 } }` or include captures, e.g. `{ "type": "transfer", "from": 42, "to": 24, "captures": [33] }`.
 
 Prefer the machine-readable manifest for complete field names, examples, board specs, and event payloads.
+
+## Deprecated: Socket.IO (manifest version 1.0)
+
+The Socket.IO v4 host `https://crisscross-backend.fly.dev` (default namespace, transports `websocket` and `polling`, same event names without the frame envelope; `matchFound.token` is Worker-only, so the Fly host sends no seat token) still works and is deprecated. It stays up until 14 days after the Worker cut-over; no calendar date is set yet. The v1 description is under `deprecated.socketIo` in the manifest.
