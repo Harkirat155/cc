@@ -24,7 +24,11 @@ interface RoomState {
   newGameRequestedAt: number | null;
   // One-time seat tokens from Lobby.reserveSeats (brick 8): token -> seat and expiry (ms epoch).
   seatTokens: Record<string, { seat: Seat; exp: number }>;
+  // Voice chat members (brick 9): sid -> muted. Room state, not attachment, so publish reads one place.
+  voice: Record<string, { muted: boolean }>;
 }
+// voice:signal payload cap, serialized. Express had none beyond the Socket.IO 1 MB frame.
+const MAX_SIGNAL_BYTES = 64 * 1024;
 // Express kept a matched seat across a reconnect for 2 min (connectionStateRecovery, app.js:186).
 const TOKEN_TTL_MS = 120_000;
 interface Att {
@@ -55,6 +59,7 @@ const fresh = (roomId: string): RoomState => ({
   newGameRequester: null,
   newGameRequestedAt: null,
   seatTokens: {},
+  voice: {},
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.lastMoveBy = null; };
@@ -139,6 +144,10 @@ export class Room extends DurableObject {
       case "requestNewGame": await this.game(data, (s) => { s.newGameRequester = this.att(ws).sid; s.newGameRequestedAt = Date.now(); }, ws); break;
       case "cancelNewGameRequest": await this.game(data, clearRequest, ws); break;
       case "switchGame": ack(await this.switchGame(ws, data)); break;
+      case "voice:join": await this.voiceSet(ws, data, "voice:user-joined"); break;
+      case "voice:mute-state": await this.voiceSet(ws, data, "voice:mute-state"); break;
+      case "voice:leave": await this.voiceLeave(ws, data); break;
+      case "voice:signal": this.voiceSignal(ws, data); break;
     }
     for (const f of this.after.splice(0)) f();
   }
@@ -156,7 +165,9 @@ export class Room extends DurableObject {
   private async drop(ws: WebSocket): Promise<void> {
     const s = this.s;
     const sid = this.att(ws).sid;
-    if (!s || !sid || !this.free(s, sid)) return;
+    if (!s || !sid) return;
+    const voiced = this.dropVoice(s, sid);
+    if (!this.free(s, sid) && !voiced) return;
     await this.save();
     this.publish(ws);
   }
@@ -281,11 +292,14 @@ export class Room extends DurableObject {
     const s = this.s;
     if (!s?.created || s.roomId !== validateRoomId(p.roomId)) return { error: "Room not found" };
     const clientId = typeof p.clientId === "string" ? p.clientId : null;
-    const changed = this.free(s, this.att(ws).sid);
+    const sid = this.att(ws).sid;
+    const voiced = this.dropVoice(s, sid);
+    const changed = this.free(s, sid);
     const hadSeat = !!clientId && clientId in s.seatByClient;
     if (clientId) delete s.seatByClient[clientId];
     if (!changed) {
-      if (hadSeat) await this.save(); // the reservation delete must survive hibernation
+      if (hadSeat || voiced) await this.save(); // the reservation delete must survive hibernation
+      if (voiced) this.publish(ws);
       return { error: "Not in room" };
     }
     this.setJoined(ws, false);
@@ -370,6 +384,50 @@ export class Room extends DurableObject {
     return { success: true, gameId };
   }
 
+  // server/handlers/voiceHandlers.js. Express emits these without acks, so none here. Unjoined sockets
+  // are ignored: they would otherwise show up in the roster and reach members.
+  private async voiceSet(ws: WebSocket, p: Msg, event: string) {
+    const s = this.room(p.roomId);
+    if (!s || !this.att(ws).joined) return;
+    const sid = this.att(ws).sid;
+    const muted = Boolean(p.muted);
+    s.voice[sid] = { muted };
+    await this.save();
+    this.others(ws, { t: event, d: { socketId: sid, muted } });
+    this.publish(ws);
+  }
+
+  private async voiceLeave(ws: WebSocket, p: Msg) {
+    const s = this.room(p.roomId);
+    if (!s || !this.att(ws).joined || !this.dropVoice(s, this.att(ws).sid)) return;
+    await this.save();
+    this.publish(ws);
+  }
+
+  // Relay to exactly one live, joined socket of THIS room: the Worker is room-scoped, unlike Express
+  // (socket.to(targetId) reaches any socket on the server).
+  private voiceSignal(ws: WebSocket, p: Msg) {
+    const s = this.room(p.roomId);
+    const sid = this.att(ws).sid;
+    const { targetId, data } = p;
+    if (!s || !this.att(ws).joined || typeof targetId !== "string" || !targetId || targetId === sid || !data) return;
+    const json = JSON.stringify(data);
+    if (new TextEncoder().encode(json).length > MAX_SIGNAL_BYTES) return;
+    const text = `{"t":"voice:signal","d":{"from":${JSON.stringify(sid)},"data":${json},"roomId":${JSON.stringify(s.roomId)}}}`;
+    for (const w of this.ctx.getWebSockets()) {
+      const a = this.att(w);
+      if (a.joined && a.sid === targetId) { try { w.send(text); } catch { /* closing */ } return; }
+    }
+  }
+
+  // Remove sid from voice and tell the others. True if it was in voice.
+  private dropVoice(s: RoomState, sid: string): boolean {
+    if (!s.voice[sid]) return false;
+    delete s.voice[sid];
+    this.others(sid, { t: "voice:user-left", d: { socketId: sid } });
+    return true;
+  }
+
   private free(s: RoomState, sid: string): boolean {
     let changed = false;
     for (const k of ["X", "O"] as const) if (s.players[k] === sid) { s.players[k] = null; changed = true; }
@@ -411,6 +469,16 @@ export class Room extends DurableObject {
     ws.serializeAttachment({ ...this.att(ws), joined });
   }
 
+  // Every joined socket except the sender (socket.to(room)).
+  private others(from: WebSocket | string, frame: object) {
+    const sid = typeof from === "string" ? from : this.att(from).sid;
+    const text = JSON.stringify(frame);
+    for (const w of this.ctx.getWebSockets()) {
+      const a = this.att(w);
+      if (a.joined && a.sid !== sid) try { w.send(text); } catch { /* closing */ }
+    }
+  }
+
   private broadcast(frame: object) {
     const text = JSON.stringify(frame);
     for (const w of this.ctx.getWebSockets()) if (this.att(w).joined) try { w.send(text); } catch { /* closing */ }
@@ -420,6 +488,12 @@ export class Room extends DurableObject {
   private publish(_ws: WebSocket) {
     const s = this.s;
     if (!s?.created) return;
+    // Voice entries of sockets that no longer exist (lost in an eviction) are removed here, so no path
+    // republishes a ghost; every handler saves before publish, so the prune is saved on its own.
+    const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
+    const ghosts = Object.keys(s.voice).filter((k) => !live.has(k));
+    for (const k of ghosts) { delete s.voice[k]; this.others("", { t: "voice:user-left", d: { socketId: k } }); }
+    if (ghosts.length) void this.save();
     const nameOf = (k: Seat) => {
       const sid = s.players[k];
       return !sid ? null : (s.names[k] ?? (sid.length > 8 ? `${sid.slice(0, 5)}…` : sid));
@@ -455,7 +529,7 @@ export class Room extends DurableObject {
         roomId: s.roomId,
         gameId: s.gameId,
         roster: { X: s.players.X, O: s.players.O, XName: nameOf("X"), OName: nameOf("O"), spectators: s.spectators },
-        voiceRoster: {}, // TODO(brick 9): voice roster
+        voiceRoster: Object.fromEntries(Object.entries(s.voice).map(([k, v]) => [k, { muted: Boolean(v?.muted) }])),
       },
     });
   }
