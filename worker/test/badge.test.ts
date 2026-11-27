@@ -5,7 +5,7 @@ import app from "../src/index";
 import type { Lobby } from "../src/lobby";
 
 const sql = <T>(fn: (s: any) => T) => runInDurableObject((env as any).LOBBY.getByName("lobby"), async (_o: Lobby, st) => fn(st.storage.sql));
-const badge = (name: string, q = "?game=connect4") => app.fetch(new Request(`http://x/api/arena/badge/${name}.svg${q}`), env);
+const badge = (name: string, q = "?game=connect4", ext = ".svg") => app.fetch(new Request(`http://x/api/arena/badge/${name}${ext}${q}`), env);
 const seed = (name: string, game: string, rating: number) =>
   sql((s) => {
     s.exec("INSERT OR REPLACE INTO bots (name, name_lc, key_hash, created_at) VALUES (?, ?, ?, 0)", name, name.toLowerCase(), `h${name}`);
@@ -43,6 +43,23 @@ describe("GET /api/arena/badge/:name.svg", () => {
     expect(svg).toContain("CrissCross Connect Four");
     expect(svg).toContain("unrated");
     expect(svg).toContain("#9f9f9f");
+    expect(r.headers.get("content-type")).toContain("image/svg+xml");
+    expect(r.headers.get("cache-control")).toBe("public, max-age=60");
+  });
+
+  it("accepts .SVG in any case; a missing or other suffix is 404", async () => {
+    await seed("Gamma", "ttt", 1210);
+    expect(await (await badge("Gamma", "?game=ttt", ".SVG")).text()).toContain("1210");
+    expect((await badge("Gamma", "?game=ttt", "")).status).toBe(404);
+    expect((await badge("Gamma", "?game=ttt", ".png")).status).toBe(404);
+  });
+
+  it("decodes the name once, and a malformed escape is unrated 200", async () => {
+    await seed("a%41", "ttt", 1230);
+    expect(await (await badge("a%2541", "?game=ttt")).text()).toContain("1230");
+    const r = await badge("%zz", "?game=ttt");
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain("unrated");
   });
 
   it("returns 400 for a missing or unknown game", async () => {

@@ -103,8 +103,9 @@ const xml = (s: string) => s.replace(/[<>&"']/g, (ch) => XML[ch]);
 app.get("/api/arena/badge/:file", async (c) => {
   const game = c.req.query("game") ?? "";
   if (!Object.hasOwn(BADGE_GAMES, game)) return c.json({ error: "game must be ttt, connect4, checkers or five" }, 400);
-  let name = c.req.param("file").replace(/\.svg$/, "");
-  try { name = decodeURIComponent(name); } catch { /* keep the raw text: it simply will not match a bot */ }
+  const m = /^(.+)\.svg$/i.exec(c.req.param("file")); // Hono already percent-decodes the param (a malformed escape stays raw)
+  if (!m) return c.json({ error: "not found" }, 404);
+  const name = m[1];
   const r = name.length <= 24 ? await c.env.LOBBY.getByName("lobby").ratingOf(name, game) : null;
   const left = `CrissCross ${BADGE_GAMES[game]}`;
   const right = r ? String(r.rating) : "unrated";
@@ -113,7 +114,7 @@ app.get("/api/arena/badge/:file", async (c) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lw + rw}" height="20" role="img" aria-label="${xml(left)}: ${xml(right)}"><title>${xml(title)}</title>` +
     `<rect width="${lw}" height="20" fill="#555"/><rect x="${lw}" width="${rw}" height="20" fill="${r ? "#4c1" : "#9f9f9f"}"/>` +
     `<g fill="#fff" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11" text-anchor="middle"><text x="${lw / 2}" y="14">${xml(left)}</text><text x="${lw + rw / 2}" y="14">${xml(right)}</text></g></svg>`;
-  return c.body(svg, 200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "public, max-age=300" });
+  return c.body(svg, 200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": `public, max-age=${r ? 300 : 60}` });
 });
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
