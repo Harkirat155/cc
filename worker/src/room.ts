@@ -53,7 +53,9 @@ export const HOUSE_SID = "house"; // not a socket: it can never be live, so it i
 const HOUSE_LEVELS = ["easy", "medium", "hard"] as const;
 type HouseLevel = (typeof HOUSE_LEVELS)[number];
 export const houseName = (l: string) => `House (${l})`;
-const houseMax = (gameId: string): HouseLevel => (gameId === "ttt" ? "hard" : "medium");
+// Five in a Row scans the whole 15x15 board per evaluation and bot.js has no node budget at medium, so it is easy only.
+const HOUSE_MAX: Record<string, HouseLevel> = { ttt: "hard", connect4: "medium", checkers: "medium", five: "easy" };
+const houseMax = (gameId: string): HouseLevel => HOUSE_MAX[gameId] ?? "easy";
 const mulberry32 = (a: number) => () => {
   a = (a + 0x6d2b79f5) | 0;
   let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -284,7 +286,11 @@ export class Room extends DurableObject {
     if ((s.players.X && s.players.X !== sidX) || (s.players.O && s.players.O !== sidO)) return;
     if ((!x && !o) || (s.house && (!x || !o)) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
     const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
-    try { this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score).catch(() => {})); } catch { /* the leaderboard must never break the broadcast */ }
+    try {
+      this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score)
+        .then((r) => { if (r === "limit") this.broadcast({ t: "unrated", d: { reason: "daily house limit" } }); })
+        .catch(() => {}));
+    } catch { /* the leaderboard must never break the broadcast */ }
   }
 
   private ttl() {
@@ -317,7 +323,13 @@ export class Room extends DurableObject {
     if (!s || !sid) return;
     this.touch();
     const voiced = this.dropVoice(s, sid);
+    const wasX = s.players.X === sid;
     if (!this.free(s, sid) && !voiced) return;
+    // House rooms: leaving a game in progress is a resignation, so walking away never dodges a loss.
+    if (s.house && wasX && s.state?.status === "active" && s.moves > 0) {
+      s.state = { ...s.state, status: "win", winner: 1, winningCells: [], scores: [s.state.scores?.[0] || 0, (s.state.scores?.[1] || 0) + 1] };
+      clearOffer(s);
+    }
     await this.save();
     await this.arm();
     this.publish(ws);
@@ -549,6 +561,11 @@ export class Room extends DurableObject {
 
   // gameHandlers.js:108. The slot that moved last does not start the next game (nextStarterSlot).
   private async resetGame(ws: WebSocket, p: Msg) {
+    const h = this.room(p.roomId);
+    if (h?.house && h.state?.status === "active" && h.moves > 0 && this.slot(h, ws) >= 0) { // else a bot resets whenever it is losing
+      ws.send(JSON.stringify({ t: "error", d: { code: "HOUSE_RESIGN", message: "resign to start over" } }));
+      return;
+    }
     const ran = await this.game(p, (s) => {
       const prev = s.state;
       const over = prev?.status === "win" || prev?.status === "draw";

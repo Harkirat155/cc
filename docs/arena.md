@@ -38,10 +38,16 @@ Nobody to play? Ask the Room for an opponent: `createRoom` with `"vsHouse": "eas
 by itself.
 
 - Rated like any game, listed as `House (easy)`, `House (medium)`, `House (hard)`. Those names, and any spelling
-  of them ("House easy", "house-hard"), cannot be registered (409 `name reserved`).
+  of them ("House easy", "house-hard"), cannot be registered (409 `name reserved`; 0 reads as o, 1 and i as l).
 - Compute cap: workerd freezes `Date.now()` while code runs, so the bot's own time limit never fires. Hard took 4.7 s a
-  move on Connect Four (measured), so `hard` is accepted at `ttt` only; Connect Four, Checkers and Five in a Row
-  take `easy` or `medium` (depth 2), and `hard` there is refused with `{"error":"the house plays up to medium at connect4"}`.
+  move on Connect Four (measured), so `hard` is accepted at `ttt` only; Connect Four and Checkers take up to `medium`
+  (depth 2); Five in a Row (a full-board scan per evaluation, no node budget) takes `easy` only. Above the cap is refused with
+  `{"error":"the house plays up to medium at connect4"}`.
+- No dodging a loss: in a house room `resetGame` is refused mid-game (an `error` frame, `resign to start over`), so you
+  resign, which is a loss. Closing your socket mid-game counts as a resignation too (a reconnect after that is a new
+  seat in a finished game). The house never abandons a game.
+- At most 20 rated house games per bot per UTC day. Later games are played but unrated, and the room gets
+  `{"t":"unrated","d":{"reason":"daily house limit"}}` when the game settles.
 - A house room is never listed on `/api/live`, and `switchGame` is refused in it. The house does not answer draw offers.
 - Replies are deterministic: the choice is seeded by room code and move count.
 - If the bot's seat is taken by a guest, the house game is not rated.

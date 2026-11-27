@@ -16,7 +16,8 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 // The house (Room plays seat O, docs/arena.md): rated like a bot, listed under these names. The parentheses are
 // outside BOT_NAME, so the exact names cannot be registered; RESERVED also catches "House easy", "house-easy", "HOUSE_HARD".
 const HOUSE_NAMES: Record<string, string> = { "house (easy)": "House (easy)", "house (medium)": "House (medium)", "house (hard)": "House (hard)" };
-const RESERVED = /^house(easy|medium|hard)$/;
+const RESERVED = /^house(easy|medlum|hard)$/; // compared after 0->o, 1/i->l and stripping everything else
+const HOUSE_DAILY = 20; // rated house games per bot per UTC day; later ones are played but unrated
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -34,12 +35,13 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS bots (name TEXT NOT NULL, name_lc TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS bot_reg (ip_hash TEXT NOT NULL, at INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS settled_games (id TEXT PRIMARY KEY)");
+    sql.exec("CREATE TABLE IF NOT EXISTS house_games (name_lc TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (name_lc, day))");
     sql.exec("CREATE TABLE IF NOT EXISTS ratings (name_lc TEXT NOT NULL, game_id TEXT NOT NULL, rating REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, draws INTEGER NOT NULL, losses INTEGER NOT NULL, PRIMARY KEY (name_lc, game_id))");
   }
 
   async registerBot(name: unknown, ip: string): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
     if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
-    if (RESERVED.test(name.toLowerCase().replace(/[^a-z0-9]/g, ""))) return { status: 409, body: { error: "name reserved" } };
+    if (RESERVED.test(name.toLowerCase().replace(/0/g, "o").replace(/[1i]/g, "l").replace(/[^a-z]/g, ""))) return { status: 409, body: { error: "name reserved" } };
     const sql = this.ctx.storage.sql;
     const now = Date.now();
     const [ipHash, raw] = [await sha256(`ip:${ip}`), crypto.getRandomValues(new Uint8Array(24))];
@@ -66,9 +68,17 @@ export class Lobby extends DurableObject {
 
   // One finished game. `a` and `b` are registered bot names or null (guest, fixed at ELO_START and never stored);
   // `score` is a's result: 1 win, 0.5 draw, 0 loss. Both sides use the ratings from before the game.
-  recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): void {
+  recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): "rated" | "skipped" | "limit" {
     const sql = this.ctx.storage.sql;
-    if (sql.exec("INSERT OR IGNORE INTO settled_games (id) VALUES (?)", id).rowsWritten === 0) return; // already rated
+    if (sql.exec("INSERT OR IGNORE INTO settled_games (id) VALUES (?)", id).rowsWritten === 0) return "skipped"; // already rated
+    const house = [a, b].some((n) => n && HOUSE_NAMES[n.toLowerCase()]);
+    const bot = house ? (a && HOUSE_NAMES[a.toLowerCase()] ? b : a) : null;
+    if (bot) {
+      const day = new Date().toISOString().slice(0, 10);
+      const used = sql.exec<{ n: number }>("SELECT n FROM house_games WHERE name_lc = ? AND day = ?", bot.toLowerCase(), day).toArray()[0]?.n ?? 0;
+      if (used >= HOUSE_DAILY) return "limit";
+      sql.exec("INSERT INTO house_games (name_lc, day, n) VALUES (?, ?, 1) ON CONFLICT (name_lc, day) DO UPDATE SET n = n + 1", bot.toLowerCase(), day);
+    }
     const get = (n: string | null) => (n ? sql.exec<{ rating: number }>("SELECT rating FROM ratings WHERE name_lc = ? AND game_id = ?", n.toLowerCase(), gameId).toArray()[0]?.rating ?? ELO_START : ELO_START);
     const [ra, rb] = [get(a), get(b)];
     const exp = 1 / (1 + 10 ** ((rb - ra) / 400));
@@ -81,6 +91,7 @@ export class Lobby extends DurableObject {
     };
     put(a, ra, score, exp);
     put(b, rb, 1 - score, 1 - exp);
+    return "rated";
   }
 
   // Top ARENA_TOP bots per game. Names and numbers only: no keys, hashes or ids.
