@@ -1,5 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
-import { validateDisplayName, validateRoomId } from "./validation";
+import { validateDisplayName, validateGameId, validateIndex, validateRoomId } from "./validation";
+import { get as getRules } from "../../shared/games/registry.js";
+import { SLOT_TO_MARK } from "../../shared/games/ttt.js";
 
 type Seat = "X" | "O";
 // Mirrors the room fields of server/roomManager.js:83-98 that bricks 5 touches. Socket ids are
@@ -12,6 +14,14 @@ interface RoomState {
   spectators: string[];
   seatByClient: Record<string, Seat>;
   names: { X: string | null; O: string | null };
+  // Game state, shared/games slot-indexed shape (server/roomManager.js:83-98). Plain JSON, so it
+  // survives the storage round trip. Room-level fields mirror Express: they are not in `state`.
+  state: any;
+  lastMove: unknown;
+  lastEvents: unknown;
+  lastMoveBy: number | null;
+  newGameRequester: string | null;
+  newGameRequestedAt: number | null;
 }
 interface Att {
   sid: string;
@@ -27,7 +37,15 @@ const fresh = (roomId: string): RoomState => ({
   spectators: [],
   seatByClient: {},
   names: { X: null, O: null },
+  state: getRules("ttt").createInitialState(),
+  lastMove: null,
+  lastEvents: null,
+  lastMoveBy: null,
+  newGameRequester: null,
+  newGameRequestedAt: null,
 });
+const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
+const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.lastMoveBy = null; };
 
 export class Room extends DurableObject {
   private s: RoomState | null = null;
@@ -36,7 +54,13 @@ export class Room extends DurableObject {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
-      this.s = (await ctx.storage.get<RoomState>("room")) ?? null;
+      const st = (await ctx.storage.get<RoomState>("room")) ?? null;
+      if (st && (!st.state || typeof st.state !== "object")) {
+        // Rooms stored before brick 6 have no game state and an unvalidated gameId (brick 5 createRoom).
+        st.gameId = validateGameId(st.gameId) ?? "ttt";
+        st.state = getRules(st.gameId).createInitialState();
+      }
+      this.s = st && { ...fresh(st.roomId), ...st };
     });
   }
 
@@ -71,11 +95,18 @@ export class Room extends DurableObject {
       if (Number.isInteger(id)) ws.send(JSON.stringify({ t: "ack", id, d: body }));
     };
     // TODO(brick 7): per-connection rate limit. TODO(brick 8): bind and check the seat token in joinRoom.
+    // TODO(brick 11): touch/TTL alarm on every game event, as touch() does in gameHandlers.js.
     switch (t) {
       case "createRoom": ack(await this.createRoom(ws, data)); break;
       case "joinRoom": ack(await this.joinRoom(ws, data)); break;
       case "updateDisplayName": await this.updateName(ws, data); break;
       case "leaveRoom": ack(await this.leaveRoom(ws, data)); break;
+      case "makeMove": await this.makeMove(ws, data); break;
+      case "resetGame": await this.resetGame(ws, data); break;
+      case "resetScores": await this.game(data, (s) => { s.state = { ...s.state, scores: [0, 0] }; }, ws); break;
+      case "requestNewGame": await this.game(data, (s) => { s.newGameRequester = this.att(ws).sid; s.newGameRequestedAt = Date.now(); }, ws); break;
+      case "cancelNewGameRequest": await this.game(data, clearRequest, ws); break;
+      case "switchGame": ack(await this.switchGame(ws, data)); break;
     }
     for (const f of this.after.splice(0)) f();
   }
@@ -106,7 +137,8 @@ export class Room extends DurableObject {
     s.created = true;
     s.players.X = sid;
     s.names.X = validateDisplayName(p.displayName);
-    if (typeof p.gameId === "string") s.gameId = p.gameId; // TODO(brick 6): validate against the game registry
+    const gameId = validateGameId(p.gameId); // roomManager.js:81 falls back to ttt for an unknown id
+    if (gameId && gameId !== s.gameId) { s.gameId = gameId; s.state = getRules(gameId).createInitialState(); }
     if (clientId) s.seatByClient[clientId] = "X";
     this.setJoined(ws, true);
     await this.save();
@@ -202,6 +234,82 @@ export class Room extends DurableObject {
     return { ok: true };
   }
 
+  // The room, or null when the roomId is invalid or not this room: the common gate of every game event.
+  private room(roomId: unknown): RoomState | null {
+    const s = this.s;
+    return s?.created && validateRoomId(roomId) === s.roomId ? s : null;
+  }
+
+  // Run an unacked room-level mutation from a seated player, save, publish. The mutation runs before the
+  // first await. Express lets spectators run these too; seating them is deliberately stricter.
+  private async game(p: Msg, fn: (s: RoomState) => void, ws: WebSocket): Promise<boolean> {
+    const s = this.room(p.roomId);
+    if (!s || this.slot(s, ws) < 0) return false;
+    fn(s);
+    await this.save();
+    this.publish(ws);
+    return true;
+  }
+
+  private slot(s: RoomState, ws: WebSocket): 0 | 1 | -1 {
+    const sid = this.att(ws).sid;
+    return s.players.X === sid ? 0 : s.players.O === sid ? 1 : -1;
+  }
+
+  // server/handlers/gameHandlers.js:59. Illegal moves drop silently.
+  private async makeMove(ws: WebSocket, p: Msg) {
+    const s = this.room(p.roomId);
+    if (!s) return;
+    const slot = this.slot(s, ws);
+    if (slot === -1) return;
+    const move = p.move || (validateIndex(p.index) ? { type: "place", cell: p.index } : null);
+    if (!move) return;
+    let result;
+    try {
+      result = getRules(s.gameId).applyMove(s.state, move as any, slot);
+    } catch {
+      return;
+    }
+    s.state = result.state;
+    s.lastMove = move;
+    s.lastEvents = result.events || [];
+    s.lastMoveBy = slot;
+    await this.save();
+    this.publish(ws);
+  }
+
+  // gameHandlers.js:108. The slot that moved last does not start the next game (nextStarterSlot).
+  private async resetGame(ws: WebSocket, p: Msg) {
+    const ran = await this.game(p, (s) => {
+      const prev = s.state;
+      const over = prev?.status === "win" || prev?.status === "draw";
+      s.state = { ...getRules(s.gameId).createInitialState(), turn: over && prev.turn === 0 ? 1 : 0, scores: prev?.scores ? [...prev.scores] : [0, 0] };
+      clearRequest(s);
+      clearLast(s);
+    }, ws);
+    if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
+  }
+
+  // gameHandlers.js:150. Emits before the ack, as Express does.
+  private async switchGame(ws: WebSocket, p: Msg) {
+    const id = validateRoomId(p.roomId);
+    if (!id) return { success: false, error: "Invalid room ID" };
+    const gameId = validateGameId(p.gameId);
+    if (!gameId) return { success: false, error: "Invalid game" };
+    const s = this.room(id);
+    if (!s) return { success: false, error: "Room not found" };
+    if (this.slot(s, ws) < 0) return { success: false, error: "Only seated players can switch games" };
+    if (s.gameId === gameId) return { success: true, gameId };
+    s.gameId = gameId;
+    s.state = getRules(gameId).createInitialState();
+    clearRequest(s);
+    clearLast(s);
+    await this.save();
+    this.publish(ws);
+    this.broadcast({ t: "gameReset", d: { roomId: s.roomId, gameId, reason: "gameSwitch" } });
+    return { success: true, gameId };
+  }
+
   private free(s: RoomState, sid: string): boolean {
     let changed = false;
     for (const k of ["X", "O"] as const) if (s.players[k] === sid) { s.players[k] = null; changed = true; }
@@ -227,7 +335,7 @@ export class Room extends DurableObject {
     for (const w of this.ctx.getWebSockets()) if (this.att(w).joined) try { w.send(text); } catch { /* closing */ }
   }
 
-  // roster as buildGameState, server/roomPublisher.js:84-91. TODO(brick 6): merge the game state fields.
+  // buildGameState + toLegacyWireState, server/roomPublisher.js:34-141. Same fields, same values.
   private publish(_ws: WebSocket) {
     const s = this.s;
     if (!s?.created) return;
@@ -235,13 +343,38 @@ export class Room extends DurableObject {
       const sid = s.players[k];
       return !sid ? null : (s.names[k] ?? (sid.length > 8 ? `${sid.slice(0, 5)}…` : sid));
     };
+    const rules: any = getRules(s.gameId); // JSDoc GameRules omits moveStyle
+    const playerInfo = rules.playerInfo;
+    const marks: string[] = playerInfo.map((p: { slot: number; label?: string }) => p.label || SLOT_TO_MARK[p.slot] || "");
+    const st = s.state;
+    const scores: [number, number] = [st.scores?.[0] || 0, st.scores?.[1] || 0];
     this.broadcast({
       t: "gameUpdate",
       d: {
+        board: st.board,
+        turn: Number.isInteger(st.turn) ? marks[st.turn] : st.turn,
+        winner: st.status === "draw" ? "draw" : st.status === "win" && (st.winner === 0 || st.winner === 1) ? marks[st.winner] : null,
+        winningLine: st.winningCells || [],
+        xScore: scores[0],
+        oScore: scores[1],
+        turnSlot: Number.isInteger(st.turn) ? st.turn : null,
+        winnerSlot: st.status === "win" ? st.winner : st.status === "draw" ? "draw" : null,
+        scores,
+        status: st.status || "active",
+        winningCells: st.winningCells || [],
+        playerInfo,
+        marks,
+        boardSpec: rules.boardSpec || null,
+        moveStyle: rules.moveStyle || "place",
+        lastMove: s.lastMove ?? null,
+        lastEvents: s.lastEvents ?? null,
+        lastMoveBy: Number.isInteger(s.lastMoveBy) ? s.lastMoveBy : null,
+        newGameRequester: s.newGameRequester ?? null,
+        newGameRequestedAt: s.newGameRequestedAt ?? null,
         roomId: s.roomId,
         gameId: s.gameId,
         roster: { X: s.players.X, O: s.players.O, XName: nameOf("X"), OName: nameOf("O"), spectators: s.spectators },
-        voiceRoster: {},
+        voiceRoster: {}, // TODO(brick 9): voice roster
       },
     });
   }
