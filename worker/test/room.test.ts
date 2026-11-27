@@ -367,6 +367,19 @@ describe("game: resign, draw offers, emotes", () => {
     expect(d).toMatchObject({ winner: "draw", winnerSlot: "draw", scores: [0, 0], drawOfferer: null });
   });
 
+  it("an offer dies with its offerer's seat, so a rejoin cannot accept its own offer", async () => {
+    const { a, b, roomId, stored } = await pair();
+    a.send("offerDraw", { roomId });
+    await b.wait((f) => f.t === "gameUpdate" && !!f.d.drawOfferer);
+    await a.call("leaveRoom", { roomId }); // keeps c1's claim on X
+    expect((await stored()).drawOfferer).toBeNull();
+    const a2 = await open(`/ws/room/${roomId}`);
+    expect((await a2.call("joinRoom", { roomId, clientId: "c1" })).player).toBe("X");
+    a2.send("acceptDraw", { roomId });
+    await flush(a2, roomId);
+    expect((await stored()).state.status).toBe("active");
+  });
+
   it("the offerer can cancel an offer, and a move clears it", async () => {
     const { a, b, roomId, mv } = await pair();
     a.send("offerDraw", { roomId });

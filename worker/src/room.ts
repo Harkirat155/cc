@@ -531,6 +531,7 @@ export class Room extends DurableObject {
   private free(s: RoomState, sid: string): boolean {
     let changed = false;
     for (const k of ["X", "O"] as const) if (s.players[k] === sid) { s.players[k] = null; changed = true; }
+    if (changed && s.drawOfferer === sid) clearOffer(s); // a rejoin gets a new sid and could accept its own offer
     const n = s.spectators.length;
     s.spectators = s.spectators.filter((x) => x !== sid);
     return changed || s.spectators.length !== n;

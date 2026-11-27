@@ -15,9 +15,10 @@ const RoomActions = ({ gameState, socketId, roster, onAction }) => {
   const offerer = gameState?.drawOfferer || null;
   const mine = Boolean(offerer && offerer === socketId);
 
+  // Any new board (a move, a reset, a switch) disarms a pending resign, so one click never resigns a fresh game.
   useEffect(() => {
-    if (!active || offerer) setConfirming(false);
-  }, [active, offerer]);
+    setConfirming(false);
+  }, [active, offerer, gameState?.board]);
   useEffect(() => {
     if (!cooling) return undefined;
     const t = setTimeout(() => setCooling(false), EMOTE_COOLDOWN_MS);
@@ -28,6 +29,8 @@ const RoomActions = ({ gameState, socketId, roster, onAction }) => {
     setCooling(true);
     onAction("emote", { emote: e });
   };
+
+  if (!socketId || (roster?.X !== socketId && roster?.O !== socketId)) return null; // spectators get no controls
 
   return (
     <section className="flex w-full max-w-sm flex-col items-center gap-3" aria-label="Room actions">

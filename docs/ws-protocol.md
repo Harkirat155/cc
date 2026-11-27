@@ -2,7 +2,7 @@
 
 JSON frames over one WebSocket, replacing Socket.IO. Game rules and payload shapes are unchanged from the
 Socket.IO contract; only the envelope is new. `shared/wsProtocol.test.js` checks that the headings below equal
-the events the server registers (17 client to server) and emits (12 server to client).
+the events the server registers (17 client to server, plus 6 Worker only) and emits (12 server to client, plus 1 Worker only).
 
 ## Sockets (Worker)
 
@@ -38,7 +38,7 @@ Every frame is one JSON text message: `{"t":"<event>","id"?:n,"d"?:{...}}`.
 - Handler failure on an acked event: the ack carries `{"error":string}` (or `{"success":false,"error":string}`
   for `switchGame`, `joinLobby`, `leaveLobby`). Unacked events drop silently on bad input, as today.
 
-## Client to server (17)
+## Client to server (17, plus 6 Worker only)
 
 ### `createRoom`
 Frame: `{"t":"createRoom","id":n,"d"?:{"clientId"?:string,"displayName"?:string,"gameId"?:string}}`.
@@ -91,7 +91,7 @@ Frame: `{"t":"resign","d":{"roomId":string}}`. No ack. Seated players only, whil
 Source: worker/src/room.ts
 
 ### `offerDraw`
-Frame: `{"t":"offerDraw","d":{"roomId":string}}`. No ack. Sets `drawOfferer` to the sender's socket id. Then `gameUpdate`. Worker only.
+Frame: `{"t":"offerDraw","d":{"roomId":string}}`. No ack. Seated players only, while the game is active with both seats filled. Sets `drawOfferer` to the sender's socket id; the offer clears when the offerer leaves or disconnects. Then `gameUpdate`. Worker only.
 Source: worker/src/room.ts
 
 ### `cancelDrawOffer`
@@ -103,7 +103,7 @@ Frame: `{"t":"acceptDraw","d":{"roomId":string}}`. No ack. Only the seat that di
 Source: worker/src/room.ts
 
 ### `declineDraw`
-Frame: `{"t":"declineDraw","d":{"roomId":string}}`. No ack. Clears the offer. Then `gameUpdate`. A move, `resetGame` or `switchGame` also clears a pending offer. Worker only.
+Frame: `{"t":"declineDraw","d":{"roomId":string}}`. No ack. Only the seat that did not offer can decline; it clears the offer. Then `gameUpdate`. A move, `resetGame` or `switchGame` also clears a pending offer. Worker only.
 Source: worker/src/room.ts
 
 ### `emote`
@@ -139,7 +139,7 @@ Source: server/handlers/voiceHandlers.js:44
 Frame: `{"t":"voice:signal","d":{"roomId":string,"targetId":string,"data":any}}`. No ack; dropped unless `targetId` and `data` are set. Relayed as `voice:signal`.
 Source: server/handlers/voiceHandlers.js:62
 
-## Server to client (12)
+## Server to client (12, plus 1 Worker only)
 
 All server frames are unacked and carry no `id`.
 

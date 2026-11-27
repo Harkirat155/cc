@@ -31,3 +31,10 @@ test("emotes send the chosen value; resign is hidden once the game ended", () =>
   fireEvent.click(screen.getByLabelText("Send 🔥"));
   expect(onAction).toHaveBeenCalledWith("emote", { emote: "🔥" });
 });
+
+test("a spectator sees no room actions, even while a draw is offered", () => {
+  const { container } = render(
+    <RoomActions gameState={{ status: "active", drawOfferer: "me" }} socketId="watcher" roster={roster} onAction={jest.fn()} />,
+  );
+  expect(container).toBeEmptyDOMElement();
+});
