@@ -1,4 +1,4 @@
-import "../../shared/games/index.js"; // registers ttt, connect4, checkers
+import "../../shared/games/index.js"; // registers ttt, connect4, checkers, five
 import { has as hasGame } from "../../shared/games/registry.js";
 
 // Same rules as server/handlers/validation.js:11-27.

@@ -39,6 +39,25 @@ export const GAME_PALETTES = {
       ring: "ring-yellow-300/70",
     },
   },
+  five: {
+    displayName: "Five in a Row",
+    p1: {
+      label: "Player Blue",
+      symbol: "",
+      color: "text-sky-500 dark:text-sky-400",
+      glow: "bg-sky-500",
+      piece: "bg-sky-500 border-sky-400/50 shadow-[inset_0_-2px_3px_rgba(0,0,0,0.35)]",
+      ring: "ring-sky-400/70",
+    },
+    p2: {
+      label: "Player Green",
+      symbol: "",
+      color: "text-emerald-500 dark:text-emerald-400",
+      glow: "bg-emerald-500",
+      piece: "bg-emerald-500 border-emerald-400/50 shadow-[inset_0_-2px_3px_rgba(0,0,0,0.35)]",
+      ring: "ring-emerald-400/70",
+    },
+  },
   checkers: {
     displayName: "Checkers",
     p1: {

@@ -87,6 +87,10 @@ const Game = () => {
     }
   };
   const winningSquares = gameState.winningLine || [];
+  // The cell filled by the move shown on the board: diff with the previous snapshot.
+  const prevSquares = history?.[Math.min(viewIndex, history.length - 1) - 1]?.squares;
+  const lastIdx = prevSquares ? displayedBoard.findIndex((v, i) => v && !prevSquares[i]) : -1;
+  const lastMove = lastIdx >= 0 ? lastIdx : null;
   const activeGlowClass = useMemo(() => {
     const palette = getGamePalette(gameState?.gameId);
     const turnSlot = Number.isInteger(gameState?.turnSlot)
@@ -351,6 +355,7 @@ const Game = () => {
                 moveStyle={gameState?.moveStyle}
                 selection={selection}
                 legalTargets={legalTargets}
+                lastMove={lastMove}
               />
               <WinnerCard
                 winner={winnerCardResult}

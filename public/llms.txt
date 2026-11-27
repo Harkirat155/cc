@@ -26,6 +26,7 @@ Server-to-client events: `gameUpdate`, `gameReset`, `startGame`, `lobbyUpdate`, 
 
 - Tic-Tac-Toe (`ttt`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "place", "cell": 4 } }`; legacy `{ "roomId": "ABCDE", "index": 4 }` is also accepted.
 - Connect Four (`connect4`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "place", "cell": 3 } }`; `cell` is the column index `0..6`.
+- Five in a Row (`five`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "place", "cell": 112 } }`; `cell` is the absolute index `0..224` on a 15×15 board; five or more in a row wins.
 - Checkers (`checkers`): `makeMove` with `{ "roomId": "ABCDE", "move": { "type": "transfer", "from": 42, "to": 33 } }` or include captures, e.g. `{ "type": "transfer", "from": 42, "to": 24, "captures": [33] }`.
 
 Prefer the machine-readable manifest for complete field names, examples, board specs, and event payloads.

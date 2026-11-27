@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import BoardFrame from "./BoardFrame";
 import BoardSquare from "./BoardSquare";
 import { ConnectPiece, EmptyConnectSlot } from "./games/boardPresentation";
-import { cx } from "./games/boardPresentationUtils";
+import { cx, paletteForValue, revealClasses } from "./games/boardPresentationUtils";
 import { getGamePalette } from "./games/palette";
 import useReducedMotion from "../hooks/useReducedMotion";
 
@@ -15,6 +15,7 @@ const EMPTY_LEGAL_TARGETS = [];
 
 function resolveGameId(boardSpec, moveStyle) {
   if (moveStyle === "select-target" || boardSpec?.dark) return "checkers";
+  if (boardSpec?.rows === 15 && boardSpec?.cols === 15) return "five";
   if (boardSpec?.rows === 6 && boardSpec?.cols === 7) return "connect4";
   return "ttt";
 }
@@ -30,6 +31,7 @@ const GameBoard = ({
   moveStyle = "place",
   selection = null,
   legalTargets = EMPTY_LEGAL_TARGETS,
+  lastMove = null,
 }) => {
   const colsClass = GRID_COLS[cols] || GRID_COLS[3];
   const isDark = Boolean(boardSpec?.dark);
@@ -102,6 +104,42 @@ const GameBoard = ({
           })}
         </div>
       </BoardFrame>
+    );
+  }
+
+  if (gameId === "five") {
+    return (
+      <div className="mx-auto w-full max-w-[34rem] rounded-xl border border-foreground/10 bg-foreground/[0.02] p-1 shadow-2xl" data-tour="board">
+        <div className="grid grid-cols-[repeat(15,minmax(0,1fr))]">
+          {squares.map((value, index) => {
+            const info = paletteForValue(value, playerInfo, palette);
+            const isWinning = winningSquareIndexes.has(index);
+            const label = `Row ${Math.floor(index / cols) + 1}, column ${(index % cols) + 1}`;
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => handleSquareClick(index)}
+                disabled={Boolean(value)}
+                aria-label={value ? `${label}, ${info?.label || value}${isWinning ? " (winning)" : ""}` : `${label}, empty`}
+                className="relative flex aspect-square items-center justify-center border border-foreground/10 hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:cursor-default"
+              >
+                {value && (
+                  <span
+                    className={cx(
+                      "h-[72%] w-[72%] rounded-full border",
+                      revealClasses(reducedMotion),
+                      info?.piece || "bg-stone-500",
+                      lastMove === index && "ring-2 ring-foreground/70 ring-offset-1 ring-offset-background",
+                      isWinning && "scale-110 ring-2 ring-foreground/60"
+                    )}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
