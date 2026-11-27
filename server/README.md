@@ -47,6 +47,7 @@ Server game rules come from `shared/games/`, currently:
 - `ttt`
 - `connect4`
 - `checkers`
+- `five` (Five in a Row)
 
 Rooms keep a current `gameId`, board, turn slot, winner slot, scores, roster, and rule metadata (`boardSpec`, `playerInfo`, `moveStyle`). `switchGame` resets the board for the room while preserving room membership.
 

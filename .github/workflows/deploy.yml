@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       backend:
-        description: "fly: the BACKEND_URL secret (default). worker: the Cloudflare Worker (ADR 0001 brick 15 rehearsal)."
+        description: "worker: the Cloudflare Worker (default since the 2026-11-28 cut-over). fly: the BACKEND_URL secret, the rollback."
         type: choice
-        options: [fly, worker]
-        default: fly
+        options: [worker, fly]
+        default: worker
 
 permissions:
   contents: read
@@ -65,11 +65,12 @@ jobs:
       - name: Set backend URL
         if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: |
-          if [ "${{ inputs.backend }}" = worker ]; then
+          # pushes have no inputs, so they build against the Worker; dispatch backend=fly to roll back
+          if [ "${{ inputs.backend }}" = fly ]; then
+            echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
+          else
             echo "VITE_SOCKET_SERVER=wss://cc-api.harkirat-hira.workers.dev" >> $GITHUB_ENV
             echo "VITE_API_BASE=https://cc-api.harkirat-hira.workers.dev" >> $GITHUB_ENV
-          else
-            echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
           fi
 
       - name: Install Dependencies

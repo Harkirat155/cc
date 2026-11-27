@@ -130,6 +130,40 @@
       }
     },
     {
+      "id": "five",
+      "displayName": "Five in a Row",
+      "players": 2,
+      "boardSpec": {
+        "kind": "grid",
+        "rows": 15,
+        "cols": 15
+      },
+      "playerInfo": [
+        {
+          "slot": 0,
+          "label": "Blue",
+          "color": "sky"
+        },
+        {
+          "slot": 1,
+          "label": "Green",
+          "color": "emerald"
+        }
+      ],
+      "moveStyle": "place",
+      "movePayload": {
+        "event": "makeMove",
+        "shape": {
+          "roomId": "ABCDE",
+          "move": {
+            "type": "place",
+            "cell": 112
+          }
+        },
+        "cellSemantics": "Flat board index 0..224, row-major; five or more in an unbroken line wins."
+      }
+    },
+    {
       "id": "checkers",
       "displayName": "Checkers",
       "players": 2,
