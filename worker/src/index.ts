@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { Lobby } from "./lobby";
+import { cors } from "./cors";
 import { Room } from "./room";
 
 export { Lobby, Room };
@@ -22,8 +23,14 @@ function formatUptime(ms: number): string {
 }
 
 const app = new Hono<{
-  Bindings: { ROOM: DurableObjectNamespace<Room>; LOBBY: DurableObjectNamespace<Lobby> };
+  Bindings: {
+    ROOM: DurableObjectNamespace<Room>;
+    LOBBY: DurableObjectNamespace<Lobby>;
+    CORS_ORIGINS?: string;
+  };
 }>();
+
+app.use(cors);
 
 // Keys match getHealthStatus (server/metrics.js:122-127). 200 while healthy (server/app.js:85-88).
 app.get("/health", (c) => {
