@@ -206,10 +206,12 @@ export class Room extends DurableObject {
       if (!clientId) return { error: "clientId required with seat token" };
       if (mapped) {
         if (tok && tok.seat !== mapped) return { error: "Already seated" };
+        if (tok) delete s.seatTokens[p.token as string];
       } else {
         if (!tok) return { error: "Invalid or used seat token" };
         const other = tok.seat === "X" ? "O" : "X";
         if (s.players[other] === sid) return { error: "Already seated" };
+        if (s.players[tok.seat] && s.players[tok.seat] !== sid) return { error: "Seat taken" };
         delete s.seatTokens[p.token as string];
         s.players[tok.seat] = sid;
         s.seatByClient[clientId] = tok.seat;

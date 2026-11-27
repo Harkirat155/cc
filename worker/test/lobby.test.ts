@@ -198,4 +198,32 @@ describe("matchFound and seat tokens", () => {
     }
     expect((await a.call("getLobbyState")).queue).toEqual([]);
   });
+
+  // Edit stored state, then evict so the Room reloads it (it caches state in memory).
+  const edit = async (room: string, fn: (s: any) => void) => {
+    await runInDurableObject(rooms().getByName(room), async (_o, st) => { const s = await st.storage.get<any>("room"); fn(s); await st.storage.put("room", s); });
+    await evictDurableObject(rooms().getByName(room), { webSockets: "hibernate" });
+  };
+
+  it("consumes the token when its seat is already mapped to the joining clientId", async () => {
+    const { room, ma } = await matched();
+    await edit(room, (s) => { s.seatByClient.c9 = "X"; });
+    const s1 = await open(`/ws/room/${room}`);
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c9", token: ma.token })).toEqual({ player: "X" });
+    const s2 = await open(`/ws/room/${room}`);
+    expect(await s2.call("joinRoom", { roomId: room, clientId: "c1", token: ma.token })).toEqual({ error: "Invalid or used seat token" });
+  });
+
+  it("does not overwrite a seat held by another socket and keeps the token", async () => {
+    const { room, ma } = await matched();
+    const s1 = await open(`/ws/room/${room}`);
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c1", token: ma.token })).toEqual({ player: "X" });
+    const before = (await stored(room)).players.X;
+    await edit(room, (s) => { s.seatTokens[ma.token] = { seat: "X", exp: Date.now() + 60_000 }; });
+    const s2 = await open(`/ws/room/${room}`);
+    expect(await s2.call("joinRoom", { roomId: room, clientId: "c2", token: ma.token })).toEqual({ error: "Seat taken" });
+    const after = await stored(room);
+    expect(after.players.X).toBe(before);
+    expect(after.seatTokens[ma.token]).toBeTruthy();
+  });
 });
