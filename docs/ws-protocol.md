@@ -120,7 +120,7 @@ Source: server/handlers/voiceHandlers.js:62
 All server frames are unacked and carry no `id`.
 
 ### `gameUpdate`
-`{"t":"gameUpdate","d":{...}}` to the room, batched per tick. `d` is the full room state: legacy wire state plus `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
+`{"t":"gameUpdate","d":{...}}` to the room, batched per tick. `d` is the full room state: `board`, `turn`, `winner`, `winningLine`, `xScore`, `oScore`, `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
 Source: server/roomPublisher.js:146, :183
 
 ### `gameReset`

@@ -1,8 +1,71 @@
 import { listAll as listRegisteredGames } from '../shared/games/registry.js';
 
+// The Fly Socket.IO host, deprecated (manifest v1). Its sunset is relative: Fly stays up 14 days after the cut-over.
 const PRODUCTION_BACKEND_URL = 'https://crisscross-backend.fly.dev';
+const SOCKET_IO_SUNSET = '14 days after the Worker cut-over (brick 15 of ADR 0001); no calendar date yet';
+// The Worker host for the JSON WebSocket protocol (docs/measurements-2026-11.md). Kept in public/agent-manifest.json, llms.txt and src/Agents.jsx.
+export const WORKER_URL = 'https://cc-api.harkirat-hira.workers.dev';
 const FRONTEND_ROOM_URL_FORMAT = 'https://harkirat155.github.io/cc/room/{roomId}';
 
+const EVENTS = {
+  clientToServer: [
+    { name: 'createRoom', ack: true, payloadFields: ['clientId', 'displayName', 'gameId'] },
+    { name: 'joinRoom', ack: true, payloadFields: ['clientId', 'displayName', 'roomId', 'token'] },
+    { name: 'updateDisplayName', ack: false, payloadFields: ['displayName', 'roomId'] },
+    { name: 'leaveRoom', ack: true, payloadFields: ['clientId', 'roomId'] },
+    { name: 'makeMove', ack: false, payloadFields: ['index', 'move', 'roomId'] },
+    { name: 'resetGame', ack: false, payloadFields: ['roomId'] },
+    { name: 'resetScores', ack: false, payloadFields: ['roomId'] },
+    { name: 'switchGame', ack: true, payloadFields: ['gameId', 'roomId'] },
+    { name: 'requestNewGame', ack: false, payloadFields: ['roomId'] },
+    { name: 'cancelNewGameRequest', ack: false, payloadFields: ['roomId'] },
+    { name: 'joinLobby', ack: true, payloadFields: ['displayName', 'gameId'] },
+    { name: 'leaveLobby', ack: true, payloadFields: [] },
+    { name: 'getLobbyState', ack: true, payloadFields: [] },
+    { name: 'voice:join', ack: false, payloadFields: ['muted', 'roomId'] },
+    { name: 'voice:leave', ack: false, payloadFields: ['roomId'] },
+    { name: 'voice:mute-state', ack: false, payloadFields: ['muted', 'roomId'] },
+    { name: 'voice:signal', ack: false, payloadFields: ['data', 'roomId', 'targetId'] },
+  ],
+  serverToClient: [
+    { name: 'gameUpdate', payloadFields: ['board', 'boardSpec', 'gameId', 'lastEvents', 'lastMove', 'lastMoveBy', 'marks', 'moveStyle', 'newGameRequestedAt', 'newGameRequester', 'oScore', 'playerInfo', 'roomId', 'roster', 'scores', 'status', 'turn', 'turnSlot', 'voiceRoster', 'winner', 'winnerSlot', 'winningCells', 'winningLine', 'xScore'] },
+    { name: 'gameReset', payloadFields: ['gameId', 'reason', 'roomId'] },
+    { name: 'startGame', payloadFields: [] },
+    { name: 'lobbyUpdate', payloadFields: ['queue', 'timestamp'] },
+    { name: 'matchFound', payloadFields: ['opponent', 'player', 'roomId', 'token'] },
+    { name: 'matchError', payloadFields: ['error'] },
+    { name: 'voice:user-joined', payloadFields: ['muted', 'socketId'] },
+    { name: 'voice:user-left', payloadFields: ['socketId'] },
+    { name: 'voice:mute-state', payloadFields: ['muted', 'socketId'] },
+    { name: 'voice:signal', payloadFields: ['data', 'from', 'roomId'] },
+    { name: 'error', payloadFields: ['code', 'message', 'retryAfter'] },
+    { name: 'server:shutdown', payloadFields: ['message'] },
+  ],
+};
+
+const PROTOCOL = {
+  type: 'websocket-json',
+  url: WORKER_URL,
+  webSocketUrl: WORKER_URL.replace('https', 'wss'),
+  routes: { lobby: '/ws/lobby', room: '/ws/room/{roomId}', newRoom: '/ws/room/new' },
+  spec: 'https://github.com/Harkirat155/cc/blob/main/docs/ws-protocol.md',
+  envelope: {
+    frame: '{"t":"<event>","id"?:n,"d"?:{...}}',
+    ack: 'A client frame with an integer "id" gets {"t":"ack","id":n,"d":{...}} back; "d" holds an "error" string on failure. Frames without "id" get no ack.',
+    hello: 'The first frame on every socket is {"t":"hello","d":{"sid":string}}.',
+    unknown: 'Unparseable and unknown frames are ignored.',
+  },
+  flow: [
+    'Open wss://HOST/ws/lobby and read the hello frame.',
+    'Send joinLobby ({"t":"joinLobby","id":1,"d":{"displayName":"Agent Bot","gameId":"ttt"}}); the ack is {"success":true,"position":n}. When two sockets are queued the lobby sends each of them matchFound with roomId, player (X or O), opponent and a one-time token.',
+    'Open /ws/room/{roomId} with the roomId from matchFound. To make a room yourself, open /ws/room/new and send createRoom; the ack carries the roomId.',
+    'On every room socket open, send joinRoom with roomId, clientId and, after a lobby match, the token. Keep the same clientId across reconnects.',
+    'Read gameUpdate. When status is "active" and turnSlot is your seat (X is 0, O is 1), send makeMove with roomId and move. makeMove has no ack; an illegal move is dropped silently.',
+    'The game is over when gameUpdate.status is not "active"; winnerSlot is the winning slot, or "draw".',
+  ],
+};
+
+// Manifest v1 event contract (Socket.IO), kept under deprecated.socketIo.
 const SOCKET_EVENT_CONTRACT = {
   createRoom: {
     direction: 'client->server',
@@ -87,28 +150,33 @@ export function buildAgentManifest(req) {
 
   return {
     name: 'CrissCross Agent Manifest',
-    manifestVersion: '1.0',
+    manifestVersion: '2.0',
     app: {
       name: 'CrissCross',
       packageName: 'crisscross-tictactoe',
       version: '1.0.0',
     },
-    backend: {
-      detectedUrl: backendUrl,
-      productionUrl: PRODUCTION_BACKEND_URL,
-    },
-    socket: {
-      serverUrl: backendUrl,
-      namespace: '/',
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-      clientHint: `io("${backendUrl}", { transports: ["websocket", "polling"] })`,
+    protocol: PROTOCOL,
+    events: EVENTS,
+    deprecated: {
+      socketIo: {
+        status: 'deprecated',
+        manifestVersion: '1.0',
+        sunset: SOCKET_IO_SUNSET,
+        replacedBy: 'protocol',
+        url: PRODUCTION_BACKEND_URL,
+        detectedUrl: backendUrl,
+        namespace: '/',
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        clientHint: `io("${backendUrl}", { transports: ["websocket", "polling"] })`,
+        eventContract: SOCKET_EVENT_CONTRACT,
+      },
     },
     supportedGames: listRegisteredGames().map(summarizeGame),
     roomUrlFormat: FRONTEND_ROOM_URL_FORMAT,
-    eventContract: SOCKET_EVENT_CONTRACT,
     notes: [
-      'Room and game state changes are subject to server-side Socket.IO rate limits.',
+      'Room and game state changes are subject to server-side rate limits.',
       'Agents are non-privileged clients; use documented public events only.',
       'This manifest is read-only and does not expose secrets, metrics, or admin state.',
     ],
