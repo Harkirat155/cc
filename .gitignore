@@ -28,6 +28,7 @@
 
 first.md
 package-lock.json
+!worker/package-lock.json
 
 # Claude Code per-developer settings (committed: .claude/settings.json)
 /.claude/settings.local.json
