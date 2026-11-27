@@ -56,8 +56,10 @@ class Conn {
     });
     this.ws.addEventListener('message', (m) => {
       const f = JSON.parse(String(m.data));
-      if (f.t === 'ack') this.pending.get(f.id)?.(f.d), this.pending.delete(f.id);
-      else this.on.get(f.t)?.(f.d ?? {});
+      // Frames come off the wire: call only handlers this script registered.
+      const fn = f.t === 'ack' ? this.pending.get(f.id) : this.on.get(f.t);
+      if (f.t === 'ack') this.pending.delete(f.id);
+      if (typeof fn === 'function') fn(f.t === 'ack' ? f.d : f.d ?? {});
     });
   }
   send(t, d) {
