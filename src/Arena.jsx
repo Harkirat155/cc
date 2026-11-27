@@ -20,10 +20,10 @@ function Arena() {
   const [games, setGames] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
   const [rooms, setRooms] = useState(() => new Map()); // lowercased name -> roomId; optional, empty on any failure
-  const [copied, setCopied] = useState(""); // row key, "!"-prefixed on failure; cleared after 2 s
+  const [copied, setCopied] = useState(""); // row key; cleared after 2 s, or "!"-prefixed on failure, which stays
   const copyBadge = async (key, md) => {
-    try { await navigator.clipboard.writeText(md); setCopied(key); } catch { setCopied(`!${key}`); }
-    window.setTimeout(() => setCopied(""), 2000);
+    try { await navigator.clipboard.writeText(md); setCopied(key); window.setTimeout(() => setCopied(""), 2000); }
+    catch { setCopied(`!${key}`); } // stays open so the reader can copy the text by hand
   };
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = apiBase() || "https://cc-api.harkirat-hira.workers.dev";
@@ -93,6 +93,9 @@ function Arena() {
                         <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
                       )}
                       <button type="button" className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4" onClick={() => copyBadge(`${id}/${b.name}`, badgeMd(base, b.name, id))}>{copied === `${id}/${b.name}` ? "Copied" : copied === `!${id}/${b.name}` ? "Copy failed: select the text below" : "Badge"}</button>
+                      {copied === `!${id}/${b.name}` && (
+                        <input readOnly aria-label={`Badge Markdown for ${b.name}`} value={badgeMd(base, b.name, id)} onFocus={(e) => e.target.select()} className="mt-1 block w-full rounded border border-foreground/20 bg-transparent px-1 text-xs font-normal" />
+                      )}
                     </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>
