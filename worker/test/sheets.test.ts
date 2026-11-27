@@ -30,14 +30,14 @@ const mk = (extra: Record<string, string> = {}) => ({
 const ROW = { timestamp: "2026-01-02T03:04:05.000Z", rating: 4.5, message: "great game", context: { roomId: "r1" }, meta: { ip: "1.2.3.4" } };
 
 type Call = { url: string; init: RequestInit };
-function stubFetch(tokenStatus = 200, appendStatus = 200) {
+function stubFetch(tokenStatus = 200, appendStatus = 200, tokenBody: unknown = { access_token: "tok-abc", expires_in: 3600 }) {
   const calls: Call[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input instanceof Request ? input.url : input);
     calls.push({ url, init: init ?? {} });
     if (url === "https://oauth2.googleapis.com/token") {
       return tokenStatus === 200
-        ? Response.json({ access_token: "tok-abc", expires_in: 3600 })
+        ? Response.json(tokenBody)
         : new Response("boom", { status: tokenStatus });
     }
     return new Response("{}", { status: appendStatus });
@@ -73,6 +73,8 @@ describe("appendFeedbackRow", () => {
     expect(claims.aud).toBe("https://oauth2.googleapis.com/token");
     expect(claims.scope).toBe("https://www.googleapis.com/auth/spreadsheets");
     expect(claims.exp - claims.iat).toBe(3600);
+    expect(Math.abs(claims.iat - Date.now() / 1000)).toBeLessThan(5);
+    expect(new Headers(tokenCall.init.headers).get("content-type")).toBe("application/x-www-form-urlencoded");
     const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, unb64url(s), new TextEncoder().encode(`${h}.${c}`));
     expect(ok).toBe(true);
   });
@@ -124,6 +126,22 @@ describe("appendFeedbackRow", () => {
     expect(await appendFeedbackRow(mk(), ROW)).toEqual({ success: false });
     expect(calls.length).toBe(1);
     expect(err).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["no access_token", { expires_in: 3600 }],
+    ["empty access_token", { access_token: "", expires_in: 3600 }],
+    ["missing expires_in", { access_token: "t" }],
+    ["expires_in 60", { access_token: "t", expires_in: 60 }],
+    ["expires_in not a number", { access_token: "t", expires_in: "3600" }],
+  ])("(d) a 200 token response with %s fails and is not cached", async (_n, tokenBody) => {
+    const calls = stubFetch(200, 200, tokenBody);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const e = mk();
+    expect(await appendFeedbackRow(e, ROW)).toEqual({ success: false });
+    expect(calls.length).toBe(1);
+    expect(await appendFeedbackRow(e, ROW)).toEqual({ success: false });
+    expect(calls.filter((c) => c.url.includes("oauth2")).length).toBe(2);
   });
 
   it("(d) an append 403 is a failure, logged with the status only", async () => {

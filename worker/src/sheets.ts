@@ -46,7 +46,10 @@ async function accessToken(email: string, rawKey: string): Promise<string> {
     body: `grant_type=${encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer")}&assertion=${await signJwt(email, rawKey)}`,
   });
   if (!res.ok) throw new Error(`token ${res.status}`);
-  const { access_token, expires_in } = (await res.json()) as { access_token: string; expires_in: number };
+  const { access_token, expires_in } = (await res.json()) as { access_token?: unknown; expires_in?: unknown };
+  if (typeof access_token !== "string" || !access_token || typeof expires_in !== "number" || !Number.isFinite(expires_in) || expires_in <= 60) {
+    throw new Error("token response invalid");
+  }
   tokens.set(email, { token: access_token, expiresAt: Date.now() + (expires_in - 60) * 1000 });
   return access_token;
 }
