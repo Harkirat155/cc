@@ -35,7 +35,8 @@ describe("room TTL alarm (brick 11)", () => {
     await set(stub, (s) => { s.lastTouched = ago(TTL * 5); });
     await runDurableObjectAlarm(stub);
     expect((await stored(stub))?.players.X).toBeTruthy();
-    expect(await alarmAt(stub)).not.toBeNull();
+    const next = (await alarmAt(stub)) as number;
+    expect(Math.abs(next - (Date.now() + TTL))).toBeLessThan(5000); // now+TTL, not the past deadline
   });
 
   it("(b2) a spectator keeps the room", async () => {
@@ -59,9 +60,10 @@ describe("room TTL alarm (brick 11)", () => {
   });
 
   it("(d) a frame arms an alarm; a later frame does not move it", async () => {
+    const before = Date.now();
     const { a, stub } = await made();
     const first = await alarmAt(stub);
-    expect(first).not.toBeNull();
+    expect(Math.abs((first as number) - (before + TTL))).toBeLessThan(5000);
     await new Promise((r) => setTimeout(r, 30));
     await a.call("createRoom", {}); // a processed frame, touches again
     expect(await alarmAt(stub)).toBe(first);
@@ -74,7 +76,10 @@ describe("room TTL alarm (brick 11)", () => {
   it("(e) after deletion joinRoom answers as for a room that never existed", async () => {
     const { a, roomId, stub } = await made();
     await vacate(stub, ago(TTL + 1000));
-    await runDurableObjectAlarm(stub); // a's leftover socket is closed by the deletion
+    const closed = new Promise<CloseEvent>((r) => a.ws.addEventListener("close", r));
+    await runDurableObjectAlarm(stub);
+    const ev = await closed;
+    expect([ev.code, ev.reason]).toEqual([1000, "room expired"]);
     const never = (await open("/ws/room/ZZZZZZ").catch(() => null));
     const b = await open(`/ws/room/${roomId}`);
     const got = await b.call("joinRoom", { roomId, clientId: "x" });
@@ -109,5 +114,41 @@ describe("room TTL alarm (brick 11)", () => {
     await set(stub, (s) => { s.players = { X: null, O: null }; s.lastTouched = ago(TTL + 1000); s.seatTokens = { t: { seat: "O", exp: Date.now() + 60_000 } }; });
     await runDurableObjectAlarm(stub);
     expect((await stored(stub))?.roomId).toBeTruthy();
+  });
+
+  it("a frame touches the room: an old empty room that just got one is not deleted", async () => {
+    const { a, stub } = await made();
+    await vacate(stub, ago(TTL * 3)); // empty, a's socket is open but unseated
+    await a.call("createRoom", {}); // any processed frame touches
+    await runDurableObjectAlarm(stub);
+    expect((await stored(stub))?.roomId).toBeTruthy();
+  });
+
+  it("a room occupied only by seat O survives", async () => {
+    const { a, roomId, stub } = await made();
+    const b = await open(`/ws/room/${roomId}`);
+    expect(await b.call("joinRoom", { roomId, clientId: "c2" })).toEqual({ player: "O" });
+    await set(stub, (s) => { s.players.X = null; s.lastTouched = ago(TTL * 3); });
+    await runDurableObjectAlarm(stub);
+    expect((await stored(stub))?.players.O).toBeTruthy();
+    void a;
+  });
+
+  it("an expired seat token does not keep an empty room", async () => {
+    const { stub } = await made();
+    await set(stub, (s) => { s.players = { X: null, O: null }; s.lastTouched = ago(TTL + 1000); s.seatTokens = { t: { seat: "O", exp: ago(1000) } }; });
+    await runDurableObjectAlarm(stub);
+    expect(await stored(stub)).toBeUndefined();
+  });
+
+  it("the last socket closing arms an alarm that then deletes the room", async () => {
+    const { a, stub } = await made();
+    await runInDurableObject(stub, async (o, st) => { (o as any).armed = false; await st.storage.deleteAlarm(); });
+    a.close();
+    for (let i = 0; i < 100 && (await alarmAt(stub)) === null; i++) await new Promise((r) => setTimeout(r, 10));
+    expect(await alarmAt(stub)).not.toBeNull();
+    await vacate(stub, ago(TTL + 1000));
+    await runDurableObjectAlarm(stub);
+    expect(await stored(stub)).toBeUndefined();
   });
 });

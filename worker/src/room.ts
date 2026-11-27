@@ -82,6 +82,7 @@ export class Room extends DurableObject {
         st.state = getRules(st.gameId).createInitialState();
       }
       this.s = st && { ...fresh(st.roomId), ...st };
+      await this.arm(); // one getAlarm read on wake, so a room that lost its alarm gets one
     });
   }
 
@@ -212,6 +213,7 @@ export class Room extends DurableObject {
     const voiced = this.dropVoice(s, sid);
     if (!this.free(s, sid) && !voiced) return;
     await this.save();
+    await this.arm();
     this.publish(ws);
   }
 
