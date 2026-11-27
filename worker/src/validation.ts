@@ -1,3 +1,6 @@
+import "../../shared/games/index.js"; // registers ttt, connect4, checkers
+import { has as hasGame } from "../../shared/games/registry.js";
+
 // Same rules as server/handlers/validation.js:11-27.
 export function validateRoomId(roomId: unknown): string | null {
   if (!roomId || typeof roomId !== "string") return null;
@@ -17,4 +20,13 @@ export function genCode(): string {
   let code = "";
   for (let i = 0; i < 5; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
   return code;
+}
+
+// server/handlers/validation.js:34-47.
+export const validateIndex = (i: unknown): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) <= 8;
+
+export function validateGameId(gameId: unknown): string | null {
+  if (!gameId || typeof gameId !== "string") return null;
+  const n = gameId.trim().toLowerCase();
+  return hasGame(n) ? n : null;
 }

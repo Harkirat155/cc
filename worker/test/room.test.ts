@@ -223,3 +223,151 @@ describe("persistence", () => {
     expect((await a2.update()).roster.XName).toBe("Alice");
   });
 });
+
+// Cases ported from server/handlers/gameHandlers.test.js. Express drops illegal input silently, so
+// "rejected" here means no gameUpdate follows and the stored game is unchanged.
+async function pair() {
+  const { a, ack } = await newRoom("c1", "Alice");
+  const b = await open(`/ws/room/${ack.roomId}`);
+  await b.call("joinRoom", { roomId: ack.roomId, clientId: "c2", displayName: "Bob" });
+  const roomId: string = ack.roomId;
+  const mv = (c: Client, index: number) => c.send("makeMove", { roomId, index });
+  const latest = async (pred: (d: any) => boolean = () => true) => (await a.wait((f) => f.t === "gameUpdate" && pred(f.d), 0)).d;
+  const stored = () => runInDurableObject(rooms().getByName(roomId), async (_o, st) => st.storage.get<any>("room"));
+  return { a, b, roomId, mv, latest, stored };
+}
+const XWINS = [[0, 0], [1, 3], [0, 1], [1, 4], [0, 2]]; // [player, cell]: X takes the top row
+
+describe("game: makeMove", () => {
+  it("places a mark and publishes the legacy wire shape", async () => {
+    const { a, b, roomId, mv } = await pair();
+    mv(a, 4);
+    const w = (await b.wait((f) => f.t === "gameUpdate" && f.d.board?.[4] === "X")).d;
+    expect(w).toMatchObject({ turn: "O", winner: null, winningLine: [], xScore: 0, oScore: 0, gameId: "ttt", roomId, turnSlot: 1, scores: [0, 0], status: "active", moveStyle: "place", newGameRequester: null, lastMove: { type: "place", cell: 4 }, lastMoveBy: 0 });
+    expect(w.boardSpec).toMatchObject({ kind: "grid", rows: 3, cols: 3 });
+    expect(w.marks).toEqual(["X", "O"]);
+    expect(w.roster).toMatchObject({ XName: "Alice", OName: "Bob" });
+  });
+
+  it("silently drops a wrong-turn move, a spectator move and an occupied cell", async () => {
+    const { a, b, roomId, mv, stored } = await pair();
+    const s = await open(`/ws/room/${roomId}`);
+    expect(await s.call("joinRoom", { roomId })).toEqual({ player: "spectator" });
+    mv(b, 0); // O moves first: wrong turn
+    mv(s, 0); // spectator
+    mv(a, 4);
+    mv(b, 4); // occupied
+    mv(a, 9); // out of range
+    a.send("makeMove", { roomId, index: "4" });
+    a.send("makeMove", { roomId: "bad", index: 0 });
+    mv(b, 0); // the one legal reply, a flush marker
+    await a.wait((f) => f.t === "gameUpdate" && f.d.board[0] === "O");
+    const marks = a.frames.filter((f) => f.t === "gameUpdate").map((f) => f.d.board.filter(Boolean).length);
+    expect(marks.filter((n: number) => n > 0)).toEqual([1, 2]); // only the two legal moves published
+    expect((await stored()).state.board).toEqual(["O", "", "", "", "X", "", "", "", ""]);
+    expect(a.frames.some((f) => f.t === "error")).toBe(false);
+  });
+
+  it("scores a win and reports the winning line", async () => {
+    const { a, b, mv, latest } = await pair();
+    for (const [p, c] of XWINS) mv(p ? b : a, c);
+    const w = await latest((d) => d.winner);
+    expect(w).toMatchObject({ winner: "X", winningLine: [0, 1, 2], xScore: 1, oScore: 0, status: "win", winnerSlot: 0, scores: [1, 0], winningCells: [0, 1, 2] });
+  });
+
+  it("reports a draw as winner 'draw' with no score", async () => {
+    const { a, b, mv, latest } = await pair();
+    for (const [p, c] of [[0, 0], [1, 1], [0, 2], [1, 4], [0, 3], [1, 5], [0, 7], [1, 6], [0, 8]]) mv(p ? b : a, c);
+    expect(await latest((d) => d.winner === "draw")).toMatchObject({ xScore: 0, oScore: 0, status: "draw", winnerSlot: "draw" });
+  });
+});
+
+describe("game: reset, scores, new-game requests", () => {
+  it("resetGame lets the loser start, keeps scores, clears the request, then sends gameReset", async () => {
+    const { a, b, roomId, mv, latest } = await pair();
+    for (const [p, c] of XWINS) mv(p ? b : a, c);
+    await latest((d) => d.winner);
+    b.send("requestNewGame", { roomId });
+    await a.wait((f) => f.t === "gameUpdate" && !!f.d.newGameRequester);
+    const n = a.frames.length;
+    a.send("resetGame", { roomId });
+    const reset = await a.wait((f) => f.t === "gameReset", n);
+    expect(reset.d).toEqual({ roomId });
+    const tail = a.frames.slice(n).map((f) => f.t);
+    expect(tail.indexOf("gameUpdate")).toBeLessThan(tail.indexOf("gameReset"));
+    const w = a.frames.slice(n).find((f) => f.t === "gameUpdate")!.d;
+    expect(w).toMatchObject({ board: Array(9).fill(""), turn: "O", turnSlot: 1, xScore: 1, oScore: 0, newGameRequester: null, newGameRequestedAt: null, lastMove: null, lastEvents: null, lastMoveBy: null });
+  });
+
+  it("resetScores zeroes scores without touching the board", async () => {
+    const { a, roomId, mv, latest } = await pair();
+    mv(a, 0);
+    await latest((d) => d.board[0] === "X");
+    a.send("resetScores", { roomId });
+    expect(await latest((d) => d.board[0] === "X" && d.scores[0] === 0)).toMatchObject({ scores: [0, 0] });
+  });
+
+  it("requestNewGame and cancel ride on gameUpdate", async () => {
+    const { a, b, roomId, stored } = await pair();
+    b.send("requestNewGame", { roomId });
+    const sid = (await stored()).players.O;
+    const req = (await a.wait((f) => f.t === "gameUpdate" && !!f.d.newGameRequester)).d;
+    expect(req.newGameRequester).toBe(sid);
+    expect(typeof req.newGameRequestedAt).toBe("number");
+    b.send("cancelNewGameRequest", { roomId });
+    const n = a.frames.length;
+    expect((await a.wait((f) => f.t === "gameUpdate" && f.d.newGameRequester === null, n)).d.newGameRequestedAt).toBeNull();
+  });
+});
+
+describe("game: switchGame", () => {
+  it("lets a seated player switch, resets state, emits gameUpdate then gameReset, then acks", async () => {
+    const { a, b, roomId, mv, latest } = await pair();
+    for (const [p, c] of XWINS) mv(p ? b : a, c);
+    await latest((d) => d.winner);
+    const n = a.frames.length;
+    expect(await a.call("switchGame", { roomId, gameId: " Connect4 " })).toEqual({ success: true, gameId: "connect4" });
+    const tail = a.frames.slice(n);
+    expect(tail.map((f) => f.t)).toEqual(["gameUpdate", "gameReset", "ack"]);
+    expect(tail[1].d).toEqual({ roomId, gameId: "connect4", reason: "gameSwitch" });
+    expect(tail[0].d).toMatchObject({ gameId: "connect4", scores: [0, 0], xScore: 0, newGameRequester: null, lastMove: null });
+    expect(tail[0].d.board).toHaveLength(42);
+    expect(tail[0].d.boardSpec).toMatchObject({ rows: 6, cols: 7 });
+  });
+
+  it("returns the Socket.IO error acks and leaves the room alone", async () => {
+    const { a, roomId, stored } = await pair();
+    const s = await open(`/ws/room/${roomId}`);
+    await s.call("joinRoom", { roomId });
+    expect(await s.call("switchGame", { roomId, gameId: "checkers" })).toEqual({ success: false, error: "Only seated players can switch games" });
+    expect(await a.call("switchGame", { roomId, gameId: "missing-game" })).toEqual({ success: false, error: "Invalid game" });
+    expect(await a.call("switchGame", { roomId: "bad", gameId: "checkers" })).toEqual({ success: false, error: "Invalid room ID" });
+    expect(await a.call("switchGame", { roomId: "ABCDE", gameId: "checkers" })).toEqual({ success: false, error: "Room not found" });
+    expect(await a.call("switchGame", { roomId, gameId: "ttt" })).toEqual({ success: true, gameId: "ttt" });
+    expect((await stored()).gameId).toBe("ttt");
+  });
+
+  it("falls back to ttt for an unregistered gameId on createRoom, as Express does", async () => {
+    const a = await open("/ws/room/new");
+    const ack = await a.call("createRoom", { gameId: "nope" });
+    expect((await a.update()).gameId).toBe("ttt");
+    const b = await open("/ws/room/new");
+    await b.call("createRoom", { gameId: "connect4" });
+    expect((await b.update()).boardSpec).toMatchObject({ rows: 6 });
+    void ack;
+  });
+});
+
+describe("game: hibernation", () => {
+  it("keeps board, turn and scores across eviction", async () => {
+    const { a, b, roomId, mv, latest } = await pair();
+    mv(a, 0);
+    mv(b, 3);
+    await latest((d) => d.board[3] === "O");
+    await evictDurableObject(rooms().getByName(roomId), { webSockets: "hibernate" });
+    mv(a, 1);
+    const w = await latest((d) => d.board[1] === "X");
+    expect(w.board).toEqual(["X", "X", "", "O", "", "", "", "", ""]);
+    expect(w).toMatchObject({ turn: "O", turnSlot: 1, lastMoveBy: 0 });
+  });
+});
