@@ -5,7 +5,8 @@
  * The Worker serves two sockets, /ws/lobby and /ws/room/:code (/new creates a room), so the url is a base and the
  * shim moves its one logical socket between them: joinLobby -> lobby, createRoom -> new, joinRoom or matchFound ->
  * the room. Every Room socket open re-sends joinRoom with the clientId (and the matchFound seat token).
- * `id` is client-generated until the Room DO assigns the real socket id (brick 5).
+ * `id` is client-generated until the Worker's first frame, `hello`, carries the socket's server sid; every route
+ * swap opens a new socket, so `id` follows the newest one.
  */
 import { getClientId } from "./clientId.js";
 
@@ -78,6 +79,7 @@ export class WsSocket extends Emitter {
       let f;
       try { f = JSON.parse(ev.data); } catch { return; }
       if (!f || typeof f.t !== "string") return;
+      if (f.t === "hello") { if (typeof f.d?.sid === "string") this.id = f.d.sid; return; }
       if (f.t === "ack") {
         const p = this.pending.get(f.id);
         if (p) { this.pending.delete(f.id); clearTimeout(p.timer); p.cb(f.d); }

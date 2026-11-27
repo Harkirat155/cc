@@ -115,7 +115,9 @@ export class Room extends DurableObject {
     if (req.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("expected websocket", { status: 426 });
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ sid: crypto.randomUUID(), joined: false } satisfies Att);
+    const sid = crypto.randomUUID();
+    server.serializeAttachment({ sid, joined: false } satisfies Att);
+    server.send(JSON.stringify({ t: "hello", d: { sid } }));
     return new Response(null, { status: 101, webSocket: client });
   }
 

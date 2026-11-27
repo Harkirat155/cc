@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { square, youAre, twoPlayers, expect } from "./helpers.js";
+import { square, youAre, youBadge, twoPlayers, expect } from "./helpers.js";
 
 test("create a room, join by code, X wins the top row, both see it", async ({ browser }) => {
   const [a, b] = await twoPlayers(browser);
@@ -14,9 +14,11 @@ test("create a room, join by code, X wins the top row, both see it", async ({ br
   await square(a, 1, 1).click();
   await expect(square(b, 1, 1)).toBeDisabled();
   await expect(youAre(a, "X").first()).toBeVisible();
+  await expect(youBadge(a)).toHaveCount(1);
   await expect(youAre(b, "X")).toHaveCount(0);
   await square(b, 2, 1).click();
   await expect(youAre(b, "O").first()).toBeVisible();
+  await expect(youBadge(b)).toHaveCount(1);
   // Squares disable only once filled, so each click waits until the mover's opponent has seen the last move.
   await expect(square(a, 2, 1)).toBeDisabled();
   await square(a, 1, 2).click();

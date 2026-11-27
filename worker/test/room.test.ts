@@ -14,6 +14,19 @@ async function newRoom(clientId?: string, displayName?: string) {
 }
 
 describe("Room create/join/leave", () => {
+  it("sends hello with the socket's sid first, and that sid is the roster id", async () => {
+    const a = await open("/ws/room/new");
+    const ack = await a.call("createRoom", { clientId: "h1", displayName: "Alice" });
+    expect(a.frames[0]).toEqual({ t: "hello", d: { sid: expect.any(String) } });
+    const u = await a.update();
+    expect(u.roster.X).toBe(a.frames[0].d.sid);
+    const b = await open(`/ws/room/${ack.roomId}`);
+    await b.call("joinRoom", { roomId: ack.roomId, clientId: "h2", displayName: "Bob" });
+    expect(b.frames[0].t).toBe("hello");
+    expect(b.frames[0].d.sid).not.toBe(a.frames[0].d.sid);
+    expect((await b.update()).roster.O).toBe(b.frames[0].d.sid);
+  });
+
   it("creates, joins, broadcasts, and updates after leave", async () => {
     const { a, ack } = await newRoom("c1", "Alice");
     expect(ack.player).toBe("X");
