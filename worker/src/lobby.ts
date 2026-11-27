@@ -7,6 +7,12 @@ interface Att { sid: string }
 const LIVE_MAX = 50;
 const LIVE_STALE_MS = 10 * 60_000; // no move in 10 min is not a live game
 const LIVE_ROWS_MAX = 200; // bounds the table against listPublicly spam between reads
+const BOT_NAME = /^[A-Za-z0-9 _-]{3,24}$/;
+const REG_PER_HOUR = 3; // registrations per IP per hour
+const ARENA_TOP = 20;
+const ELO_K = 32;
+const ELO_START = 1200; // also the fixed rating of the unlisted guest pool (humans, unregistered bots)
+const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -20,6 +26,63 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS queue (seq INTEGER PRIMARY KEY AUTOINCREMENT, sid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, game_id TEXT NOT NULL, joined_at INTEGER NOT NULL)");
     // Public live-games registry (GET /api/live). Rooms push here; a row is public by construction: no sids.
     sql.exec("CREATE TABLE IF NOT EXISTS live (room_id TEXT PRIMARY KEY, game_id TEXT NOT NULL, x_name TEXT, o_name TEXT, moves INTEGER NOT NULL, started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
+    // Agent Arena (docs/arena.md). Only the SHA-256 of a bot's key and of a registering IP is stored, never either value.
+    sql.exec("CREATE TABLE IF NOT EXISTS bots (name TEXT NOT NULL, name_lc TEXT PRIMARY KEY, key_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS bot_reg (ip_hash TEXT NOT NULL, at INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS ratings (name_lc TEXT NOT NULL, game_id TEXT NOT NULL, rating REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, draws INTEGER NOT NULL, losses INTEGER NOT NULL, PRIMARY KEY (name_lc, game_id))");
+  }
+
+  async registerBot(name: unknown, ip: string): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
+    if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
+    const sql = this.ctx.storage.sql;
+    const now = Date.now();
+    const ipHash = await sha256(`ip:${ip}`);
+    sql.exec("DELETE FROM bot_reg WHERE at < ?", now - 3_600_000);
+    if (sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM bot_reg WHERE ip_hash = ?", ipHash).one().n >= REG_PER_HOUR) return { status: 429, body: { error: "too many registrations from this address, try again in an hour" } };
+    if (sql.exec("SELECT 1 FROM bots WHERE name_lc = ?", name.toLowerCase()).toArray().length) return { status: 409, body: { error: "name already taken" } };
+    const raw = crypto.getRandomValues(new Uint8Array(24));
+    const key = `ccb_${[...raw].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+    sql.exec("INSERT INTO bots (name, name_lc, key_hash, created_at) VALUES (?, ?, ?, ?)", name, name.toLowerCase(), await sha256(key), now);
+    sql.exec("INSERT INTO bot_reg (ip_hash, at) VALUES (?, ?)", ipHash, now);
+    return { status: 201, body: { name, key } };
+  }
+
+  // The registered name a key belongs to, else null. Rooms call this at join time.
+  async verifyBot(key: string): Promise<string | null> {
+    const r = this.ctx.storage.sql.exec<{ name: string }>("SELECT name FROM bots WHERE key_hash = ?", await sha256(key)).toArray();
+    return r[0]?.name ?? null;
+  }
+
+  // One finished game. `a` and `b` are registered bot names or null (guest, fixed at ELO_START and never stored);
+  // `score` is a's result: 1 win, 0.5 draw, 0 loss. Both sides use the ratings from before the game.
+  recordGame(gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): void {
+    const sql = this.ctx.storage.sql;
+    const get = (n: string | null) => (n ? sql.exec<{ rating: number }>("SELECT rating FROM ratings WHERE name_lc = ? AND game_id = ?", n.toLowerCase(), gameId).toArray()[0]?.rating ?? ELO_START : ELO_START);
+    const [ra, rb] = [get(a), get(b)];
+    const exp = 1 / (1 + 10 ** ((rb - ra) / 400));
+    const put = (n: string | null, r: number, s: number, e: number) => {
+      if (!n) return;
+      sql.exec(
+        `INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, ?, ?, 1, ?, ?, ?)
+         ON CONFLICT (name_lc, game_id) DO UPDATE SET rating = excluded.rating, games = games + 1, wins = wins + excluded.wins, draws = draws + excluded.draws, losses = losses + excluded.losses`,
+        n.toLowerCase(), gameId, r + ELO_K * (s - e), s === 1 ? 1 : 0, s === 0.5 ? 1 : 0, s === 0 ? 1 : 0);
+    };
+    put(a, ra, score, exp);
+    put(b, rb, 1 - score, 1 - exp);
+  }
+
+  // Top ARENA_TOP bots per game. Names and numbers only: no keys, hashes or ids.
+  listArena(): Record<string, { name: string; rating: number; games: number; wins: number; draws: number; losses: number }[]> {
+    const sql = this.ctx.storage.sql;
+    const out: Record<string, any[]> = {};
+    for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
+      out[game_id] = sql
+        .exec<{ name: string; rating: number; games: number; wins: number; draws: number; losses: number }>(
+          "SELECT b.name AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? ORDER BY r.rating DESC, r.games DESC, b.name LIMIT ?", game_id, ARENA_TOP)
+        .toArray()
+        .map((r) => ({ ...r, rating: Math.round(r.rating) }));
+    }
+    return out;
   }
 
   reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {

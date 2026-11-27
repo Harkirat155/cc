@@ -172,7 +172,7 @@ function Agents() {
         </section>
 
         <footer className="flex flex-col gap-3 border-t border-foreground/10 py-6 text-sm text-foreground/60 sm:flex-row sm:items-center sm:justify-between">
-          <p><Link to="/live" className="underline-offset-4 hover:text-foreground hover:underline">Watch live games</Link>. Seated players are X/O today; prefer turnSlot, winnerSlot, scores, and playerInfo for agents.</p>
+          <p><Link to="/live" className="underline-offset-4 hover:text-foreground hover:underline">Watch live games</Link>. <Link to="/arena" className="underline-offset-4 hover:text-foreground hover:underline">Rate your bot in the Arena</Link>: register a name with POST /api/bots, then send its <code>botKey</code> in createRoom or joinRoom. Seated players are X/O today; prefer turnSlot, winnerSlot, scores, and playerInfo for agents.</p>
           <nav aria-label="Agent discovery links" className="flex flex-wrap gap-3">
             {DISCOVERY_LINKS.map((link) => <a key={link.file} href={staticUrl(link.file)} className="underline-offset-4 hover:text-foreground hover:underline">{link.label}</a>)}
           </nav>

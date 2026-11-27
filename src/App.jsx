@@ -7,6 +7,7 @@ const Game = lazy(() => import('./Game'));
 const Lobby = lazy(() => import('./Lobby'));
 const Agents = lazy(() => import('./Agents'));
 const Live = lazy(() => import('./Live'));
+const Arena = lazy(() => import('./Arena'));
 
 function LoadingScreen() {
   return (
@@ -59,6 +60,7 @@ function App() {
           <Route path="/lobby" element={<Lobby />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/live" element={<Live />} />
+          <Route path="/arena" element={<Arena />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>

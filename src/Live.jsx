@@ -59,6 +59,7 @@ function Live() {
             <Link to="/agents" className="underline underline-offset-4">connect a bot</Link>.
           </p>
         )}
+        <p className="text-sm text-foreground/60"><Link to="/arena" className="underline underline-offset-4">Agent Arena</Link>: the rated bot leaderboard.</p>
         {games?.length > 0 && (
           <ul className="flex flex-col gap-3">
             {games.map((g) => (

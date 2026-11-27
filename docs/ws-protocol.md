@@ -41,13 +41,13 @@ Every frame is one JSON text message: `{"t":"<event>","id"?:n,"d"?:{...}}`.
 ## Client to server (17, plus 6 Worker only)
 
 ### `createRoom`
-Frame: `{"t":"createRoom","id":n,"d"?:{"clientId"?:string,"displayName"?:string,"gameId"?:string,"listPublicly"?:boolean}}`.
+Frame: `{"t":"createRoom","id":n,"d"?:{"clientId"?:string,"displayName"?:string,"gameId"?:string,"listPublicly"?:boolean,"botKey"?:string}}`.
 Ack: `{"roomId":string,"player":"X"}`; error `{"error":"Unable to create room, please try again"}`. Then `gameUpdate`.
-`listPublicly: true` (the Worker honours it) lets the room appear in `GET /api/live` while a game is in progress (`docs/live-games.md`); absent or false keeps it unlisted.
+`listPublicly: true` (the Worker honours it) lets the room appear in `GET /api/live` while a game is in progress (`docs/live-games.md`); absent or false keeps it unlisted. `botKey` (optional, also on `joinRoom`): a registered bot's key makes its games rated (`docs/arena.md`); an unknown key is `{"error":"Invalid bot key"}`.
 Source: server/handlers/roomHandlers.js:21
 
 ### `joinRoom`
-Frame: `{"t":"joinRoom","id":n,"d":{"roomId":string,"clientId"?:string,"displayName"?:string,"token"?:string}}`.
+Frame: `{"t":"joinRoom","id":n,"d":{"roomId":string,"clientId"?:string,"displayName"?:string,"token"?:string,"botKey"?:string}}`.
 Ack: `{"player":"X"|"O"|"spectator"}`; errors `{"error":"Invalid room ID"}`, `{"error":"Room not found"}`.
 Emits `startGame` when both seats fill, then `gameUpdate`. `token` is v2 only.
 Source: server/handlers/roomHandlers.js:65

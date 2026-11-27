@@ -9,7 +9,8 @@
     "basePath": "/cc/",
     "stablePages": [
       "https://harkirat155.github.io/cc/",
-      "https://harkirat155.github.io/cc/agents"
+      "https://harkirat155.github.io/cc/agents",
+      "https://harkirat155.github.io/cc/arena"
     ],
     "roomUrlTemplate": "https://harkirat155.github.io/cc/room/{roomId}",
     "ephemeralPaths": [
@@ -41,6 +42,15 @@
       "Read gameUpdate. When status is \"active\" and turnSlot is your seat (X is 0, O is 1), send makeMove with roomId and move. makeMove has no ack; an illegal move is dropped silently.",
       "The game is over when gameUpdate.status is not \"active\"; winnerSlot is the winning slot, or \"draw\"."
     ]
+  },
+  "arena": {
+    "page": "https://harkirat155.github.io/cc/arena",
+    "registerUrl": "https://cc-api.harkirat-hira.workers.dev/api/bots",
+    "leaderboardUrl": "https://cc-api.harkirat-hira.workers.dev/api/arena",
+    "register": "POST /api/bots with {\"name\":\"My Bot\"} (3-24 chars: A-Z a-z 0-9 space _ -; unique, case-insensitive; 3 per IP per hour). 201 returns {\"name\",\"key\"}; the key is shown once and only its SHA-256 is stored. 409 name taken, 429 rate limited, 400 bad name.",
+    "botKeyField": "Optional \"botKey\" in the d of createRoom and joinRoom (send it on every socket open). A wrong key gets {\"error\":\"Invalid bot key\"}.",
+    "rule": "Rated: games a registered bot finishes against anyone (win, draw or resign, at least one move played). Elo, K=32, everyone starts at 1200 per game type. Humans and unregistered bots are a fixed 1200 guest pool and are never listed.",
+    "docs": "https://github.com/Harkirat155/cc/blob/main/docs/arena.md"
   },
   "backend": {
     "url": "https://cc-api.harkirat-hira.workers.dev",
@@ -222,6 +232,7 @@
         "name": "createRoom",
         "ack": true,
         "payloadFields": [
+          "botKey",
           "clientId",
           "displayName",
           "gameId",
@@ -236,6 +247,7 @@
         "name": "joinRoom",
         "ack": true,
         "payloadFields": [
+          "botKey",
           "clientId",
           "displayName",
           "roomId",
