@@ -192,19 +192,32 @@ export class Room extends DurableObject {
     const name = validateDisplayName(p.displayName);
     let role: Seat | "spectator" | null = null;
 
-    // 0) seat token from matchFound: exactly the seat it names, once.
+    // Expired tokens are dropped when seen, so storage does not grow and their seat opens up.
+    const now = Date.now();
+    const expired = Object.keys(s.seatTokens).filter((k) => now > s.seatTokens[k].exp);
+    for (const k of expired) delete s.seatTokens[k];
+    if (expired.length) await this.save();
+    const mapped = clientId ? s.seatByClient[clientId] : undefined;
+
+    // 0) seat token from matchFound: exactly the seat it names, once. A clientId that already owns a
+    // seat rebinds below and ignores the token, so a retry after a lost ack succeeds.
     if (p.token !== undefined) {
       const tok = typeof p.token === "string" ? s.seatTokens[p.token] : undefined;
       if (!clientId) return { error: "clientId required with seat token" };
-      if (!tok || Date.now() > tok.exp) return { error: "Invalid or used seat token" };
-      delete s.seatTokens[p.token as string];
-      s.players[tok.seat] = sid;
-      s.seatByClient[clientId] = tok.seat;
-      if (name) s.names[tok.seat] = name;
-      role = tok.seat;
+      if (mapped) {
+        if (tok && tok.seat !== mapped) return { error: "Already seated" };
+      } else {
+        if (!tok) return { error: "Invalid or used seat token" };
+        const other = tok.seat === "X" ? "O" : "X";
+        if (s.players[other] === sid) return { error: "Already seated" };
+        delete s.seatTokens[p.token as string];
+        s.players[tok.seat] = sid;
+        s.seatByClient[clientId] = tok.seat;
+        if (name) s.names[tok.seat] = name;
+        role = tok.seat;
+      }
     }
     // 1) rebind by clientId
-    const mapped = clientId ? s.seatByClient[clientId] : undefined;
     if (!role && (mapped === "X" || mapped === "O")) {
       if (!s.players[mapped] || s.players[mapped] === sid) {
         s.players[mapped] = sid;
@@ -220,7 +233,7 @@ export class Room extends DurableObject {
       else if (s.players.O === sid) { role = "O"; if (name) s.names.O = name; }
     }
     // A seat with an unclaimed matchFound token is not open to a tokenless join.
-    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k && Date.now() <= q.exp);
+    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k);
     // 3) open seat. A clientId that owns a seat is never given the other one.
     if (!role) {
       // A clientId that already owns a seat (held by a live socket, so rebind skipped it) never gets the other one.

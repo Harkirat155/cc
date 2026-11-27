@@ -131,4 +131,71 @@ describe("matchFound and seat tokens", () => {
     const r2 = await open(`/ws/room/${mb.roomId}`);
     expect(await r2.call("joinRoom", { roomId: mb.roomId, clientId: "x", token: mb.token })).toMatchObject({ error: "Invalid or used seat token" });
   });
+
+  const matched = async () => {
+    await clear();
+    const a = await lobbyOf();
+    const b = await lobbyOf();
+    await a.call("joinLobby", { displayName: "Alice" });
+    await b.call("joinLobby", { displayName: "Bob" });
+    const [ma, mb] = [await found(a), await found(b)];
+    return { room: ma.roomId as string, ma, mb, a, b };
+  };
+  const stored = (room: string) => runInDurableObject(rooms().getByName(room), async (_o, st) => st.storage.get<any>("room"));
+
+  it("never seats one socket or one clientId in both seats", async () => {
+    const { room, ma, mb } = await matched();
+    const s1 = await open(`/ws/room/${room}`);
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c1", token: ma.token })).toEqual({ player: "X" });
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c2", token: mb.token })).toEqual({ error: "Already seated" });
+    const s2 = await open(`/ws/room/${room}`);
+    expect(await s2.call("joinRoom", { roomId: room, clientId: "c1", token: mb.token })).toEqual({ error: "Already seated" });
+    // The refused token was not consumed: its owner still gets O.
+    const s3 = await open(`/ws/room/${room}`);
+    expect(await s3.call("joinRoom", { roomId: room, clientId: "c3", token: mb.token })).toEqual({ player: "O" });
+  });
+
+  it("a retry with the used token and the owning clientId rebinds", async () => {
+    const { room, ma } = await matched();
+    const s1 = await open(`/ws/room/${room}`);
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c1", token: ma.token })).toEqual({ player: "X" });
+    s1.close();
+    await new Promise((r) => setTimeout(r, 50));
+    const s2 = await open(`/ws/room/${room}`);
+    expect(await s2.call("joinRoom", { roomId: room, clientId: "c1", token: ma.token })).toEqual({ player: "X" });
+  });
+
+  it("deletes an expired token, refuses it and opens the seat to a tokenless join", async () => {
+    const { room, ma, mb } = await matched();
+    await runInDurableObject(rooms().getByName(room), async (_o, st) => {
+      const s = await st.storage.get<any>("room");
+      s.seatTokens[mb.token].exp = Date.now() - 1;
+      await st.storage.put("room", s);
+    });
+    await evictDurableObject(rooms().getByName(room));
+    const s1 = await open(`/ws/room/${room}`);
+    expect(await s1.call("joinRoom", { roomId: room, clientId: "c2", token: mb.token })).toMatchObject({ error: "Invalid or used seat token" });
+    expect(Object.keys((await stored(room)).seatTokens)).toEqual([ma.token]);
+    const s2 = await open(`/ws/room/${room}`);
+    expect(await s2.call("joinRoom", { roomId: room, clientId: "c3" })).toEqual({ player: "O" });
+  });
+
+  it("sends matchError to both players, without requeueing, when the Room cannot be made", async () => {
+    await clear();
+    const a = await lobbyOf();
+    const b = await lobbyOf();
+    const real: unknown = await runInDurableObject<Lobby, unknown>(lobby(), async (o: any) => {
+      const env = o.env;
+      o.env = { ...env, ROOM: { getByName: () => ({ reserveSeats: async () => { throw new Error("room down"); } }) } };
+      return env;
+    });
+    try {
+      await a.call("joinLobby", { displayName: "Alice" });
+      await b.call("joinLobby", { displayName: "Bob" });
+      for (const c of [a, b]) expect((await c.wait((f) => f.t === "matchError")).d).toEqual({ error: "Failed to create room" });
+    } finally {
+      await runInDurableObject<Lobby, void>(lobby(), async (o: any) => { o.env = real; });
+    }
+    expect((await a.call("getLobbyState")).queue).toEqual([]);
+  });
 });

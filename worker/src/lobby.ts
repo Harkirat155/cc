@@ -42,10 +42,13 @@ export class Lobby extends DurableObject {
       .map((r) => ({ socketId: r.sid, displayName: r.name, gameId: r.game_id, joinedAt: r.joined_at }));
   }
 
-  // Debounced lobbyUpdate (broadcastLobbyState, lobbyManager.js:187): the first change arms a
-  // LOBBY_MATCH_DEBOUNCE_MS alarm, later changes inside the window ride on it.
+  // Debounced lobbyUpdate (broadcastLobbyState, lobbyManager.js:187). Express resets the timer on every
+  // change; here the first change arms the alarm and later changes inside the window ride on it, so a
+  // steady stream still updates every LOBBY_MATCH_DEBOUNCE_MS (config.js:39: default 100, clamp 0-1000).
   private async touched() {
-    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + 100);
+    const ms = parseInt(String((this.env as Record<string, unknown>).LOBBY_MATCH_DEBOUNCE_MS), 10);
+    const debounce = Number.isNaN(ms) ? 100 : Math.max(0, Math.min(1000, ms));
+    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + debounce);
   }
 
   // matchPlayers + handleMatch (lobbyManager.js:111, lobbyHandlers.js:104): the two longest-waiting
@@ -60,10 +63,12 @@ export class Lobby extends DurableObject {
     const players = [p1, p2];
     let roomId: string | null = null;
     const env = this.env as unknown as { ROOM: DurableObjectNamespace<import("./room").Room> };
-    for (let i = 0; i < 10 && !roomId; i++) {
-      const code = genCode();
-      if (await env.ROOM.getByName(code).reserveSeats(code, p1.game_id, seats)) roomId = code;
-    }
+    try {
+      for (let i = 0; i < 10 && !roomId; i++) {
+        const code = genCode();
+        if (await env.ROOM.getByName(code).reserveSeats(code, p1.game_id, seats)) roomId = code;
+      }
+    } catch { /* roomId stays null: matchError, and like handleMatch (lobbyHandlers.js:113) no requeue */ }
     const to = (sid: string, frame: object) => {
       for (const w of this.ctx.getWebSockets()) if ((w.deserializeAttachment() as Att).sid === sid) try { w.send(JSON.stringify(frame)); } catch { /* closing */ }
     };
