@@ -40,6 +40,10 @@ const GameBoard = ({
   const palette = getGamePalette(gameId);
   const reducedMotion = useReducedMotion();
   const [activeColumn, setActiveColumn] = useState(null);
+  // Five in a Row cells are ~22px on a phone: a touch tap previews the stone, a second tap places it.
+  const [pendingCell, setPendingCell] = useState(null);
+  const [pendingFor, setPendingFor] = useState(squares);
+  if (pendingFor !== squares) { setPendingFor(squares); setPendingCell(null); }
   const onSquareClickRef = useRef(onSquareClick);
   onSquareClickRef.current = onSquareClick;
 
@@ -115,15 +119,24 @@ const GameBoard = ({
             const info = paletteForValue(value, playerInfo, palette);
             const isWinning = winningSquareIndexes.has(index);
             const label = `Row ${Math.floor(index / cols) + 1}, column ${(index % cols) + 1}`;
+            const isPending = !value && pendingCell === index;
             return (
               <button
                 key={index}
                 type="button"
-                onClick={() => handleSquareClick(index)}
-                disabled={Boolean(value)}
-                aria-label={value ? `${label}, ${info?.label || value}${isWinning ? " (winning)" : ""}` : `${label}, empty`}
+                onPointerUp={(e) => { if (e.pointerType === "touch") e.currentTarget.dataset.touch = "1"; }}
+                onClick={(e) => {
+                  const touch = e.currentTarget.dataset.touch === "1";
+                  delete e.currentTarget.dataset.touch;
+                  if (touch && pendingCell !== index) { setPendingCell(index); return; }
+                  setPendingCell(null);
+                  handleSquareClick(index);
+                }}
+                disabled={Boolean(value) || winningSquareIndexes.size > 0}
+                aria-label={value ? `${label}, ${info?.label || value}${isWinning ? " (winning)" : ""}` : `${label}, empty${isPending ? ", tap again to place" : ""}`}
                 className="relative flex aspect-square items-center justify-center border border-foreground/10 hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:cursor-default"
               >
+                {isPending && <span aria-hidden="true" className="h-[72%] w-[72%] rounded-full border-2 border-dashed border-foreground/60" />}
                 {value && (
                   <span
                     className={cx(
