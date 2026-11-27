@@ -44,7 +44,11 @@ interface RoomState {
   rated: { id: string; X: string | null; O: string | null; sidX: string | null; sidO: string | null } | null;
   // The house level when seat O is played by the Room itself (createRoom vsHouse), else null.
   house: HouseLevel | null;
+  // House rooms: ms epoch when the departed bot's seat is settled as a resignation (the alarm fires it). While set, X is held
+  // for that bot: its clientId rebinds, or its botKey rejoins, and either clears it; nobody else is seated at X.
+  abandonAt: number | null;
 }
+const HOUSE_GRACE_MS = 30_000;
 // The house (docs/arena.md): the Room plays seat O with shared/ai/bot.js. workerd freezes Date.now() during CPU
 // work, so bot.js's own 300 ms deadline never fires on hard; measured with a frozen clock, hard took 4.7 s a move on
 // Connect Four and far longer on Five in a Row. So the compute cap is the level: hard only where the search is
@@ -110,6 +114,7 @@ const fresh = (roomId: string): RoomState => ({
   settled: false,
   rated: null,
   house: null,
+  abandonAt: null,
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearOffer = (s: RoomState) => { s.drawOfferer = null; };
@@ -229,11 +234,13 @@ export class Room extends DurableObject {
     this.armed = false;
     const s = this.s;
     if (!s) return;
+    if (s.abandonAt && Date.now() >= s.abandonAt) { this.abandon(s); await this.save(); }
     const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
     const occupied = !!((s.players.X && live.has(s.players.X)) || (s.players.O && live.has(s.players.O)) || s.spectators.some((x) => live.has(x)));
     const due = Math.max(s.lastTouched + this.ttl(), ...Object.values(s.seatTokens).map((q) => q.exp));
-    if (occupied || Date.now() <= due) {
-      await this.ctx.storage.setAlarm(occupied ? Date.now() + this.ttl() : due);
+    if (occupied || Date.now() <= due || s.abandonAt) {
+      const next = occupied ? Date.now() + this.ttl() : Math.max(due, Date.now());
+      await this.ctx.storage.setAlarm(s.abandonAt ? Math.min(next, s.abandonAt) : next);
       this.armed = true;
       return;
     }
@@ -288,7 +295,7 @@ export class Room extends DurableObject {
     const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
     try {
       this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score)
-        .then((r) => { if (r === "limit") this.broadcast({ t: "unrated", d: { reason: "daily house limit" } }); })
+        .then((r) => { if (r === "limit") this.broadcast({ t: "unrated", d: { reason: "daily house limit", gameId: id } }); })
         .catch(() => {}));
     } catch { /* the leaderboard must never break the broadcast */ }
   }
@@ -325,14 +332,25 @@ export class Room extends DurableObject {
     const voiced = this.dropVoice(s, sid);
     const wasX = s.players.X === sid;
     if (!this.free(s, sid) && !voiced) return;
-    // House rooms: leaving a game in progress is a resignation, so walking away never dodges a loss.
+    // House rooms: walking away from a game in progress is a resignation, after a grace for a normal reconnect.
     if (s.house && wasX && s.state?.status === "active" && s.moves > 0) {
-      s.state = { ...s.state, status: "win", winner: 1, winningCells: [], scores: [s.state.scores?.[0] || 0, (s.state.scores?.[1] || 0) + 1] };
-      clearOffer(s);
+      s.abandonAt = Date.now() + HOUSE_GRACE_MS;
+      const at = await this.ctx.storage.getAlarm();
+      if (at === null || at > s.abandonAt) await this.ctx.storage.setAlarm(s.abandonAt);
+      this.armed = true;
     }
     await this.save();
     await this.arm();
     this.publish(ws);
+  }
+
+  private abandon(s: RoomState) {
+    s.abandonAt = null;
+    if (s.state?.status === "active") {
+      s.state = { ...s.state, status: "win", winner: 1, winningCells: [], scores: [s.state.scores?.[0] || 0, (s.state.scores?.[1] || 0) + 1] };
+      clearOffer(s);
+    }
+    this.publish();
   }
 
   private async createRoom(ws: WebSocket, p: Msg) {
@@ -429,7 +447,7 @@ export class Room extends DurableObject {
       else if (s.players.O === sid) { role = "O"; if (name) s.names.O = name; }
     }
     // A seat with an unclaimed matchFound token is not open to a tokenless join.
-    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k);
+    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k) || (k === "X" && !!s.abandonAt && !(bot.name && bot.name === s.rated?.X));
     // 3) open seat. A clientId that owns a seat is never given the other one.
     if (!role) {
       // A clientId that already owns a seat (held by a live socket, so rebind skipped it) never gets the other one.
@@ -450,6 +468,10 @@ export class Room extends DurableObject {
       s.spectators = s.spectators.filter((x) => x !== sid);
     }
     if (bot.name && role !== "spectator") s.botBySid[sid] = bot.name;
+    if (role === "X" && s.abandonAt) { // the departed bot is back: resume, and the new sid is the rated seat
+      s.abandonAt = null;
+      if (s.rated) s.rated.sidX = sid;
+    }
     this.setJoined(ws, true);
     await this.save();
     this.after.push(() => {
@@ -738,7 +760,7 @@ export class Room extends DurableObject {
   }
 
   // buildGameState + toLegacyWireState, server/roomPublisher.js:34-141. Same fields, same values.
-  private publish(_ws: WebSocket) {
+  private publish(_ws?: WebSocket) {
     const s = this.s;
     if (!s?.created) return;
     // Voice entries of sockets that no longer exist (lost in an eviction) are removed here, so no path

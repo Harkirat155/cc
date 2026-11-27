@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
 import { open } from "./helpers";
@@ -147,8 +147,11 @@ async function firstMove(roomId: string) {
 }
 
 describe("reserved names", () => {
-  it.each(["House (easy)", "House easy", "house-easy", "HOUSE_MEDIUM", "House  Hard", "H0use easy", "house medIum", "h0use_hard", "House_Med1um"])("refuses %j", async (n) => {
-    expect([400, 409]).toContain((await register(n)).status);
+  it("answers 400 invalid name for the exact names, whose parentheses the name rule excludes", async () => {
+    expect((await register("House (easy)")).status).toBe(400);
+  });
+  it.each(["House easy", "house-easy", "HOUSE_MEDIUM", "House  Hard", "H0use easy", "house medIum", "h0use_hard", "House_Med1um"])("refuses %j", async (n) => {
+    expect((await register(n)).status).toBe(409);
   });
   it("refuses with 409 'name reserved' where the name is otherwise valid", async () => {
     const r = await register("House_Hard");
@@ -178,17 +181,51 @@ describe("no dodging a loss", () => {
     expect(bots(await rows(2))).toMatchObject({ games: 1, losses: 1, rating: 1184 });
   });
 
-  it("settles a bot that leaves mid-game as a loss", async () => {
-    const { a, roomId } = await vsHouse("easy");
-    const from = a.frames.length;
-    a.send("makeMove", { roomId, index: 4 });
-    await a.wait((f) => f.t === "gameUpdate" && f.d.lastMoveBy === 1, from);
+  const stub = (roomId: string) => (env as any).ROOM.getByName(roomId);
+  const held = (roomId: string, patch?: (s: any) => void): Promise<any> => (runInDurableObject as any)(stub(roomId), async (o: any, st: any) => { if (patch) { patch(o.s); await st.storage.put("room", o.s); } return { abandonAt: o.s.abandonAt, alarm: await st.storage.getAlarm() }; });
+  const played = async () => {
+    const v = await vsHouse("easy");
+    const from = v.a.frames.length;
+    v.a.send("makeMove", { roomId: v.roomId, index: 4 });
+    await v.a.wait((f) => f.t === "gameUpdate" && f.d.lastMoveBy === 1, from);
+    return v;
+  };
+
+  it("holds the seat for a grace when the bot leaves; the alarm then settles a loss", async () => {
+    const { a, roomId } = await played();
     a.close();
-    expect(bots(await rows(2))).toMatchObject({ games: 1, losses: 1 });
-    const g = await open(`/ws/room/${roomId}`); // a guest cannot revive or re-rate it
-    await g.call("joinRoom", { roomId, clientId: "guest" });
     await new Promise((r) => setTimeout(r, 50));
-    expect(bots(await rows(2))).toMatchObject({ games: 1 });
+    const h = await held(roomId);
+    expect(h.abandonAt).toBeGreaterThan(Date.now() + 20_000);
+    expect(h.alarm).toBeLessThanOrEqual(h.abandonAt);
+    expect((await arena()).games).toEqual({}); // not settled yet
+    const g = await open(`/ws/room/${roomId}`); // nobody else may take the held seat
+    expect((await g.call("joinRoom", { roomId, clientId: "guest" })).player).toBe("spectator");
+    await held(roomId, (s) => { s.abandonAt = Date.now() - 1; });
+    expect(await runDurableObjectAlarm(stub(roomId))).toBe(true);
+    expect(bots(await rows(2))).toMatchObject({ games: 1, losses: 1 });
+  });
+
+  it("resumes when the same bot rejoins inside the grace, and rates the finished game once", async () => {
+    const { a, roomId, key } = await played();
+    a.close();
+    await new Promise((r) => setTimeout(r, 50));
+    const b = await open(`/ws/room/${roomId}`);
+    expect((await b.call("joinRoom", { roomId, clientId: "other", botKey: key })).player).toBe("X"); // botKey path
+    expect((await held(roomId)).abandonAt).toBeNull();
+    expect(await runDurableObjectAlarm(stub(roomId))).toBe(true); // an alarm with nothing due changes nothing
+    expect((await arena()).games).toEqual({});
+    b.send("resign", { roomId });
+    expect(bots(await rows(2))).toMatchObject({ games: 1, losses: 1 });
+  });
+
+  it("resumes on the same clientId without a key", async () => {
+    const { a, roomId } = await played();
+    a.close();
+    await new Promise((r) => setTimeout(r, 50));
+    const b = await open(`/ws/room/${roomId}`);
+    expect((await b.call("joinRoom", { roomId, clientId: `c${ipN}` })).player).toBe("X");
+    expect((await held(roomId)).abandonAt).toBeNull();
   });
 
   it("rates a rematch as a new game", async () => {
@@ -213,7 +250,7 @@ describe("no dodging a loss", () => {
       a.send("makeMove", { roomId, index: 4 });
       await a.wait((f) => f.t === "gameUpdate" && f.d.lastMoveBy === 1, from);
       a.send("resign", { roomId });
-      if (i === 20) expect((await a.wait((f) => f.t === "unrated")).d.reason).toBe("daily house limit");
+      if (i === 20) expect((await a.wait((f) => f.t === "unrated")).d).toEqual({ reason: "daily house limit", gameId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
       else await a.wait((f) => f.t === "gameUpdate" && f.d.status === "win", from);
       await new Promise((r) => setTimeout(r, 5));
       a.close();
