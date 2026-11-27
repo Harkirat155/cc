@@ -1,3 +1,4 @@
+/* global process */
 /**
  * @jest-environment node
  */
