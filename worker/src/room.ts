@@ -392,7 +392,10 @@ export class Room extends DurableObject {
       return;
     }
     s.state = result.state;
-    s.lastMove = move;
+    const m = move as any;
+    s.lastMove = m.type === "transfer"
+      ? { type: m.type, from: m.from, to: m.to, captures: String(m.captures ?? "").split(",").filter(Boolean).map(Number) }
+      : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
     await this.save();

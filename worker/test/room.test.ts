@@ -216,6 +216,14 @@ describe("game: makeMove", () => {
     expect(w.roster).toMatchObject({ XName: "Alice", OName: "Bob" });
   });
 
+  it("broadcasts and stores only a move's own fields as lastMove", async () => {
+    const { a, b, roomId, stored } = await pair();
+    a.send("makeMove", { roomId, move: { type: "place", cell: 4, junk: "x".repeat(1000) } });
+    const w = (await b.wait((f) => f.t === "gameUpdate" && f.d.board?.[4] === "X")).d;
+    expect(w.lastMove).toEqual({ type: "place", cell: 4 });
+    expect((await stored()).lastMove).toEqual({ type: "place", cell: 4 });
+  });
+
   it("silently drops a wrong-turn move, a spectator move and an occupied cell", async () => {
     const { a, b, roomId, mv, stored } = await pair();
     const s = await open(`/ws/room/${roomId}`);
