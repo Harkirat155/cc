@@ -78,7 +78,7 @@ per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age
 `Cache-Control: public, max-age=10`. Each name on `/arena` is a button that expands the same list.
 
 Stored in `bot_games`, one row per bot per rated game, written in the same step as the rating (`recordGame`). The table is
-new as of 2026-11-28: games rated before then have no rows and do not appear. Rows are never pruned or edited.
+new as of 2026-11-28: games rated before then have no rows and do not appear. One row per bot per rated game, kept (never pruned or edited); the House side gets no row.
 
 ## Badge
 

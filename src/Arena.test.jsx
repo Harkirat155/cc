@@ -1,7 +1,7 @@
 /* global process */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import Arena, { apiBase } from "./Arena";
 
 const show = () => render(<MemoryRouter><Arena /></MemoryRouter>);
@@ -72,7 +72,7 @@ describe("Arena page", () => {
     it("expands a bot's last games on demand, one compact line each", async () => {
       stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [{ gameId: "ttt", opponent: "House (easy)", result: "win", ratingAfter: 1216, at: 1 }, { gameId: "ttt", opponent: "guest", result: "loss", ratingAfter: 1200, at: 0 }] }) });
       show();
-      const btn = await screen.findByRole("button", { name: "Ada Bot" });
+      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
       expect(window.fetch.mock.calls.some(([u]) => String(u).includes("/api/arena/Ada"))).toBe(false);
       fireEvent.click(btn);
       expect(await screen.findByText("Won vs House (easy) · Tic-Tac-Toe · 1216")).toBeTruthy();
@@ -80,17 +80,47 @@ describe("Arena page", () => {
       expect(screen.getByRole("button", { name: "Badge" })).toBeTruthy();
     });
 
+    it("keeps the newest answer when an older request for the same bot lands last, and keeps loaded data on re-expand", async () => {
+      const pending = [];
+      window.fetch = jest.fn((url) => (String(url).endsWith("/api/live") ? Promise.resolve({ ok: true, json: async () => ({ games: [] }) })
+        : String(url).includes("/api/arena/Ada%20Bot") ? new Promise((res) => pending.push(res)) : Promise.resolve({ ok: true, json: async () => row })));
+      const reply = (g) => ({ ok: true, json: async () => ({ name: "Ada Bot", games: [{ gameId: "ttt", opponent: g, result: "win", ratingAfter: 1216, at: 1 }] }) });
+      show();
+      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
+      fireEvent.click(btn); fireEvent.click(btn); fireEvent.click(btn); // open, close, open again: two requests
+      await waitFor(() => expect(pending).toHaveLength(2));
+      await act(async () => { pending[1](reply("Newer")); });
+      await act(async () => { pending[0](reply("Older")); });
+      expect(await screen.findByText("Won vs Newer · Tic-Tac-Toe · 1216")).toBeTruthy();
+      expect(screen.queryByText(/Older/)).toBeNull();
+      fireEvent.click(btn); fireEvent.click(btn); // collapse, expand: loaded data stays visible while it refetches
+      expect(screen.getByText("Won vs Newer · Tic-Tac-Toe · 1216")).toBeTruthy();
+      expect(screen.queryByText(/Loading/)).toBeNull();
+    });
+
+    it("labels the button, points aria-controls at the region, and announces loading politely", async () => {
+      window.fetch = jest.fn((url) => (String(url).endsWith("/api/live") ? Promise.resolve({ ok: true, json: async () => ({ games: [] }) })
+        : String(url).includes("/api/arena/Ada%20Bot") ? new Promise(() => {}) : Promise.resolve({ ok: true, json: async () => row })));
+      show();
+      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
+      fireEvent.click(btn);
+      const region = document.getElementById(btn.getAttribute("aria-controls"));
+      expect(region).toBeTruthy();
+      expect(region.getAttribute("aria-live")).toBe("polite");
+      expect(region.textContent).toMatch(/Loading/);
+    });
+
     it("says so when the games cannot be loaded", async () => {
       stub({ ok: false, status: 500 });
       show();
-      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot: last 10 games" }));
       expect(await screen.findByText("Could not load this bot's games")).toBeTruthy();
     });
 
     it("says since when games are recorded when there are none", async () => {
       stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [] }) });
       show();
-      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot: last 10 games" }));
       expect(await screen.findByText("No rated games recorded since 2026-11-28")).toBeTruthy();
     });
   });

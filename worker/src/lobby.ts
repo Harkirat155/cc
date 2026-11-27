@@ -72,6 +72,11 @@ export class Lobby extends DurableObject {
   // One finished game. `a` and `b` are registered bot names or null (guest, fixed at ELO_START and never stored);
   // `score` is a's result: 1 win, 0.5 draw, 0 loss. Both sides use the ratings from before the game.
   recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): "rated" | "skipped" | "limit" {
+    // One transaction: the settled mark, the house counter, both rating upserts and the history rows land together or not at all.
+    return this.ctx.storage.transactionSync(() => this.settle(id, gameId, a, b, score));
+  }
+
+  private settle(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): "rated" | "skipped" | "limit" {
     const sql = this.ctx.storage.sql;
     if (sql.exec("INSERT OR IGNORE INTO settled_games (id) VALUES (?)", id).rowsWritten === 0) return "skipped"; // already rated
     const house = [a, b].some((n) => n && HOUSE_NAMES[n.toLowerCase()]);
@@ -88,7 +93,7 @@ export class Lobby extends DurableObject {
     const now = Date.now();
     const put = (n: string | null, r: number, s: number, e: number, opp: string | null) => {
       if (!n) return;
-      sql.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, ?, ?, ?, ?, ?)",
+      if (!HOUSE_NAMES[n.toLowerCase()]) sql.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, ?, ?, ?, ?, ?)",
         n.toLowerCase(), gameId, opp ? HOUSE_NAMES[opp.toLowerCase()] ?? opp : "guest", s === 1 ? "win" : s === 0 ? "loss" : "draw", r + ELO_K * (s - e), now);
       sql.exec(
         `INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, ?, ?, 1, ?, ?, ?)

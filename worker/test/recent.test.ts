@@ -57,3 +57,38 @@ describe("GET /api/arena/:name", () => {
     expect(badge.headers.get("content-type")).toContain("image/svg+xml");
   });
 });
+
+describe("settlement", () => {
+  const count = (t: string, where = "1=1") => sql((s) => s.exec(`SELECT COUNT(*) AS n FROM ${t} WHERE ${where}`).one().n as number);
+
+  it("is all-or-nothing: a throw leaves no settled mark, rating or history row", async () => {
+    await reg("Atomic"); await reg("Boom");
+    await sql((s) => s.exec("CREATE TRIGGER bg_boom BEFORE INSERT ON bot_games WHEN NEW.name_lc = 'boom' BEGIN SELECT RAISE(ABORT, 'boom'); END"));
+    try {
+      await expect(play("tx1", "ttt", "Atomic", "Boom", 1)).rejects.toThrow();
+    } finally { await sql((s) => s.exec("DROP TRIGGER bg_boom")); }
+    expect(await count("settled_games")).toBe(0);
+    expect(await count("ratings")).toBe(0);
+    expect(await count("bot_games")).toBe(0);
+  });
+
+  it("replaying a settlement id leaves one history row per bot and the ratings unchanged", async () => {
+    await reg("Replay A"); await reg("Replay B");
+    await play("rp1", "ttt", "Replay A", "Replay B", 1);
+    const before = await sql((s) => s.exec("SELECT name_lc, rating FROM ratings ORDER BY name_lc").toArray());
+    expect(await play("rp1", "ttt", "Replay A", "Replay B", 1)).toBe("skipped");
+    expect(await count("bot_games")).toBe(2);
+    expect(await sql((s) => s.exec("SELECT name_lc, rating FROM ratings ORDER BY name_lc").toArray())).toEqual(before);
+  });
+
+  it("writes exactly one history row for a bot-vs-House game, and none when the daily house limit makes it unrated", async () => {
+    await reg("Houseman");
+    await play("h1", "ttt", "Houseman", "House (easy)", 1);
+    expect(await count("bot_games")).toBe(1);
+    expect(await count("bot_games", "name_lc LIKE 'house (%'")).toBe(0);
+    expect(await count("ratings", "name_lc = 'house (easy)'")).toBe(1); // house ratings unchanged
+    await sql((s) => s.exec("UPDATE house_games SET n = 20"));
+    expect(await play("h2", "ttt", "Houseman", "House (easy)", 1)).toBe("limit");
+    expect(await count("bot_games")).toBe(1);
+  });
+});
