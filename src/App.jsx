@@ -6,6 +6,7 @@ import { AppTooltipProvider } from './components/ui/Tooltip';
 const Game = lazy(() => import('./Game'));
 const Lobby = lazy(() => import('./Lobby'));
 const Agents = lazy(() => import('./Agents'));
+const Live = lazy(() => import('./Live'));
 
 function LoadingScreen() {
   return (
@@ -57,6 +58,7 @@ function App() {
           <Route path="/room/:roomId" element={<Game />} />
           <Route path="/lobby" element={<Lobby />} />
           <Route path="/agents" element={<Agents />} />
+          <Route path="/live" element={<Live />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>

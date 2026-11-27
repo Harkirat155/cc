@@ -248,13 +248,19 @@ const Game = () => {
   const menuItems = useMemo(
     () => [
       {
+        key: "live",
+        label: "Watch live games",
+        description: "See games in progress and join as a spectator",
+        onSelect: () => navigate("/live"),
+      },
+      {
         key: "feedback",
         label: "Send feedback",
         description: "Rate your experience and share ideas",
         onSelect: openFeedbackForm,
       },
     ],
-    [openFeedbackForm]
+    [openFeedbackForm, navigate]
   );
 
   // Auto-join a room when visiting /room/:roomId via a shared link

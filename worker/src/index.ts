@@ -81,6 +81,12 @@ app.get("/ws/lobby", async (c) => {
   return c.env.LOBBY.getByName("lobby").fetch(c.req.raw);
 });
 
+// Public, read-only list of listed games in progress (docs/live-games.md). No socket or client ids.
+app.get("/api/live", async (c) => {
+  const games = await c.env.LOBBY.getByName("lobby").listLive();
+  return c.json({ games }, 200, { "Cache-Control": "public, max-age=5" });
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

@@ -4,6 +4,8 @@ import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from 
 
 type Msg = Record<string, unknown>;
 interface Att { sid: string }
+const LIVE_MAX = 50;
+const LIVE_STALE_MS = 60 * 60_000;
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -15,6 +17,30 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS feedback (seq INTEGER PRIMARY KEY AUTOINCREMENT, entry TEXT NOT NULL)");
     // seq is the FIFO order (lobbyManager sorts by joinedAt; seq is the same order and never ties).
     sql.exec("CREATE TABLE IF NOT EXISTS queue (seq INTEGER PRIMARY KEY AUTOINCREMENT, sid TEXT NOT NULL UNIQUE, name TEXT NOT NULL, game_id TEXT NOT NULL, joined_at INTEGER NOT NULL)");
+    // Public live-games registry (GET /api/live). Rooms push here; a row is public by construction: no sids.
+    sql.exec("CREATE TABLE IF NOT EXISTS live (room_id TEXT PRIMARY KEY, game_id TEXT NOT NULL, x_name TEXT, o_name TEXT, moves INTEGER NOT NULL, started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
+  }
+
+  reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO live (room_id, game_id, x_name, o_name, moves, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      r.roomId, r.gameId, r.x, r.o, r.moves, r.startedAt, Date.now());
+  }
+
+  unlist(roomId: string): void {
+    this.ctx.storage.sql.exec("DELETE FROM live WHERE room_id = ?", roomId);
+  }
+
+  // Newest game first, at most LIVE_MAX. A row nobody refreshed for LIVE_STALE_MS is a room that vanished
+  // without telling us (eviction, deploy), so it is dropped here rather than listed as live.
+  listLive() {
+    const sql = this.ctx.storage.sql;
+    sql.exec("DELETE FROM live WHERE updated_at < ?", Date.now() - LIVE_STALE_MS);
+    return sql
+      .exec<{ room_id: string; game_id: string; x_name: string | null; o_name: string | null; moves: number; started_at: number }>(
+        "SELECT room_id, game_id, x_name, o_name, moves, started_at FROM live ORDER BY started_at DESC LIMIT ?", LIVE_MAX)
+      .toArray()
+      .map((r) => ({ roomId: r.room_id, gameId: r.game_id, players: [r.x_name ?? "Anonymous", r.o_name ?? "Anonymous"], moves: r.moves, startedAt: r.started_at }));
   }
 
   // addPlayer, lobbyManager.js:26. Same checks in the same order, same messages.
