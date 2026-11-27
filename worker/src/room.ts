@@ -26,6 +26,8 @@ interface RoomState {
   seatTokens: Record<string, { seat: Seat; exp: number }>;
   // Voice chat members (brick 9): sid -> muted. Room state, not attachment, so publish reads one place.
   voice: Record<string, { muted: boolean }>;
+  // server/roomManager.js touch(): ms epoch of the last game, room or voice event. Saved with the next save.
+  lastTouched: number;
 }
 // voice:signal payload cap, serialized. Express had none beyond the Socket.IO 1 MB frame.
 const MAX_SIGNAL_BYTES = 64 * 1024;
@@ -60,12 +62,14 @@ const fresh = (roomId: string): RoomState => ({
   newGameRequestedAt: null,
   seatTokens: {},
   voice: {},
+  lastTouched: Date.now(),
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.lastMoveBy = null; };
 
 export class Room extends DurableObject {
   private s: RoomState | null = null;
+  private armed = false; // an alarm is known to be set, so frames skip the getAlarm read
   private after: (() => void)[] = []; // broadcasts that follow the ack, as io emits after ack() in roomHandlers.js
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -78,6 +82,7 @@ export class Room extends DurableObject {
         st.state = getRules(st.gameId).createInitialState();
       }
       this.s = st && { ...fresh(st.roomId), ...st };
+      await this.arm(); // one getAlarm read on wake, so a room that lost its alarm gets one
     });
   }
 
@@ -86,6 +91,7 @@ export class Room extends DurableObject {
     if (this.s) return false;
     this.s = fresh(roomId);
     await this.save();
+    await this.arm();
     return true;
   }
 
@@ -101,6 +107,7 @@ export class Room extends DurableObject {
       s.seatTokens[q.token] = { seat: q.seat, exp: Date.now() + TOKEN_TTL_MS };
     }
     await this.save();
+    await this.arm();
     return true;
   }
 
@@ -132,7 +139,7 @@ export class Room extends DurableObject {
     const ack = (body: unknown) => {
       if (Number.isInteger(id)) ws.send(JSON.stringify({ t: "ack", id, d: body }));
     };
-    // TODO(brick 11): touch/TTL alarm on every game event, as touch() does in gameHandlers.js.
+    this.touch(); // every game, room and voice event, as touch() does in the Express handlers
     switch (t) {
       case "createRoom": ack(await this.createRoom(ws, data)); break;
       case "joinRoom": ack(await this.joinRoom(ws, data)); break;
@@ -150,6 +157,42 @@ export class Room extends DurableObject {
       case "voice:signal": this.voiceSignal(ws, data); break;
     }
     for (const f of this.after.splice(0)) f();
+    await this.arm();
+  }
+
+  // Room GC, server/roomGC.js: delete only a room with no occupants and now - lastTouched > ROOM_TTL_MS
+  // (config.js:29: default 120000, clamp 10000-3600000). An unexpired seat token also keeps it, so a
+  // matched room outlives its tokens whatever the TTL. The alarm only ever re-arms at the deadline.
+  async alarm(): Promise<void> {
+    this.armed = false;
+    const s = this.s;
+    if (!s) return;
+    const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
+    const occupied = !!((s.players.X && live.has(s.players.X)) || (s.players.O && live.has(s.players.O)) || s.spectators.some((x) => live.has(x)));
+    const due = Math.max(s.lastTouched + this.ttl(), ...Object.values(s.seatTokens).map((q) => q.exp));
+    if (occupied || Date.now() <= due) {
+      await this.ctx.storage.setAlarm(occupied ? Date.now() + this.ttl() : due);
+      this.armed = true;
+      return;
+    }
+    const sockets = this.ctx.getWebSockets();
+    this.s = null;
+    await this.ctx.storage.deleteAll();
+    for (const w of sockets) try { w.close(1000, "room expired"); } catch { /* already closed */ }
+  }
+
+  private ttl() {
+    return envInt((this.env as Record<string, unknown>).ROOM_TTL_MS, 120_000, 10_000, 3_600_000);
+  }
+
+  private touch() {
+    if (this.s) this.s.lastTouched = Date.now();
+  }
+
+  private async arm() {
+    if (this.armed || !this.s) return;
+    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(this.s.lastTouched + this.ttl());
+    this.armed = true;
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -166,9 +209,11 @@ export class Room extends DurableObject {
     const s = this.s;
     const sid = this.att(ws).sid;
     if (!s || !sid) return;
+    this.touch();
     const voiced = this.dropVoice(s, sid);
     if (!this.free(s, sid) && !voiced) return;
     await this.save();
+    await this.arm();
     this.publish(ws);
   }
 
