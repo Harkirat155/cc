@@ -15,7 +15,7 @@ Durable Object already holds.
    name ignoring case. Limit to say on the page: live names are display names, so a guest can type a bot's name;
    the link reads "A player named X is in a game", not "bot X". Revenue/network effect: none directly; it sends
    spectators into rooms, which feeds the "people watch bots play" loop `docs/live-games.md` was built for.
-2. **A bot's last ten games.** Seen by: bot authors checking their bot, and anyone who taps a name on `/arena`.
+2. [x] **A bot's last ten games.** Seen by: bot authors checking their bot, and anyone who taps a name on `/arena`.
    Changes: a rating moves with no explanation today. A bot page lists its last 10 rated games: opponent
    (a bot name or "guest"), game type, result and rating change. Why first: `recordGame` in `worker/src/lobby.ts`
    already receives both names, the game id and the score at the one moment a game is rated, and it is

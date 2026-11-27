@@ -37,6 +37,9 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS settled_games (id TEXT PRIMARY KEY)");
     sql.exec("CREATE TABLE IF NOT EXISTS house_games (name_lc TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (name_lc, day))");
     sql.exec("CREATE TABLE IF NOT EXISTS ratings (name_lc TEXT NOT NULL, game_id TEXT NOT NULL, rating REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL, draws INTEGER NOT NULL, losses INTEGER NOT NULL, PRIMARY KEY (name_lc, game_id))");
+    // A bot's per-game history (GET /api/arena/:name), written with the rating in recordGame. Additive: rows exist only for games rated after this table shipped. id is an internal order, never served.
+    sql.exec("CREATE TABLE IF NOT EXISTS bot_games (id INTEGER PRIMARY KEY AUTOINCREMENT, name_lc TEXT NOT NULL, game_id TEXT NOT NULL, opponent TEXT NOT NULL, result TEXT NOT NULL, rating_after REAL NOT NULL, at INTEGER NOT NULL)");
+    sql.exec("CREATE INDEX IF NOT EXISTS bot_games_by_bot ON bot_games (name_lc, id)");
   }
 
   async registerBot(name: unknown, ip: string): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
@@ -82,15 +85,18 @@ export class Lobby extends DurableObject {
     const get = (n: string | null) => (n ? sql.exec<{ rating: number }>("SELECT rating FROM ratings WHERE name_lc = ? AND game_id = ?", n.toLowerCase(), gameId).toArray()[0]?.rating ?? ELO_START : ELO_START);
     const [ra, rb] = [get(a), get(b)];
     const exp = 1 / (1 + 10 ** ((rb - ra) / 400));
-    const put = (n: string | null, r: number, s: number, e: number) => {
+    const now = Date.now();
+    const put = (n: string | null, r: number, s: number, e: number, opp: string | null) => {
       if (!n) return;
+      sql.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, ?, ?, ?, ?, ?)",
+        n.toLowerCase(), gameId, opp ? HOUSE_NAMES[opp.toLowerCase()] ?? opp : "guest", s === 1 ? "win" : s === 0 ? "loss" : "draw", r + ELO_K * (s - e), now);
       sql.exec(
         `INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, ?, ?, 1, ?, ?, ?)
          ON CONFLICT (name_lc, game_id) DO UPDATE SET rating = excluded.rating, games = games + 1, wins = wins + excluded.wins, draws = draws + excluded.draws, losses = losses + excluded.losses`,
         n.toLowerCase(), gameId, r + ELO_K * (s - e), s === 1 ? 1 : 0, s === 0.5 ? 1 : 0, s === 0 ? 1 : 0);
     };
-    put(a, ra, score, exp);
-    put(b, rb, 1 - score, 1 - exp);
+    put(a, ra, score, exp, b);
+    put(b, rb, 1 - score, 1 - exp, a);
     return "rated";
   }
 
@@ -114,6 +120,19 @@ export class Lobby extends DurableObject {
       .exec<{ name: string; rating: number }>("SELECT b.name, r.rating FROM ratings r JOIN bots b ON b.name_lc = r.name_lc WHERE r.name_lc = ? AND r.game_id = ?", name.toLowerCase(), gameId)
       .toArray()[0];
     return r ? { name: r.name, rating: Math.round(r.rating) } : null;
+  }
+
+  // A registered bot's last 10 rated games, newest first. Null when the name is not registered. Names and numbers only.
+  recentGames(name: string): { name: string; games: { gameId: string; opponent: string; result: string; ratingAfter: number; at: number }[] } | null {
+    const sql = this.ctx.storage.sql;
+    const lc = name.toLowerCase();
+    const bot = sql.exec<{ name: string }>("SELECT name FROM bots WHERE name_lc = ?", lc).toArray()[0];
+    if (!bot) return null;
+    const games = sql
+      .exec<{ game_id: string; opponent: string; result: string; rating_after: number; at: number }>("SELECT game_id, opponent, result, rating_after, at FROM bot_games WHERE name_lc = ? ORDER BY id DESC LIMIT 10", lc)
+      .toArray()
+      .map((r) => ({ gameId: r.game_id, opponent: r.opponent, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
+    return { name: bot.name, games };
   }
 
   reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {

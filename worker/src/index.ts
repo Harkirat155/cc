@@ -96,6 +96,13 @@ app.post("/api/bots", async (c) => {
 
 app.get("/api/arena", async (c) => c.json({ games: await c.env.LOBBY.getByName("lobby").listArena() }, 200, { "Cache-Control": "public, max-age=10" }));
 
+// A bot's last 10 rated games (docs/arena.md). One path segment, so it never matches /api/arena/badge/:file.
+app.get("/api/arena/:name", async (c) => {
+  const name = c.req.param("name");
+  const r = /^[A-Za-z0-9 _-]{3,24}$/.test(name) ? await c.env.LOBBY.getByName("lobby").recentGames(name) : null;
+  return r ? c.json(r, 200, { "Cache-Control": "public, max-age=10" }) : c.json({ error: "bot not found" }, 404);
+});
+
 // Rating badge for a bot's README (docs/arena.md): a flat SVG, no storage. Unknown bot or no games: grey "unrated", still 200.
 const BADGE_GAMES: Record<string, string> = { ttt: "Tic-Tac-Toe", connect4: "Connect Four", checkers: "Checkers", five: "Five in a Row" };
 const XML: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" };

@@ -64,4 +64,34 @@ describe("Arena page", () => {
     expect(field.value).toBe("[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/Ada%20Bot.svg?game=connect4)](https://harkirat155.github.io/cc/arena)");
     expect(screen.getByRole("button", { name: "Copy failed: select the text below" })).toBeTruthy();
   });
+
+  describe("recent games", () => {
+    const row = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }] } };
+    const stub = (recent) => { window.fetch = jest.fn(async (url) => (String(url).endsWith("/api/live") ? { ok: true, json: async () => ({ games: [] }) } : String(url).includes("/api/arena/Ada%20Bot") ? recent : { ok: true, json: async () => row })); };
+
+    it("expands a bot's last games on demand, one compact line each", async () => {
+      stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [{ gameId: "ttt", opponent: "House (easy)", result: "win", ratingAfter: 1216, at: 1 }, { gameId: "ttt", opponent: "guest", result: "loss", ratingAfter: 1200, at: 0 }] }) });
+      show();
+      const btn = await screen.findByRole("button", { name: "Ada Bot" });
+      expect(window.fetch.mock.calls.some(([u]) => String(u).includes("/api/arena/Ada"))).toBe(false);
+      fireEvent.click(btn);
+      expect(await screen.findByText("Won vs House (easy) · Tic-Tac-Toe · 1216")).toBeTruthy();
+      expect(screen.getByText("Lost vs guest · Tic-Tac-Toe · 1200")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Badge" })).toBeTruthy();
+    });
+
+    it("says so when the games cannot be loaded", async () => {
+      stub({ ok: false, status: 500 });
+      show();
+      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot" }));
+      expect(await screen.findByText("Could not load this bot's games")).toBeTruthy();
+    });
+
+    it("says since when games are recorded when there are none", async () => {
+      stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [] }) });
+      show();
+      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot" }));
+      expect(await screen.findByText("No rated games recorded since 2026-11-28")).toBeTruthy();
+    });
+  });
 });
