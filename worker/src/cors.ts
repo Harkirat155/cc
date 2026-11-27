@@ -30,6 +30,8 @@ export const cors: MiddlewareHandler<{ Bindings: { CORS_ORIGINS?: string } }> = 
   if (c.req.method === "OPTIONS") return new Response(null, { status: 204, headers: h });
 
   await next();
+  // A 101 upgrade response has immutable headers, and CORS does not apply to a socket (the Origin check above does).
+  if (c.res.status === 101) return;
   // Set on the final Response: Hono drops c.header() values when a handler returns its own Response.
   for (const [k, v] of h) k === "Vary" ? c.res.headers.append(k, v) : c.res.headers.set(k, v);
 };
