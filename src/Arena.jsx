@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
+import { liveUrl } from "./Live";
+import { watchRooms } from "./arenaWatch";
 
 const REFRESH_MS = 30_000;
 
@@ -14,6 +16,7 @@ export function apiBase() {
 function Arena() {
   const [games, setGames] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
+  const [rooms, setRooms] = useState(() => new Map()); // lowercased name -> roomId; optional, empty on any failure
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = apiBase() || "https://cc-api.harkirat-hira.workers.dev";
 
@@ -25,6 +28,13 @@ function Arena() {
       setFailed(false);
     } catch {
       setFailed(true);
+    }
+    try {
+      const res = await window.fetch(liveUrl());
+      if (!res.ok) throw new Error(String(res.status));
+      setRooms(watchRooms((await res.json()).games));
+    } catch {
+      setRooms(new Map());
     }
   }, []);
 
@@ -66,7 +76,12 @@ function Arena() {
               <tbody>
                 {games[id].map((b, i) => (
                   <tr key={b.name} className="border-t border-foreground/10">
-                    <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">{b.name}</td><td className="pr-2">{b.rating}</td>
+                    <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">
+                      {b.name}
+                      {rooms.has(b.name.toLowerCase()) && (
+                        <Link to={`/room/${rooms.get(b.name.toLowerCase())}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
+                      )}
+                    </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>
                 ))}

@@ -32,6 +32,24 @@ describe("Arena page", () => {
     expect(screen.queryByText(/No rated bot/)).toBeNull();
   });
 
+  it("links a row to the room of a live player with the same name, and says only that a player has that name", async () => {
+    const arena = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }, { name: "Grace Bot", rating: 1200, games: 1, wins: 0, draws: 1, losses: 0 }] } };
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [{ roomId: "r9", players: ["ada bot", "Sam"] }] } : arena) }));
+    show();
+    const link = await screen.findByRole("link", { name: "A player named Ada Bot is in a game · Watch" });
+    expect(link.getAttribute("href")).toBe("/room/r9");
+    expect(screen.queryByRole("link", { name: /Grace Bot/ })).toBeNull();
+  });
+
+  it("still renders the leaderboard, with no links and no error, when /api/live fails", async () => {
+    const arena = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }] } };
+    window.fetch = jest.fn(async (url) => (String(url).endsWith("/api/live") ? { ok: false, status: 500 } : { ok: true, json: async () => arena }));
+    show();
+    expect(await screen.findByText("Ada Bot")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Watch$/ })).toBeNull();
+  });
+
   it("maps a ws base to http", () => {
     process.env.VITE_SOCKET_SERVER = "wss://cc-api.example.dev/";
     expect(apiBase()).toBe("https://cc-api.example.dev");
