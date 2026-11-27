@@ -4,6 +4,14 @@ JSON frames over one WebSocket, replacing Socket.IO. Game rules and payload shap
 Socket.IO contract; only the envelope is new. `shared/wsProtocol.test.js` checks that the headings below equal
 the events the server registers (17 client to server) and emits (12 server to client).
 
+## Sockets (Worker)
+
+The Worker serves two upgrade routes (`worker/src/index.ts`): `/ws/lobby`, and `/ws/room/:code` (`/ws/room/new` has
+the Worker pick a free code, then the client sends `createRoom`). `VITE_SOCKET_SERVER` is the base URL; the client
+shim (`src/utils/wsSocket.js`) opens the lobby socket first, moves to the room route on `createRoom`, `joinRoom` or
+`matchFound`, and on every Room socket open (first and each reconnect) sends `joinRoom` with `clientId` and, after
+a lobby match, the seat `token`. Any other path is 404. Saved curls: `docs/e2e.md`.
+
 ## Envelope
 
 Every frame is one JSON text message: `{"t":"<event>","id"?:n,"d"?:{...}}`.

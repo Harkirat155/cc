@@ -15,7 +15,7 @@ class FakeWS {
   drop() { this.onclose?.({}); }
 }
 
-const make = (opts) => new WsSocket("wss://x/ws", { WebSocketImpl: FakeWS, ...opts });
+const make = (opts) => new WsSocket("wss://x", { WebSocketImpl: FakeWS, ...opts });
 const last = () => FakeWS.instances[FakeWS.instances.length - 1];
 
 beforeEach(() => { FakeWS.instances = []; jest.useFakeTimers(); });
@@ -24,10 +24,10 @@ afterEach(() => jest.useRealTimers());
 test("ack resolves by id, out of order", () => {
   const s = make(); last().open();
   const a = jest.fn(), b = jest.fn();
-  s.emit("createRoom", { x: 1 }, a);
-  s.emit("joinRoom", { roomId: "ABCDE" }, b);
+  s.emit("switchGame", { x: 1 }, a);
+  s.emit("leaveRoom", { roomId: "ABCDE" }, b);
   const [f1, f2] = last().sent;
-  expect(f1).toEqual({ t: "createRoom", id: f1.id, d: { x: 1 } });
+  expect(f1).toEqual({ t: "switchGame", id: f1.id, d: { x: 1 } });
   expect(f2.id).not.toBe(f1.id);
   last().recv({ t: "ack", id: f2.id, d: { player: "O" } });
   expect(b).toHaveBeenCalledWith({ player: "O" });
@@ -98,6 +98,64 @@ test("unparseable frames are ignored", () => {
   expect(h).toHaveBeenCalledTimes(1);
 });
 
+describe("Worker routes and joinRoom", () => {
+  const CID = () => window.sessionStorage.getItem("cc_client_id");
+  const urls = () => FakeWS.instances.map((w) => w.url);
+
+  test("opens the lobby socket first", () => {
+    make();
+    expect(urls()).toEqual(["wss://x/ws/lobby"]);
+  });
+
+  test("matchFound moves to the Room socket, joins with clientId + token first, re-sends on reconnect", () => {
+    const s = make(); last().open();
+    const lobby = last();
+    const onMatch = jest.fn(); s.on("matchFound", onMatch);
+    lobby.recv({ t: "matchFound", d: { roomId: "ABCDE", player: "O", opponent: "p", token: "tok1" } });
+    expect(onMatch).toHaveBeenCalledTimes(1);
+    expect(lobby.closed).toBe(true);
+    expect(urls()).toEqual(["wss://x/ws/lobby", "wss://x/ws/room/ABCDE"]);
+    s.emit("makeMove", { roomId: "ABCDE", index: 0 }); // queued until the Room socket opens
+    last().open();
+    expect(last().sent).toEqual([
+      { t: "joinRoom", d: { roomId: "ABCDE", clientId: CID(), token: "tok1" } },
+      { t: "makeMove", d: { roomId: "ABCDE", index: 0 } },
+    ]);
+    expect(CID()).toBeTruthy();
+    last().drop();
+    jest.advanceTimersByTime(1000);
+    expect(last().url).toBe("wss://x/ws/room/ABCDE");
+    last().open();
+    expect(last().sent).toEqual([{ t: "joinRoom", d: { roomId: "ABCDE", clientId: CID(), token: "tok1" } }]);
+  });
+
+  test("createRoom uses /new once; reconnect rejoins the real code with no token", () => {
+    const s = make(); last().open();
+    const ack = jest.fn();
+    s.emit("createRoom", { clientId: "c" }, ack);
+    expect(last().url).toBe("wss://x/ws/room/new");
+    last().open();
+    const f = last().sent[0];
+    expect(f.t).toBe("createRoom"); // no joinRoom before a room exists
+    last().recv({ t: "ack", id: f.id, d: { roomId: "QWERT", player: "X" } });
+    expect(ack).toHaveBeenCalledWith({ roomId: "QWERT", player: "X" });
+    last().drop();
+    jest.advanceTimersByTime(1000);
+    expect(last().url).toBe("wss://x/ws/room/QWERT");
+    last().open();
+    expect(last().sent).toEqual([{ t: "joinRoom", d: { roomId: "QWERT", clientId: CID() } }]);
+  });
+
+  test("the app's own joinRoom picks the route and is sent once", () => {
+    const s = make(); last().open();
+    s.emit("joinRoom", { roomId: " abcde ", clientId: "c" }, jest.fn());
+    expect(last().url).toBe("wss://x/ws/room/ABCDE");
+    last().open();
+    expect(last().sent).toHaveLength(1);
+    expect(last().sent[0]).toMatchObject({ t: "joinRoom", d: { roomId: " abcde ", clientId: "c" } });
+  });
+});
+
 describe("socketManager flag", () => {
   const load = async (url) => {
     jest.resetModules();
@@ -114,9 +172,9 @@ describe("socketManager flag", () => {
   });
   test("wss URL uses the shim", async () => {
     globalThis.WebSocket = FakeWS;
-    const { io, m } = await load("wss://api.example.com/ws");
+    const { io, m } = await load("wss://api.example.com");
     m.getSocket();
     expect(io).not.toHaveBeenCalled();
-    expect(FakeWS.instances[0].url).toBe("wss://api.example.com/ws");
+    expect(FakeWS.instances[0].url).toBe("wss://api.example.com/ws/lobby");
   });
 });

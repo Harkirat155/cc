@@ -20,6 +20,7 @@
     "lint:backend": "eslint server --ext .js",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
+    "test:e2e": "playwright test",
     "check": "npm run lint && npm run build && node --check server/app.js"
   },
   "dependencies": {
@@ -42,6 +43,7 @@
     "@babel/preset-env": "^7.28.0",
     "@babel/preset-react": "^7.27.1",
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",

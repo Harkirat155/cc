@@ -14,6 +14,6 @@ export default {
   },
   transformIgnorePatterns: ['/node_modules/(?!lucide-react/)'],
   // Default ignore is only node_modules. Setting this replaces it, so keep both.
-  // worker/ tests run under Vitest (vitest-pool-workers), not Jest.
-  testPathIgnorePatterns: ['/node_modules/', '/worker/'],
+  // worker/ tests run under Vitest (vitest-pool-workers), e2e/ under Playwright, not Jest.
+  testPathIgnorePatterns: ['/node_modules/', '/worker/', '/e2e/'],
 };
