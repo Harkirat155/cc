@@ -3,6 +3,7 @@ import { Lobby } from "./lobby";
 import { cors } from "./cors";
 import { Room } from "./room";
 import { feedback } from "./feedback";
+import type { SheetsEnv } from "./sheets";
 import { genCode, validateRoomId } from "./validation";
 
 export { Lobby, Room };
@@ -29,7 +30,7 @@ const app = new Hono<{
     ROOM: DurableObjectNamespace<Room>;
     LOBBY: DurableObjectNamespace<Lobby>;
     CORS_ORIGINS?: string;
-  };
+  } & SheetsEnv;
 }>();
 
 app.use(cors);

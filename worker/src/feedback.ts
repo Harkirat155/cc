@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { Lobby } from "./lobby";
+import { appendFeedbackRow, sheetsConfigured, type SheetsEnv } from "./sheets";
 
 // Port of POST /feedback, server/app.js:103-170, plus the express.json({limit:'32kb'}) behaviour
-// of app.js:73-81. Differences: Google Sheets is out of scope (brick 10), so sheetsSync is always
-// "skipped" (what Express returns with Sheets unconfigured). req.ip is CF-Connecting-IP.
+// of app.js:73-81. Differences: the Sheets append runs in waitUntil, so a configured Worker returns
+// sheetsSync "queued" (Express awaits it); unconfigured is "skipped". req.ip is CF-Connecting-IP.
 const LIMIT = 32 * 1024; // body-parser '32kb' = 32768 bytes
 
 // Express's default error handler body for the 413 body-parser raises (finalhandler, production).
@@ -50,7 +51,7 @@ async function readCapped(req: Request): Promise<string | null> {
   return new TextDecoder().decode(all);
 }
 
-export const feedback = new Hono<{ Bindings: { LOBBY: DurableObjectNamespace<Lobby> } }>();
+export const feedback = new Hono<{ Bindings: { LOBBY: DurableObjectNamespace<Lobby> } & SheetsEnv }>();
 
 feedback.post("/feedback", async (c) => {
   let body: Record<string, unknown> = {};
@@ -101,5 +102,15 @@ feedback.post("/feedback", async (c) => {
     },
   });
 
-  return c.json({ status: "received", id: entry.id, sheetsSync: "skipped" }, 201);
+  if (!sheetsConfigured(c.env)) return c.json({ status: "received", id: entry.id, sheetsSync: "skipped" }, 201);
+  c.executionCtx.waitUntil(
+    appendFeedbackRow(c.env, {
+      timestamp: entry.receivedAt,
+      rating: entry.rating,
+      message: entry.message,
+      context: entry.context,
+      meta: entry.meta,
+    }),
+  );
+  return c.json({ status: "received", id: entry.id, sheetsSync: "queued" }, 201);
 });
