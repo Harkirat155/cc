@@ -118,6 +118,7 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null);
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
+  const [emote, setEmote] = useState(null); // the opponent's latest { slot, emote, id }; the UI hides it after ~2.5 s
   const [connectionState, setConnectionState] = useState(isConnected() ? "connected" : "disconnected");
 
   // Lobby state (inlined to avoid closure issues)
@@ -198,6 +199,7 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
       ...gameHandlers,
       ...lobbyHandlers,
       handleStartGame: () => setMessage("Game started"),
+      handleEmote: (d) => d && setEmote({ slot: d.slot, emote: d.emote, id: Date.now() }),
       handleConnection: connectionHandler,
       onInitialConnect: () => socket.connected && setConnectionState("connected"),
     };
@@ -708,6 +710,12 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
     socketId: getSocketId(),
     socket: socketRef.current,
     newGameRequestedAt,
+    emote,
+    // Room actions: no-ops outside a connected room. The server ignores them from spectators.
+    sendRoomAction: (type, extra) => {
+      if (!isMultiplayer || !roomId || !socketRef.current?.connected) return;
+      socketRef.current.emit(type, { roomId, ...extra });
+    },
     createRoom,
     joinRoom,
     handleSquareClick,

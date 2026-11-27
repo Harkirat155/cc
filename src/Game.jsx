@@ -16,6 +16,7 @@ import ScorePanel from "./components/ScorePanel";
 import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
 import OpponentControl from "./components/OpponentControl";
+import RoomActions from "./components/RoomActions";
 import useOpponent from "./hooks/useOpponent";
 import { getGamePalette } from "./components/games/palette";
 import { tally } from "./lib/tally";
@@ -64,6 +65,8 @@ const Game = () => {
     roster,
     voiceRoster,
     newGameRequestedAt,
+    emote,
+    sendRoomAction,
     socket,
     connectionState,
     displayName,
@@ -100,6 +103,14 @@ const Game = () => {
       enableMic(false);
     }
   };
+  // The opponent's emote bubble lasts 2.5 s.
+  const [visibleEmote, setVisibleEmote] = useState(null);
+  useEffect(() => {
+    if (!emote) return undefined;
+    setVisibleEmote(emote);
+    const t = setTimeout(() => setVisibleEmote(null), 2500);
+    return () => clearTimeout(t);
+  }, [emote]);
   const winningSquares = gameState.winningLine || [];
   // The cell filled by the move shown on the board: diff with the previous snapshot.
   const prevSquares = history?.[Math.min(viewIndex, history.length - 1) - 1]?.squares;
@@ -365,6 +376,7 @@ const Game = () => {
             isMultiplayer={isMultiplayer}
             displayName={displayName}
             onUpdateDisplayName={updateDisplayName}
+            emote={visibleEmote}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
             <div className="relative w-full">
@@ -390,6 +402,14 @@ const Game = () => {
               />
             </div>
           </div>
+          {isMultiplayer && player && (
+            <RoomActions
+              gameState={gameState}
+              socketId={socketId}
+              roster={roster}
+              onAction={sendRoomAction}
+            />
+          )}
         </div>
       </main>
       <MatchActionBar

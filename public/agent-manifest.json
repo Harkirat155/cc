@@ -313,6 +313,49 @@
         ]
       },
       {
+        "name": "resign",
+        "ack": false,
+        "payloadFields": [
+          "roomId"
+        ]
+      },
+      {
+        "name": "offerDraw",
+        "ack": false,
+        "payloadFields": [
+          "roomId"
+        ]
+      },
+      {
+        "name": "cancelDrawOffer",
+        "ack": false,
+        "payloadFields": [
+          "roomId"
+        ]
+      },
+      {
+        "name": "acceptDraw",
+        "ack": false,
+        "payloadFields": [
+          "roomId"
+        ]
+      },
+      {
+        "name": "declineDraw",
+        "ack": false,
+        "payloadFields": [
+          "roomId"
+        ]
+      },
+      {
+        "name": "emote",
+        "ack": false,
+        "payloadFields": [
+          "emote",
+          "roomId"
+        ]
+      },
+      {
         "name": "joinLobby",
         "ack": true,
         "payloadFields": [
@@ -379,6 +422,7 @@
         "payloadFields": [
           "board",
           "boardSpec",
+          "drawOfferer",
           "gameId",
           "lastEvents",
           "lastMove",
@@ -421,6 +465,13 @@
       {
         "name": "startGame",
         "payloadFields": []
+      },
+      {
+        "name": "emote",
+        "payloadFields": [
+          "emote",
+          "slot"
+        ]
       },
       {
         "name": "lobbyUpdate",

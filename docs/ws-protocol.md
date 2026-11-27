@@ -86,6 +86,30 @@ Source: server/handlers/gameHandlers.js:190
 Frame: `{"t":"cancelNewGameRequest","d":{"roomId":string}}`. No ack. Then `gameUpdate`.
 Source: server/handlers/gameHandlers.js:203
 
+### `resign`
+Frame: `{"t":"resign","d":{"roomId":string}}`. No ack. Seated players only, while the game is active with both seats filled; otherwise ignored. The other seat wins and its score rises by one. Then `gameUpdate`. Worker only.
+Source: worker/src/room.ts
+
+### `offerDraw`
+Frame: `{"t":"offerDraw","d":{"roomId":string}}`. No ack. Sets `drawOfferer` to the sender's socket id. Then `gameUpdate`. Worker only.
+Source: worker/src/room.ts
+
+### `cancelDrawOffer`
+Frame: `{"t":"cancelDrawOffer","d":{"roomId":string}}`. No ack. Only the offerer can cancel. Then `gameUpdate`. Worker only.
+Source: worker/src/room.ts
+
+### `acceptDraw`
+Frame: `{"t":"acceptDraw","d":{"roomId":string}}`. No ack. Only the seat that did not offer can accept; the game ends as a draw, scores unchanged. Then `gameUpdate`. Worker only.
+Source: worker/src/room.ts
+
+### `declineDraw`
+Frame: `{"t":"declineDraw","d":{"roomId":string}}`. No ack. Clears the offer. Then `gameUpdate`. A move, `resetGame` or `switchGame` also clears a pending offer. Worker only.
+Source: worker/src/room.ts
+
+### `emote`
+Frame: `{"t":"emote","d":{"roomId":string,"emote":"👍"|"👏"|"😮"|"😅"|"🤔"|"🔥"}}`. No ack. Seated players only; any other value is dropped, and so is an emote less than 1 s after the same socket's last one. Relayed to the other sockets as `emote`. Worker only.
+Source: worker/src/room.ts
+
 ### `joinLobby`
 Frame: `{"t":"joinLobby","id":n,"d"?:{"displayName"?:string,"gameId"?:string}}`.
 Ack: `{"success":true,"position":number}`; error `{"success":false,"error":string}`. May trigger `matchFound` or `matchError`.
@@ -120,7 +144,7 @@ Source: server/handlers/voiceHandlers.js:62
 All server frames are unacked and carry no `id`.
 
 ### `gameUpdate`
-`{"t":"gameUpdate","d":{...}}` to the room. Express batches per tick; the Worker sends one after each handled frame. `d` is the full room state: `board`, `turn`, `winner`, `winningLine`, `xScore`, `oScore`, `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
+`{"t":"gameUpdate","d":{...}}` to the room. Express batches per tick; the Worker sends one after each handled frame. `d` is the full room state: `board`, `turn`, `winner`, `winningLine`, `xScore`, `oScore`, `turnSlot`, `winnerSlot`, `scores:[n,n]`, `status`, `winningCells`, `playerInfo`, `marks`, `boardSpec`, `moveStyle`, `lastMove`, `lastEvents`, `lastMoveBy`, `newGameRequester`, `newGameRequestedAt`, `drawOfferer` (socket id of the pending draw offer or null), `roomId`, `gameId`, `roster:{X,O,XName,OName,spectators:[string]}`, `voiceRoster:{[socketId]:{muted:boolean}}`.
 Source: server/roomPublisher.js:146, :183
 
 ### `gameReset`
@@ -130,6 +154,10 @@ Source: server/handlers/gameHandlers.js:135, :182
 ### `startGame`
 `{"t":"startGame"}` to the room when both seats are filled; no `d`.
 Source: server/handlers/roomHandlers.js:155
+
+### `emote`
+`{"t":"emote","d":{"slot":0|1,"emote":string}}` to every other joined socket when a seated player sends `emote`. Not stored; clients show it for about 2.5 s. Worker only.
+Source: worker/src/room.ts
 
 ### `lobbyUpdate`
 `{"t":"lobbyUpdate","d":{"queue":[{"socketId":string,"displayName":string,"gameId":string,"joinedAt":number}],"timestamp":number}}` to every lobby socket, debounced.

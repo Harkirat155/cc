@@ -22,6 +22,8 @@ interface RoomState {
   lastMoveBy: number | null;
   newGameRequester: string | null;
   newGameRequestedAt: number | null;
+  // sid of the player whose draw offer is pending. Cleared by a move, a reset, a switch or the game ending.
+  drawOfferer: string | null;
   // One-time seat tokens from Lobby.reserveSeats (brick 8): token -> seat and expiry (ms epoch).
   seatTokens: Record<string, { seat: Seat; exp: number }>;
   // Voice chat members (brick 9): sid -> muted. Room state, not attachment, so publish reads one place.
@@ -38,7 +40,11 @@ interface Att {
   joined: boolean;
   // Rate limit state of server/rateLimiter.js, per socket: events in the current window, its start, ban end.
   rl?: { n: number; at: number; until: number };
+  em?: number; // ms epoch of this socket's last accepted emote
 }
+// The only emotes the room relays; no free text, so nothing to moderate. One per EMOTE_GAP_MS per socket.
+const EMOTES = ["👍", "👏", "😮", "😅", "🤔", "🔥"];
+const EMOTE_GAP_MS = 1000;
 // RATE_LIMIT_* of server/config.js:33-35, same names, defaults and clamps.
 const envInt = (v: unknown, def: number, min: number, max: number) => {
   const n = parseInt(String(v), 10);
@@ -60,11 +66,13 @@ const fresh = (roomId: string): RoomState => ({
   lastMoveBy: null,
   newGameRequester: null,
   newGameRequestedAt: null,
+  drawOfferer: null,
   seatTokens: {},
   voice: {},
   lastTouched: Date.now(),
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
+const clearOffer = (s: RoomState) => { s.drawOfferer = null; };
 const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.lastMoveBy = null; };
 
 export class Room extends DurableObject {
@@ -152,6 +160,16 @@ export class Room extends DurableObject {
       case "resetScores": await this.game(data, (s) => { s.state = { ...s.state, scores: [0, 0] }; }, ws); break;
       case "requestNewGame": await this.game(data, (s) => { s.newGameRequester = this.att(ws).sid; s.newGameRequestedAt = Date.now(); }, ws); break;
       case "cancelNewGameRequest": await this.game(data, clearRequest, ws); break;
+      case "resign": await this.resign(ws, data); break;
+      case "offerDraw": await this.game(data, (s) => { if (this.live(s)) s.drawOfferer = this.att(ws).sid; }, ws); break;
+      case "cancelDrawOffer": await this.game(data, (s) => { if (s.drawOfferer === this.att(ws).sid) clearOffer(s); }, ws); break;
+      case "declineDraw": await this.game(data, (s) => { if (s.drawOfferer && s.drawOfferer !== this.att(ws).sid) clearOffer(s); }, ws); break;
+      case "acceptDraw": await this.game(data, (s) => {
+        if (!this.live(s) || !s.drawOfferer || s.drawOfferer === this.att(ws).sid) return;
+        s.state = { ...s.state, status: "draw", winner: null, winningCells: [] };
+        clearOffer(s);
+      }, ws); break;
+      case "emote": this.emote(ws, data); break;
       case "switchGame": ack(await this.switchGame(ws, data)); break;
       case "voice:join": await this.voiceSet(ws, data, "voice:user-joined"); break;
       case "voice:mute-state": await this.voiceSet(ws, data, "voice:mute-state"); break;
@@ -398,6 +416,7 @@ export class Room extends DurableObject {
       : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
+    clearOffer(s);
     await this.save();
     this.publish(ws);
   }
@@ -409,9 +428,39 @@ export class Room extends DurableObject {
       const over = prev?.status === "win" || prev?.status === "draw";
       s.state = { ...getRules(s.gameId).createInitialState(), turn: over && prev.turn === 0 ? 1 : 0, scores: prev?.scores ? [...prev.scores] : [0, 0] };
       clearRequest(s);
+      clearOffer(s);
       clearLast(s);
     }, ws);
     if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
+  }
+
+  // A game in progress with both seats filled: the only time a resign or a draw offer means anything.
+  private live(s: RoomState) {
+    return s.state?.status === "active" && !!s.players.X && !!s.players.O;
+  }
+
+  // The resigning seat loses: the other slot wins and scores, as when a game ends on the board.
+  private async resign(ws: WebSocket, p: Msg) {
+    await this.game(p, (s) => {
+      const slot = this.slot(s, ws);
+      if (!this.live(s)) return;
+      const scores = [s.state.scores?.[0] || 0, s.state.scores?.[1] || 0];
+      scores[1 - slot]++;
+      s.state = { ...s.state, status: "win", winner: 1 - slot, winningCells: [], scores };
+      clearOffer(s);
+    }, ws);
+  }
+
+  // Relay a fixed emote to the other players; nothing is stored. Bad values and bursts drop silently.
+  private emote(ws: WebSocket, p: Msg) {
+    const s = this.room(p.roomId);
+    const slot = s ? this.slot(s, ws) : -1;
+    if (slot < 0 || typeof p.emote !== "string" || !EMOTES.includes(p.emote)) return;
+    const att = this.att(ws);
+    const now = Date.now();
+    if (att.em && now - att.em < EMOTE_GAP_MS) return;
+    ws.serializeAttachment({ ...att, em: now });
+    this.others(ws, { t: "emote", d: { slot, emote: p.emote } });
   }
 
   // gameHandlers.js:150. Emits before the ack, as Express does.
@@ -427,6 +476,7 @@ export class Room extends DurableObject {
     s.gameId = gameId;
     s.state = getRules(gameId).createInitialState();
     clearRequest(s);
+    clearOffer(s);
     clearLast(s);
     await this.save();
     this.publish(ws);
@@ -576,6 +626,7 @@ export class Room extends DurableObject {
         lastMoveBy: Number.isInteger(s.lastMoveBy) ? s.lastMoveBy : null,
         newGameRequester: s.newGameRequester ?? null,
         newGameRequestedAt: s.newGameRequestedAt ?? null,
+        drawOfferer: s.drawOfferer ?? null,
         roomId: s.roomId,
         gameId: s.gameId,
         roster: { X: s.players.X, O: s.players.O, XName: nameOf("X"), OName: nameOf("O"), spectators: s.spectators },

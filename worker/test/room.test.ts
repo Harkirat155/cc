@@ -318,6 +318,92 @@ describe("game: reset, scores, new-game requests", () => {
   });
 });
 
+describe("game: resign, draw offers, emotes", () => {
+  const flush = async (c: Client, roomId: string, watch = c) => {
+    const n = watch.frames.length;
+    c.send("updateDisplayName", { roomId, displayName: `F${n}` });
+    await watch.wait((f) => f.t === "gameUpdate" && (f.d.roster.XName === `F${n}` || f.d.roster.OName === `F${n}`), n);
+    return n;
+  };
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it("resign gives the opponent the win and the score", async () => {
+    const { a, b, roomId } = await pair();
+    b.send("resign", { roomId });
+    const d = (await a.wait((f) => f.t === "gameUpdate" && f.d.status === "win")).d;
+    expect(d).toMatchObject({ winner: "X", winnerSlot: 0, scores: [1, 0], xScore: 1, oScore: 0 });
+  });
+
+  it("ignores resign from a spectator and after the game ends", async () => {
+    const { a, b, roomId, mv, stored } = await pair();
+    const s = await open(`/ws/room/${roomId}`);
+    await s.call("joinRoom", { roomId });
+    s.send("resign", { roomId });
+    await flush(a, roomId);
+    expect((await stored()).state.status).toBe("active");
+    for (const [p, c] of XWINS) mv(p ? b : a, c);
+    await a.wait((f) => f.t === "gameUpdate" && f.d.winner === "X");
+    b.send("resign", { roomId });
+    a.send("resign", { roomId });
+    await flush(a, roomId);
+    expect((await stored()).state).toMatchObject({ status: "win", winner: 0, scores: [1, 0] });
+  });
+
+  it("offers, accepts and declines a draw", async () => {
+    const { a, b, roomId, stored } = await pair();
+    a.send("offerDraw", { roomId });
+    const sid = (await stored()).players.X;
+    expect((await b.wait((f) => f.t === "gameUpdate" && !!f.d.drawOfferer)).d.drawOfferer).toBe(sid);
+    a.send("acceptDraw", { roomId }); // the offerer cannot accept their own offer
+    await flush(a, roomId);
+    expect((await stored()).state.status).toBe("active");
+    b.send("declineDraw", { roomId });
+    expect((await a.wait((f) => f.t === "gameUpdate" && f.d.drawOfferer === null && f.d.status === "active", 0)).d.status).toBe("active");
+    const m = a.frames.length;
+    b.send("offerDraw", { roomId });
+    await a.wait((f) => f.t === "gameUpdate" && !!f.d.drawOfferer, m);
+    a.send("acceptDraw", { roomId });
+    const d = (await b.wait((f) => f.t === "gameUpdate" && f.d.status === "draw")).d;
+    expect(d).toMatchObject({ winner: "draw", winnerSlot: "draw", scores: [0, 0], drawOfferer: null });
+  });
+
+  it("the offerer can cancel an offer, and a move clears it", async () => {
+    const { a, b, roomId, mv } = await pair();
+    a.send("offerDraw", { roomId });
+    await b.wait((f) => f.t === "gameUpdate" && !!f.d.drawOfferer);
+    a.send("cancelDrawOffer", { roomId });
+    await b.wait((f) => f.t === "gameUpdate" && f.d.drawOfferer === null, 0);
+    const m = a.frames.length;
+    b.send("offerDraw", { roomId });
+    await a.wait((f) => f.t === "gameUpdate" && !!f.d.drawOfferer, m);
+    const n = a.frames.length;
+    mv(a, 0);
+    const d = (await a.wait((f) => f.t === "gameUpdate" && f.d.board[0] === "X", n)).d;
+    expect(d.drawOfferer).toBeNull();
+  });
+
+  it("relays an emote to the opponent only, with the sender's slot", async () => {
+    const { a, b, roomId } = await pair();
+    b.send("emote", { roomId, emote: "🔥" });
+    const f = await a.wait((x) => x.t === "emote");
+    expect(f.d).toEqual({ slot: 1, emote: "🔥" });
+    await flush(a, roomId, b);
+    expect(b.frames.some((x) => x.t === "emote")).toBe(false);
+  });
+
+  it("drops a bad emote and rate-limits to 1 per second per player", async () => {
+    const { a, b, roomId } = await pair();
+    for (const bad of ["hi", "👍👍", 5, null]) b.send("emote", { roomId, emote: bad });
+    b.send("emote", { roomId, emote: "👍" });
+    b.send("emote", { roomId, emote: "👏" }); // within 1 s: dropped
+    await flush(b, roomId, a);
+    expect(a.frames.filter((x) => x.t === "emote").map((x) => x.d.emote)).toEqual(["👍"]);
+    await sleep(1050);
+    b.send("emote", { roomId, emote: "😮" });
+    await a.wait((x) => x.t === "emote" && x.d.emote === "😮");
+  });
+});
+
 describe("game: switchGame", () => {
   it("lets a seated player switch, resets state, emits gameUpdate then gameReset, then acks", async () => {
     const { a, b, roomId, mv, latest } = await pair();

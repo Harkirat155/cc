@@ -179,6 +179,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     handleMatchFound,
     handleMatchError,
     handleStartGame,
+    handleEmote,
     handleConnection,
   } = handlers;
 
@@ -189,6 +190,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
   socket.on("matchFound", handleMatchFound);
   socket.on("matchError", handleMatchError);
   socket.on("startGame", handleStartGame);
+  if (handleEmote) socket.on("emote", handleEmote);
 
   // Subscribe to connection state changes
   const unsubscribe = addListener(handleConnection);
@@ -206,6 +208,7 @@ export function registerSocketHandlers(socket, handlers, addListener) {
     socket.off("matchFound", handleMatchFound);
     socket.off("matchError", handleMatchError);
     socket.off("startGame", handleStartGame);
+    if (handleEmote) socket.off("emote", handleEmote);
     unsubscribe();
   };
 }
