@@ -19,6 +19,7 @@ const ScorePanel = ({
   isMultiplayer,
   displayName,
   onUpdateDisplayName,
+  emote,
 }) => {
   const [editingSlot, setEditingSlot] = useState(null);
   const [editValue, setEditValue] = useState("");
@@ -113,6 +114,17 @@ const ScorePanel = ({
                   VS
                 </div>
               )}
+              <div className="relative">
+                {emote?.slot === card.slot && (
+                  <span
+                    key={emote.id}
+                    role="status"
+                    aria-label={`${card.occupant || card.label} reacted ${emote.emote}`}
+                    className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 rounded-full border border-foreground/10 bg-background px-2.5 py-0.5 text-lg shadow-md"
+                  >
+                    {emote.emote}
+                  </span>
+                )}
               <ScorePlayerCard
                 {...card}
                 isEditing={editingSlot === card.slot}
@@ -127,6 +139,7 @@ const ScorePanel = ({
                 }
                 winnerExists={winnerExists}
               />
+              </div>
             </React.Fragment>
           ))}
         </div>

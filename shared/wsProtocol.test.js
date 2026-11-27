@@ -33,7 +33,8 @@ const emitted = names(/\.emit\(\s*'([^']+)'/g);
 function headings(section) {
   const doc = read('docs/ws-protocol.md');
   const body = doc.split(new RegExp(`^## ${section}.*$`, 'm'))[1].split(/^## /m)[0];
-  return [...body.matchAll(/^### `([^`]+)`/gm)].map((m) => m[1]).sort();
+  // Sections marked "Worker only" are not in the legacy Express server, which this test reads.
+  return body.split(/^### /m).slice(1).filter((s) => !/Worker only/.test(s)).map((s) => s.match(/^`([^`]+)`/)[1]).sort();
 }
 
 describe('docs/ws-protocol.md parity with server code', () => {

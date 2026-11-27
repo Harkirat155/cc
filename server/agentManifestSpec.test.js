@@ -66,9 +66,9 @@ const byName = (list) => [...list].sort((a, b) => (a.direction + a.name).localeC
 describe('agent manifest v2 events equal docs/ws-protocol.md', () => {
   const expected = byName(specEvents());
 
-  test('the spec parser finds the 17 + 11 Worker events with ack bodies and roster subfields', () => {
-    expect(expected.filter((e) => e.direction === 'client->server')).toHaveLength(17);
-    expect(expected.filter((e) => e.direction === 'server->client')).toHaveLength(11);
+  test('the spec parser finds the 23 + 12 Worker events with ack bodies and roster subfields', () => {
+    expect(expected.filter((e) => e.direction === 'client->server')).toHaveLength(23);
+    expect(expected.filter((e) => e.direction === 'server->client')).toHaveLength(12);
     expect(expected.find((e) => e.name === 'server:shutdown')).toBeUndefined(); // Express only
     expect(expected.find((e) => e.name === 'joinRoom')).toEqual({
       name: 'joinRoom', direction: 'client->server', ack: true, fields: ['clientId', 'displayName', 'roomId', 'token'],
