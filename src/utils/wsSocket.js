@@ -56,6 +56,7 @@ export class WsSocket extends Emitter {
     const ws = (this.ws = new this.WS(this.url + path));
     let opened = false;
     ws.onopen = () => {
+      if (this.ws !== ws) return; // replaced by a swap before it opened
       opened = true;
       const n = this.attempt;
       this.attempt = 0;
@@ -73,6 +74,7 @@ export class WsSocket extends Emitter {
       this.outbox.splice(0).forEach((m) => ws.send(m));
     };
     ws.onmessage = (ev) => {
+      if (this.ws !== ws) return; // a replaced socket's late frames belong to the old route
       let f;
       try { f = JSON.parse(ev.data); } catch { return; }
       if (!f || typeof f.t !== "string") return;
@@ -81,11 +83,11 @@ export class WsSocket extends Emitter {
         if (p) { this.pending.delete(f.id); clearTimeout(p.timer); p.cb(f.d); }
         return;
       }
-      this.emitLocal(f.t, f.d);
-      if (f.t === "matchFound" && f.d?.roomId) {
+      if (f.t === "matchFound" && f.d?.roomId) { // swap first, so a listener's emit reaches the Room
         this.room = { id: f.d.roomId, token: f.d.token };
         this.swap(f.d.roomId);
       }
+      this.emitLocal(f.t, f.d);
     };
     ws.onclose = () => {
       if (this.ws !== ws) return;
@@ -119,6 +121,7 @@ export class WsSocket extends Emitter {
     const old = this.ws;
     this.target = target;
     this.live = false;
+    this.outbox = []; // frames queued for the old route never reach the new one
     clearTimeout(this.timer);
     this.attempt = 0;
     this.open();
@@ -136,7 +139,7 @@ export class WsSocket extends Emitter {
     }
     if (event === "createRoom" && typeof ack === "function") {
       const cb = ack;
-      ack = (r) => { if (r?.roomId) { this.target = r.roomId; this.room = { id: r.roomId }; } cb(r); };
+      ack = (r) => { if (r?.roomId && this.target === "new") { this.target = r.roomId; this.room = { id: r.roomId }; } cb(r); };
     }
     const frame = { t: event };
     if (typeof ack === "function") {
@@ -148,7 +151,7 @@ export class WsSocket extends Emitter {
       this.pending.set(frame.id, { cb: ack, timer });
     }
     if (data !== undefined) frame.d = data;
-    if (this.ws && this.connected) (this.live ? this.ws.send(JSON.stringify(frame)) : this.outbox.push(JSON.stringify(frame)));
+    if (this.ws) (this.live ? this.ws.send(JSON.stringify(frame)) : this.outbox.push(JSON.stringify(frame)));
     return this;
   }
 

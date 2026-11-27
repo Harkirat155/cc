@@ -178,3 +178,45 @@ describe("socketManager flag", () => {
     expect(FakeWS.instances[0].url).toBe("wss://api.example.com/ws/lobby");
   });
 });
+
+describe("route swaps under real timing (review of #51)", () => {
+  test("a joinRoom emitted before the lobby socket opens is sent on the Room socket", () => {
+    const s = make();
+    const ack = jest.fn();
+    s.emit("joinRoom", { roomId: "ABCDE", clientId: "c" }, ack);
+    expect(last().url).toBe("wss://x/ws/room/ABCDE");
+    last().open();
+    expect(last().sent.map((f) => f.t)).toEqual(["joinRoom"]);
+    last().recv({ t: "ack", id: last().sent[0].id, d: { ok: true } });
+    expect(ack).toHaveBeenCalledWith({ ok: true });
+  });
+
+  test("a replaced socket's late frames are ignored", () => {
+    const s = make(); last().open();
+    const lobby = last();
+    const onUpdate = jest.fn(); s.on("gameUpdate", onUpdate);
+    s.emit("joinRoom", { roomId: "ABCDE" });
+    lobby.recv({ t: "gameUpdate", d: {} });
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  test("a matchFound listener that emits at once reaches the Room, not the lobby", () => {
+    const s = make(); last().open();
+    const lobby = last();
+    s.on("matchFound", (d) => s.emit("makeMove", { roomId: d.roomId, index: 4 }));
+    lobby.recv({ t: "matchFound", d: { roomId: "ABCDE", token: "tok" } });
+    expect(lobby.sent).toEqual([]);
+    last().open();
+    expect(last().sent.map((f) => f.t)).toEqual(["joinRoom", "makeMove"]);
+  });
+
+  test("frames queued for one route never flush onto the next", () => {
+    const s = make(); last().open();
+    s.emit("joinRoom", { roomId: "AAAAA" });
+    s.emit("makeMove", { roomId: "AAAAA", index: 0 });
+    s.emit("joinLobby");
+    expect(last().url).toBe("wss://x/ws/lobby");
+    last().open();
+    expect(last().sent.map((f) => f.t)).toEqual(["joinLobby"]);
+  });
+});
