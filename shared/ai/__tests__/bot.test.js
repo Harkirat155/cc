@@ -2,6 +2,7 @@ import { chooseMove, LEVELS } from '../bot.js';
 import ttt from '../../games/ttt.js';
 import connect4 from '../../games/connect4.js';
 import checkers from '../../games/checkers.js';
+import five from '../../games/five.js';
 
 function deepFreeze(o) {
   if (o && typeof o === 'object' && !Object.isFrozen(o)) {
@@ -95,5 +96,34 @@ describe('purity', () => {
     for (const level of LEVELS) {
       expect(() => chooseMove(rules, s, 0, level, mulberry32(1))).not.toThrow();
     }
+  });
+});
+
+describe('review fixes', () => {
+  test('connect4 evaluate stays a number on a board holding four in a row', () => {
+    let s = connect4.createInitialState();
+    for (const col of [0, 6, 0, 6, 0, 6, 0]) s = step(connect4, s, { type: "place", cell: col });
+    expect(Number.isFinite(connect4.evaluate(s, 0))).toBe(true);
+  });
+
+  test('five in a row: hard answers within a second and blocks an open four', () => {
+    let s = five.createInitialState();
+    const c = (r, col) => r * 15 + col;
+    // Blue builds four in a row on row 7; Green plays far away.
+    for (const [b, g] of [[c(7, 5), c(0, 0)], [c(7, 6), c(0, 2)], [c(7, 7), c(0, 4)], [c(7, 8), null]]) {
+      s = step(five, s, five.getLegalMoves(s, s.turn).find((m) => m.cell === b));
+      if (g !== null) s = step(five, s, five.getLegalMoves(s, s.turn).find((m) => m.cell === g));
+    }
+    const t0 = Date.now();
+    const mv = chooseMove(five, deepFreeze(s), 1, 'hard', mulberry32(1));
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect([c(7, 4), c(7, 9)]).toContain(mv.cell);
+  });
+
+  test.each(LEVELS)('five in a row: %s replies next to the opening stone, not in a corner', (level) => {
+    const s = step(five, five.createInitialState(), { type: 'place', cell: 7 * 15 + 7 });
+    const mv = chooseMove(five, deepFreeze(s), 1, level, mulberry32(3));
+    expect(Math.abs(Math.floor(mv.cell / 15) - 7)).toBeLessThanOrEqual(2);
+    expect(Math.abs((mv.cell % 15) - 7)).toBeLessThanOrEqual(2);
   });
 });

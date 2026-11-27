@@ -145,7 +145,7 @@ function applyMove(state, move, slot) {
 
 // Heuristic for the computer opponent: open 4-windows weighted by how many of
 // one side's discs they hold, plus a centre-column bonus. Positive favours `slot`.
-const WINDOW_WEIGHT = [0, 1, 4, 16];
+const WINDOW_WEIGHT = [0, 1, 4, 16, 64];
 function evaluate(state, slot) {
   const mine = SLOT_LABEL[slot];
   const theirs = SLOT_LABEL[slot === 0 ? 1 : 0];

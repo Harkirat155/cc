@@ -338,7 +338,14 @@ const Game = () => {
             onSwitchGame={!isMultiplayer || player ? switchGame : null}
           />
           {!isMultiplayer && (
-            <OpponentControl opponent={opponent} onChange={setOpponent} />
+            <OpponentControl
+              opponent={opponent}
+              onChange={(patch) => {
+                setOpponent(patch);
+                // A new seat or opponent mid-game would hand one side's pieces to the other.
+                if ("humanSlot" in patch || "mode" in patch) resetGame();
+              }}
+            />
           )}
           <ScorePanel
             gameState={gameState}

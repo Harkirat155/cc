@@ -9,7 +9,7 @@ const WIN = 100000;
 const HARD_TIME_MS = 300;
 const HARD_NODE_CAP = 200000;
 const MAX_DEPTH = 64;
-const WIDE_BOARD_MOVES = 40;
+const WIDE_BOARD_MOVES = 60; // only Five in a Row (up to 225) goes past this; checkers rarely tops 30
 const WIDE_BOARD_KEEP = 20;
 const MEDIUM_NOISE = 3;
 
@@ -23,8 +23,12 @@ function winnerOf(rules, state) {
   return t.status === 'active' ? undefined : t.status === 'win' ? t.winner : null;
 }
 
+// rules.candidateMoves (optional) narrows a wide board to the moves worth searching.
+const searchMoves = (rules, state, mover) =>
+  typeof rules.candidateMoves === 'function' ? rules.candidateMoves(state, mover) : rules.getLegalMoves(state, mover);
+
 function orderedMoves(rules, state, mover) {
-  const moves = rules.getLegalMoves(state, mover);
+  const moves = searchMoves(rules, state, mover);
   const wide = moves.length > WIDE_BOARD_MOVES;
   if (moves.length < 2 || (!wide && typeof rules.evaluate !== 'function')) return moves;
   const scored = moves.map((move) => {
@@ -49,7 +53,8 @@ function createSearch(rules, deadline, nodeCap) {
       return heuristic(rules, state, mover);
     }
     const moves = orderedMoves(rules, state, mover);
-    if (moves.length === 0) return 0;
+    // Not terminal yet no moves (a blocked checkers side): the mover is stuck and loses.
+    if (moves.length === 0) return -(WIN - ply);
     let best = -Infinity;
     for (const move of moves) {
       const child = rules.applyMove(state, move, mover).state;
@@ -117,7 +122,7 @@ export function chooseMove(rules, state, slot, level, rng = Math.random) {
 
   const winning = all.find((m) => winnerOf(rules, rules.applyMove(state, m, slot).state) === slot);
   if (winning) return winning;
-  if (level === 'easy') return pickRandom(all, rng);
+  if (level === 'easy') return pickRandom(searchMoves(rules, state, slot), rng);
 
   const moves = orderedMoves(rules, state, slot);
   if (level === 'medium') {
