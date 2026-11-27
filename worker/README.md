@@ -38,10 +38,21 @@ curl -sS -D - -o /dev/null -X OPTIONS -H 'Origin: https://a.example' http://127.
 curl -sS -D - -o /dev/null -H 'Upgrade: websocket' -H 'Connection: Upgrade' -H 'Origin: https://evil.example' http://127.0.0.1:8787/health
 ```
 
-POST /feedback (`npm run dev`; rows are stored in the Lobby DO's SQLite, newest 200; `sheetsSync` is always `skipped` until brick 10):
+Google Sheets feedback sync is optional and uses secrets, never `vars` (the service account needs edit access to the sheet; the range defaults to `Feedback!A:E`):
 
 ```sh
-# happy path: 201 {"status":"received","id":"<base36>-<6 chars>","sheetsSync":"skipped"}
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY   # literal \n in the value is accepted
+npx wrangler secret put GOOGLE_SHEETS_SPREADSHEET_ID
+npx wrangler secret put GOOGLE_SHEETS_FEEDBACK_RANGE         # optional
+```
+
+For `npm run dev`, put the same names in `.dev.vars`.
+
+POST /feedback (`npm run dev`; rows are stored in the Lobby DO's SQLite, newest 200; `sheetsSync` is `skipped` unless Sheets secrets are set, then `queued`; the append runs in `waitUntil`):
+
+```sh
+# happy path: 201 {"status":"received","id":"<base36>-<6 chars>","sheetsSync":"skipped"} ("queued" with the Sheets secrets set)
 curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"rating":4,"message":"great game"}' http://127.0.0.1:8787/feedback
 # bad rating: 400 {"error":"Rating must be a number between 1 and 5."}
 curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"rating":9,"message":"great game"}' http://127.0.0.1:8787/feedback
