@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
@@ -6,6 +6,9 @@ import { liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
 
 const REFRESH_MS = 30_000;
+const SINCE = "2026-11-28"; // when per-game history started being recorded; earlier games have no rows
+const BOT_NAME = /^[A-Za-z0-9 _-]{3,24}$/; // the House names fail this and have no history page
+const VERB = { win: "Won", loss: "Lost", draw: "Drew" };
 
 // The Worker answers HTTP on the same origin it serves sockets from; a ws(s):// base maps to http(s)://.
 export function apiBase() {
@@ -24,6 +27,23 @@ function Arena() {
   const copyBadge = async (key, md) => {
     try { await navigator.clipboard.writeText(md); setCopied(key); window.setTimeout(() => setCopied(""), 2000); }
     catch { setCopied(`!${key}`); } // stays open so the reader can copy the text by hand
+  };
+  const [open, setOpen] = useState(""); // row key of the expanded bot
+  const [recent, setRecent] = useState({}); // row key -> {games} | "loading" | "error"
+  const gen = useRef({}); // row key -> latest request number, so an older answer never overwrites a newer one
+  const toggle = async (key, name) => {
+    if (open === key) { setOpen(""); return; }
+    setOpen(key);
+    const mine = (gen.current[key] = (gen.current[key] ?? 0) + 1);
+    setRecent((r) => (r[key] && r[key] !== "error" ? r : { ...r, [key]: "loading" })); // loaded data stays while it refetches
+    try {
+      const res = await window.fetch(`${apiBase()}/api/arena/${encodeURIComponent(name)}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const body = await res.json();
+      if (gen.current[key] === mine) setRecent((r) => ({ ...r, [key]: { games: body.games ?? [] } }));
+    } catch {
+      if (gen.current[key] === mine) setRecent((r) => ({ ...r, [key]: r[key]?.games ? r[key] : "error" }));
+    }
   };
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = apiBase() || "https://cc-api.harkirat-hira.workers.dev";
@@ -88,7 +108,9 @@ function Arena() {
                 {games[id].map((b, i) => { const room = roomFor(rooms, id, b.name); return (
                   <tr key={b.name} className="border-t border-foreground/10">
                     <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">
-                      {b.name}
+                      {BOT_NAME.test(b.name)
+                        ? <button type="button" aria-label={`${b.name}: last 10 games`} aria-expanded={open === `${id}/${b.name}`} aria-controls={`recent-${id}-${encodeURIComponent(b.name)}`} className="font-medium underline-offset-4 hover:underline" onClick={() => toggle(`${id}/${b.name}`, b.name)}>{b.name}</button>
+                        : b.name}
                       {room && (
                         <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
                       )}
@@ -96,6 +118,14 @@ function Arena() {
                       {copied === `!${id}/${b.name}` && (
                         <input readOnly aria-label={`Badge Markdown for ${b.name}`} value={badgeMd(base, b.name, id)} onFocus={(e) => e.target.select()} className="mt-1 block w-full rounded border border-foreground/20 bg-transparent px-1 text-xs font-normal" />
                       )}
+                      {open === `${id}/${b.name}` && (() => { const r = recent[`${id}/${b.name}`]; return (
+                        <div id={`recent-${id}-${encodeURIComponent(b.name)}`} aria-live="polite" className="mt-1 text-xs font-normal text-foreground/70">
+                          {r === "error" ? <p role="alert">{"Could not load this bot's games"}</p>
+                            : !r || r === "loading" ? <p>Loading…</p>
+                            : r.games.length === 0 ? <p>No rated games recorded since {SINCE}</p>
+                            : <ul>{r.games.map((g, i) => <li key={i}>{`${VERB[g.result] ?? g.result} vs ${g.opponent} · ${names[g.gameId] || g.gameId} · ${g.ratingAfter}`}</li>)}</ul>}
+                        </div>
+                      ); })()}
                     </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>

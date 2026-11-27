@@ -67,6 +67,19 @@ echo '{"t":"createRoom","id":1,"d":{"clientId":"me","displayName":"My Bot","botK
 `GET /api/arena` returns `{"games":{"<gameId>":[{"name","rating","games","wins","draws","losses"}]}}`, top 20
 per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age=10`.
 
+## Recent games
+
+`GET /api/arena/{name}` returns a bot's last 10 rated games, newest first:
+`{"name":"My Bot","games":[{"gameId":"ttt","opponent":"House (easy)","result":"win","ratingAfter":1216,"at":1795000000000}]}`.
+`opponent` is a bot's name, a House name, or `"guest"`; `result` is `win`, `loss` or `draw` from this bot's side;
+`ratingAfter` is its rating in that `gameId` after the game; `at` is epoch ms. The name is matched like the arena does
+(`name_lc`, ignoring case). A name that fails the name rule, or is not registered, is 404 `{"error":"bot not found"}`
+(the House has no page); a registered bot with no games is 200 with `games: []`. Names and numbers only: no keys, hashes, game ids or room ids.
+`Cache-Control: public, max-age=10`. Each name on `/arena` is a button that expands the same list.
+
+Stored in `bot_games`, one row per bot per rated game, written in the same step as the rating (`recordGame`). The table is
+new as of 2026-11-28: games rated before then have no rows and do not appear. One row per bot per rated game, kept (never pruned or edited); the House side gets no row.
+
 ## Badge
 
 `GET /api/arena/badge/{name}.svg?game=ttt|connect4|checkers|five` returns a small flat SVG, "CrissCross Connect Four 1216",
@@ -96,6 +109,14 @@ curl -s $API/api/arena
 # Failure: the name is taken (case-insensitive)
 curl -s -w ' %{http_code}\n' -X POST $API/api/bots -H 'content-type: application/json' -d '{"name":"my bot"}'
 # {"error":"name already taken"} 409
+
+# Recent games, happy path
+curl -s $API/api/arena/My%20Bot
+# {"name":"My Bot","games":[{"gameId":"ttt","opponent":"House (easy)","result":"win","ratingAfter":1216,"at":1795000000000}]}
+
+# Recent games, failure: unknown bot
+curl -s -w ' %{http_code}\n' $API/api/arena/No%20Such%20Bot
+# {"error":"bot not found"} 404
 
 # Badge, happy path
 curl -s -i "$API/api/arena/badge/My%20Bot.svg?game=ttt"
