@@ -37,3 +37,19 @@ curl -sS -D - -o /dev/null -X OPTIONS -H 'Origin: https://a.example' http://127.
 # websocket upgrade from an unlisted origin: 403
 curl -sS -D - -o /dev/null -H 'Upgrade: websocket' -H 'Connection: Upgrade' -H 'Origin: https://evil.example' http://127.0.0.1:8787/health
 ```
+
+POST /feedback (`npm run dev`; rows are stored in the Lobby DO's SQLite, newest 200; `sheetsSync` is always `skipped` until brick 10):
+
+```sh
+# happy path: 201 {"status":"received","id":"<base36>-<6 chars>","sheetsSync":"skipped"}
+curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"rating":4,"message":"great game"}' http://127.0.0.1:8787/feedback
+# bad rating: 400 {"error":"Rating must be a number between 1 and 5."}
+curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"rating":9,"message":"great game"}' http://127.0.0.1:8787/feedback
+# short message: 400 {"error":"Feedback should be at least 5 characters long."}
+curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"rating":3,"message":"hi"}' http://127.0.0.1:8787/feedback
+# malformed JSON: 400 {"error":"Invalid JSON payload."}
+curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{oops' http://127.0.0.1:8787/feedback
+# over 32 KiB: 413, Express's HTML "Payload Too Large" page
+python3 -c "print('{\"rating\":4,\"message\":\"hello there\",\"p\":\"'+'a'*33000+'\"}')" > /tmp/big.json
+curl -sS -w '\n%{http_code}\n' -X POST -H 'Content-Type: application/json' --data-binary @/tmp/big.json http://127.0.0.1:8787/feedback
+```
