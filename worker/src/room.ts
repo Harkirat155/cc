@@ -26,7 +26,14 @@ interface RoomState {
 interface Att {
   sid: string;
   joined: boolean;
+  // Rate limit state of server/rateLimiter.js, per socket: events in the current window, its start, ban end.
+  rl?: { n: number; at: number; until: number };
 }
+// RATE_LIMIT_* of server/config.js:33-35, same names, defaults and clamps.
+const envInt = (v: unknown, def: number, min: number, max: number) => {
+  const n = parseInt(String(v), 10);
+  return Number.isNaN(n) ? def : Math.max(min, Math.min(max, n));
+};
 type Msg = Record<string, unknown>;
 
 const fresh = (roomId: string): RoomState => ({
@@ -81,6 +88,12 @@ export class Room extends DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    // Every frame counts, parseable or not, as every Socket.IO event does in rateLimiter.js.
+    const retryAfter = this.limited(ws);
+    if (retryAfter) {
+      ws.send(JSON.stringify({ t: "error", d: { code: "RATE_LIMITED", message: `Too many requests. Retry after ${retryAfter}s`, retryAfter } }));
+      return;
+    }
     if (typeof raw !== "string") return;
     let f: unknown;
     try {
@@ -94,7 +107,7 @@ export class Room extends DurableObject {
     const ack = (body: unknown) => {
       if (Number.isInteger(id)) ws.send(JSON.stringify({ t: "ack", id, d: body }));
     };
-    // TODO(brick 7): per-connection rate limit. TODO(brick 8): bind and check the seat token in joinRoom.
+    // TODO(brick 8): bind and check the seat token in joinRoom.
     // TODO(brick 11): touch/TTL alarm on every game event, as touch() does in gameHandlers.js.
     switch (t) {
       case "createRoom": ack(await this.createRoom(ws, data)); break;
@@ -316,6 +329,27 @@ export class Room extends DurableObject {
     const n = s.spectators.length;
     s.spectators = s.spectators.filter((x) => x !== sid);
     return changed || s.spectators.length !== n;
+  }
+
+  // checkRateLimit, server/rateLimiter.js:20: fixed window, ban on the event past the max. Returns the
+  // retryAfter seconds when this event must be dropped, else 0. State lives in the attachment.
+  private limited(ws: WebSocket): number {
+    const e = this.env as Record<string, unknown>;
+    const windowMs = envInt(e.RATE_LIMIT_WINDOW_MS, 1_000, 100, 60_000);
+    const max = envInt(e.RATE_LIMIT_MAX_EVENTS, 50, 10, 500);
+    const banMs = envInt(e.RATE_LIMIT_BAN_DURATION_MS, 30_000, 1_000, 300_000);
+    const now = Date.now();
+    const att = this.att(ws);
+    const rl = att.rl;
+    if (rl && now < rl.until) return Math.ceil((rl.until - now) / 1000);
+    const next = !rl || rl.until || now - rl.at >= windowMs ? { n: 1, at: now, until: 0 } : { ...rl, n: rl.n + 1 };
+    if (next.n > max) {
+      next.until = now + banMs;
+      ws.serializeAttachment({ ...att, rl: next });
+      return Math.ceil(banMs / 1000);
+    }
+    ws.serializeAttachment({ ...att, rl: next });
+    return 0;
   }
 
   private save() {

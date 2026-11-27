@@ -416,3 +416,103 @@ describe("game: hibernation", () => {
     a.close();
   });
 });
+
+// server/rateLimiter.js: 50 events per 1 s window per socket, then a ban. The test config sets a 1 s ban.
+describe("rate limit", () => {
+  // Window 1 s, max 50, ban 2 s (vitest.config.ts). The probe is a switchGame with an invalid room id: it is
+  // acked with an error body and touches no state, so an ack proves the frame got past the limiter.
+  let ids = 0;
+  const probe = (c: Client) => {
+    const id = ++ids;
+    c.ws.send(JSON.stringify({ t: "switchGame", id, d: { roomId: "bad" } }));
+    return id;
+  };
+  const acked = (c: Client, id: number) => c.frames.some((f) => f.t === "ack" && f.id === id);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const burst = async (c: Client, count: number) => {
+    let last = 0;
+    for (let i = 0; i < count; i++) last = probe(c);
+    await c.wait((f) => f.t === "ack" && f.id === last);
+  };
+  const limitedFrame = (c: Client, from: number) => c.wait((f) => f.t === "error" && f.d?.code === "RATE_LIMITED", from);
+  const errors = (c: Client) => c.frames.filter((f) => f.t === "error");
+
+  it("acks frames 1-50, bans on the 51st with retryAfter 2, counts down, and lifts the ban", async () => {
+    const a = await open("/ws/room/ZZZZZ");
+    await burst(a, 50);
+    expect(a.frames.filter((f) => f.t === "ack")).toHaveLength(50);
+    expect(errors(a)).toHaveLength(0);
+
+    const n = a.frames.length;
+    const id51 = probe(a);
+    const err = await limitedFrame(a, n);
+    expect(err.d).toEqual({ code: "RATE_LIMITED", message: "Too many requests. Retry after 2s", retryAfter: 2 });
+    expect(acked(a, id51)).toBe(false);
+
+    await sleep(1100);
+    const m = a.frames.length;
+    const idLate = probe(a);
+    expect((await limitedFrame(a, m)).d.retryAfter).toBe(1);
+    expect(acked(a, idLate)).toBe(false);
+
+    await sleep(1000); // ban over (2 s after the trigger)
+    const idOk = probe(a);
+    await a.wait((f) => f.t === "ack" && f.id === idOk);
+    expect(errors(a)).toHaveLength(2);
+  }, 10_000);
+
+  it("drops a banned move, spares the neighbour socket", async () => {
+    const { a, b, roomId, mv, stored } = await pair();
+    await burst(a, 49); // pair() already spent one frame on a (createRoom): 50 counted
+    const n = a.frames.length;
+    mv(a, 4); // 51st frame: banned, and must not be played
+    await limitedFrame(a, n);
+    a.ws.send(JSON.stringify({ t: "switchGame", id: 9999, d: { roomId, gameId: "ttt" } }));
+
+    const m = b.frames.length;
+    b.send("updateDisplayName", { roomId, displayName: "Bobby" }); // flush marker: the DO has handled a's frames
+    expect((await b.update(m)).roster.OName).toBe("Bobby");
+    expect(errors(b)).toHaveLength(0);
+    expect((await stored()).state.board).toEqual(Array(9).fill(""));
+    expect(acked(a, 9999)).toBe(false);
+
+    await sleep(2100);
+    mv(a, 4);
+    await a.wait((f) => f.t === "gameUpdate" && f.d.board[4] === "X", n);
+  }, 10_000);
+
+  it("resets the count each window: 50 frames, a pause, 50 more, no ban", async () => {
+    const a = await open("/ws/room/ZZZZZ");
+    await burst(a, 50);
+    await sleep(1100);
+    await burst(a, 50);
+    expect(a.frames.filter((f) => f.t === "ack")).toHaveLength(100);
+    expect(errors(a)).toHaveLength(0);
+  }, 10_000);
+
+  it("keeps the ban across hibernation", async () => {
+    const a = await open("/ws/room/ZZZZZ");
+    await burst(a, 50);
+    const n = a.frames.length;
+    probe(a);
+    await limitedFrame(a, n);
+
+    await evictDurableObject(rooms().getByName("ZZZZZ"), { webSockets: "hibernate" });
+
+    const m = a.frames.length;
+    const id = probe(a);
+    expect((await limitedFrame(a, m)).d.retryAfter).toBeGreaterThanOrEqual(1);
+    expect(acked(a, id)).toBe(false);
+
+    await sleep(2100);
+    const ok = probe(a);
+    await a.wait((f) => f.t === "ack" && f.id === ok);
+  }, 10_000);
+
+  it("counts frames that are not JSON, as Express counts every event", async () => {
+    const { a } = await pair();
+    const n = a.frames.length;
+    for (let i = 0; i < 60; i++) a.ws.send("not json");
+    expect((await a.wait((f) => f.t === "error", n)).d.code).toBe("RATE_LIMITED");
+  });
+});
