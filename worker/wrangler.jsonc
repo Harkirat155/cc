@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
   // Comma-separated allowed browser origins. Empty allows none.
-  "vars": { "CORS_ORIGINS": "" },
+  "vars": { "CORS_ORIGINS": "https://harkirat155.github.io" }, // the Pages app; brick 15 cut-over
   "durable_objects": {
     "bindings": [
       { "name": "ROOM", "class_name": "Room" },

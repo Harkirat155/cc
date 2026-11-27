@@ -4,6 +4,12 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      backend:
+        description: "fly: the BACKEND_URL secret (default). worker: the Cloudflare Worker (ADR 0001 brick 15 rehearsal)."
+        type: choice
+        options: [fly, worker]
+        default: fly
 
 permissions:
   contents: read
@@ -42,31 +48,37 @@ jobs:
               - '.github/workflows/deploy.yml'
 
       - name: Skip build (no frontend changes)
-        if: steps.changes.outputs.frontend != 'true'
+        if: steps.changes.outputs.frontend != 'true' && github.event_name != 'workflow_dispatch'
         run: |
           echo "⏭️  No frontend changes detected. Skipping build."
           exit 0
 
       - name: Set up Node.js
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
       - name: Set backend URL
-        if: steps.changes.outputs.frontend == 'true'
-        run: echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.backend }}" = worker ]; then
+            echo "VITE_SOCKET_SERVER=wss://cc-api.harkirat-hira.workers.dev" >> $GITHUB_ENV
+            echo "VITE_API_BASE=https://cc-api.harkirat-hira.workers.dev" >> $GITHUB_ENV
+          else
+            echo "VITE_SOCKET_SERVER=${{ secrets.BACKEND_URL }}" >> $GITHUB_ENV
+          fi
 
       - name: Install Dependencies
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: npm install
 
       - name: Build
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: npm run build
 
       - name: Upload Artifact
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
