@@ -1,11 +1,6 @@
-// Lets Jest load modules that read Vite's import.meta.env (tests set process.env instead).
-const viteMetaEnv = ({ types: t }) => ({
-  visitor: {
-    MetaProperty(path) {
-      path.replaceWith(t.objectExpression([t.objectProperty(t.identifier('env'), t.memberExpression(t.identifier('process'), t.identifier('env')))]));
-    },
-  },
-});
+import { fileURLToPath } from 'node:url';
+
+const viteMetaEnv = fileURLToPath(new URL('./jest.viteMetaEnv.cjs', import.meta.url));
 
 export default {
   testEnvironment: 'jsdom',
