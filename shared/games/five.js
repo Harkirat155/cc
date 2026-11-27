@@ -93,6 +93,23 @@ function getLegalMoves(state, slot) {
   return moves;
 }
 
+// Search hint for the computer opponent: legal cells within two of a stone
+// (the centre on an empty board). Never used to validate moves.
+function candidateMoves(state, slot) {
+  const legal = getLegalMoves(state, slot);
+  const near = legal.filter(({ cell }) => {
+    const r = Math.floor(cell / SIZE), c = cell % SIZE;
+    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && rr < SIZE && cc >= 0 && cc < SIZE && state.board[rr * SIZE + cc] !== '') return true;
+    }
+    return false;
+  });
+  if (near.length) return near;
+  const centre = Math.floor(CELLS / 2);
+  return legal.filter((m) => m.cell === centre).concat(legal).slice(0, 1);
+}
+
 function applyMove(state, move, slot) {
   if (move.type !== 'place') throw new Error(`five.applyMove: unsupported move type ${move.type}`);
   if (state.status !== 'active') throw new Error('five.applyMove: game already finished');
@@ -171,6 +188,7 @@ const five = {
   describeMove,
   moveFromCellClick,
   evaluate,
+  candidateMoves,
 };
 
 export default five;

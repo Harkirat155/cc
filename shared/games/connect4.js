@@ -143,6 +143,31 @@ function applyMove(state, move, slot) {
   };
 }
 
+// Heuristic for the computer opponent: open 4-windows weighted by how many of
+// one side's discs they hold, plus a centre-column bonus. Positive favours `slot`.
+const WINDOW_WEIGHT = [0, 1, 4, 16, 64];
+function evaluate(state, slot) {
+  const mine = SLOT_LABEL[slot];
+  const theirs = SLOT_LABEL[slot === 0 ? 1 : 0];
+  let score = 0;
+  for (const line of LINES) {
+    let m = 0;
+    let t = 0;
+    for (const i of line) {
+      if (state.board[i] === mine) m++;
+      else if (state.board[i] === theirs) t++;
+    }
+    if (m && !t) score += WINDOW_WEIGHT[m];
+    else if (t && !m) score -= WINDOW_WEIGHT[t];
+  }
+  for (let r = 0; r < ROWS; r++) {
+    const v = state.board[idx(r, 3)];
+    if (v === mine) score += 3;
+    else if (v === theirs) score -= 3;
+  }
+  return score;
+}
+
 function describeMove(move) {
   if (move.type !== 'place') return '';
   return `col ${move.cell + 1}`;
@@ -168,6 +193,7 @@ const connect4 = {
   applyMove,
   checkTerminal,
   describeMove,
+  evaluate,
   moveFromCellClick,
 };
 
