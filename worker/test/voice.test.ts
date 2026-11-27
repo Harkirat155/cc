@@ -129,6 +129,42 @@ describe("voice events", () => {
     expect((await b.wait((f) => f.t === "voice:user-left", n)).d).toEqual({ socketId: sidA });
   });
 
+  it("drops a signal over 64 KiB in bytes even when it is under in characters", async () => {
+    const { a, b, roomId, sidB } = await setup();
+    const n = b.frames.length;
+    a.send("voice:signal", { roomId, targetId: sidB, data: "\u20ac".repeat(30000) }); // 30k chars, 90k bytes
+    await flush(a);
+    a.send("voice:signal", { roomId, targetId: sidB, data: { ok: 1 } });
+    await b.wait((f) => f.t === "voice:signal" && f.d.data.ok === 1, n);
+    expect(got(b, "voice:signal", n).length).toBe(1);
+  });
+
+  it("relays a payload of exactly 64 KiB and drops one byte more", async () => {
+    const { a, b, roomId, sidB } = await setup();
+    const n = b.frames.length;
+    a.send("voice:signal", { roomId, targetId: sidB, data: "x".repeat(65536 - 2) }); // JSON adds 2 quotes
+    await b.wait((f) => f.t === "voice:signal", n);
+    a.send("voice:signal", { roomId, targetId: sidB, data: "x".repeat(65536 - 1) });
+    await flush(a);
+    expect(got(b, "voice:signal", n).length).toBe(1);
+  });
+
+  it("prunes voice entries of dead sockets on the next publish and tells the others", async () => {
+    const { a, b, roomId, sidA } = await setup();
+    a.send("voice:join", { roomId });
+    await b.wait((f) => f.t === "voice:user-joined");
+    const stub = rooms().getByName(roomId);
+    await runInDurableObject(stub, async (_o, state) => { const st = (await state.storage.get<any>("room"))!; st.voice.ghost = { muted: false }; await state.storage.put("room", st); });
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+    const n = b.frames.length;
+    a.send("voice:mute-state", { roomId, muted: true });
+    expect((await b.wait((f) => f.t === "voice:user-left", n)).d).toEqual({ socketId: "ghost" });
+    const u = (await b.wait((f) => f.t === "gameUpdate", n)).d;
+    expect(u.voiceRoster).toEqual({ [sidA]: { muted: true } });
+    const stored = await runInDurableObject(stub, async (_o, state) => state.storage.get<any>("room"));
+    expect(Object.keys(stored.voice)).toEqual([sidA]);
+  });
+
   it("a 40-frame ICE burst from one socket is not rate limited under the default limits", async () => {
     const { a, b, roomId, sidB } = await setup();
     const n = b.frames.length;

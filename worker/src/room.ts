@@ -199,7 +199,6 @@ export class Room extends DurableObject {
     const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
     for (const k of ["X", "O"] as const) if (s.players[k] && !live.has(s.players[k]!)) s.players[k] = null;
     s.spectators = s.spectators.filter((x) => live.has(x));
-    for (const k of Object.keys(s.voice)) if (!live.has(k)) delete s.voice[k]; // ghosts of sockets lost in an eviction
     const clientId = typeof p.clientId === "string" && p.clientId ? p.clientId : null;
     const name = validateDisplayName(p.displayName);
     let role: Seat | "spectator" | null = null;
@@ -412,8 +411,9 @@ export class Room extends DurableObject {
     const sid = this.att(ws).sid;
     const { targetId, data } = p;
     if (!s || !this.att(ws).joined || typeof targetId !== "string" || !targetId || targetId === sid || !data) return;
-    const text = JSON.stringify({ t: "voice:signal", d: { from: sid, data, roomId: s.roomId } });
-    if (JSON.stringify(data).length > MAX_SIGNAL_BYTES) return;
+    const json = JSON.stringify(data);
+    if (new TextEncoder().encode(json).length > MAX_SIGNAL_BYTES) return;
+    const text = `{"t":"voice:signal","d":{"from":${JSON.stringify(sid)},"data":${json},"roomId":${JSON.stringify(s.roomId)}}}`;
     for (const w of this.ctx.getWebSockets()) {
       const a = this.att(w);
       if (a.joined && a.sid === targetId) { try { w.send(text); } catch { /* closing */ } return; }
@@ -488,6 +488,12 @@ export class Room extends DurableObject {
   private publish(_ws: WebSocket) {
     const s = this.s;
     if (!s?.created) return;
+    // Voice entries of sockets that no longer exist (lost in an eviction) are removed here, so no path
+    // republishes a ghost; every handler saves before publish, so the prune is saved on its own.
+    const live = new Set(this.ctx.getWebSockets().map((w) => this.att(w).sid));
+    const ghosts = Object.keys(s.voice).filter((k) => !live.has(k));
+    for (const k of ghosts) { delete s.voice[k]; this.others("", { t: "voice:user-left", d: { socketId: k } }); }
+    if (ghosts.length) void this.save();
     const nameOf = (k: Seat) => {
       const sid = s.players[k];
       return !sid ? null : (s.names[k] ?? (sid.length > 8 ? `${sid.slice(0, 5)}…` : sid));
