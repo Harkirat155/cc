@@ -41,8 +41,9 @@ Every frame is one JSON text message: `{"t":"<event>","id"?:n,"d"?:{...}}`.
 ## Client to server (17, plus 6 Worker only)
 
 ### `createRoom`
-Frame: `{"t":"createRoom","id":n,"d"?:{"clientId"?:string,"displayName"?:string,"gameId"?:string}}`.
+Frame: `{"t":"createRoom","id":n,"d"?:{"clientId"?:string,"displayName"?:string,"gameId"?:string,"listPublicly"?:boolean}}`.
 Ack: `{"roomId":string,"player":"X"}`; error `{"error":"Unable to create room, please try again"}`. Then `gameUpdate`.
+`listPublicly: true` (the Worker honours it) lets the room appear in `GET /api/live` while a game is in progress (`docs/live-games.md`); absent or false keeps it unlisted.
 Source: server/handlers/roomHandlers.js:21
 
 ### `joinRoom`

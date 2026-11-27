@@ -224,7 +224,8 @@
         "payloadFields": [
           "clientId",
           "displayName",
-          "gameId"
+          "gameId",
+          "listPublicly"
         ],
         "ackFields": [
           "player",

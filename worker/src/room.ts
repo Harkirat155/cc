@@ -30,6 +30,11 @@ interface RoomState {
   voice: Record<string, { muted: boolean }>;
   // server/roomManager.js touch(): ms epoch of the last game, room or voice event. Saved with the next save.
   lastTouched: number;
+  // Public listing (GET /api/live): lobby-matched rooms and rooms created with listPublicly. Moves played in
+  // the current game and when its first move landed; both reset with the board.
+  listed: boolean;
+  moves: number;
+  startedAt: number | null;
 }
 // voice:signal payload cap, serialized. Express had none beyond the Socket.IO 1 MB frame.
 const MAX_SIGNAL_BYTES = 64 * 1024;
@@ -70,6 +75,9 @@ const fresh = (roomId: string): RoomState => ({
   seatTokens: {},
   voice: {},
   lastTouched: Date.now(),
+  listed: false,
+  moves: 0,
+  startedAt: null,
 });
 const clearRequest = (s: RoomState) => { s.newGameRequester = null; s.newGameRequestedAt = null; };
 const clearOffer = (s: RoomState) => { s.drawOfferer = null; };
@@ -78,6 +86,7 @@ const clearLast = (s: RoomState) => { s.lastMove = null; s.lastEvents = null; s.
 export class Room extends DurableObject {
   private s: RoomState | null = null;
   private armed = false; // an alarm is known to be set, so frames skip the getAlarm read
+  private reported: string | null = null; // last listing state sent to the Lobby registry, so unchanged publishes send nothing
   private after: (() => void)[] = []; // broadcasts that follow the ack, as io emits after ack() in roomHandlers.js
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -109,6 +118,7 @@ export class Room extends DurableObject {
     if (!(await this.init(roomId))) return false;
     const s = this.s!;
     s.created = true;
+    s.listed = true; // a lobby match is public: anyone queued for a game agreed to be paired and seen
     if (s.gameId !== gameId) { s.gameId = gameId; s.state = getRules(gameId).createInitialState(); }
     for (const q of seats) {
       s.names[q.seat] = q.name;
@@ -196,9 +206,29 @@ export class Room extends DurableObject {
       return;
     }
     const sockets = this.ctx.getWebSockets();
+    if (s.listed) this.ctx.waitUntil(this.lobby().unlist(s.roomId).catch(() => {}));
     this.s = null;
     await this.ctx.storage.deleteAll();
     for (const w of sockets) try { w.close(1000, "room expired"); } catch { /* already closed */ }
+  }
+
+  private lobby() {
+    return (this.env as unknown as { LOBBY: DurableObjectNamespace<import("./lobby").Lobby> }).LOBBY.getByName("lobby");
+  }
+
+  // Tell the Lobby registry behind GET /api/live whether this room is a listed game in progress. Only
+  // names, game, move count and start time leave the room; never socket ids or client ids.
+  private report(s: RoomState) {
+    if (!s.listed) return;
+    const on = this.live(s) && s.moves > 0;
+    const row = { roomId: s.roomId, gameId: s.gameId, x: s.names.X, o: s.names.O, moves: s.moves, startedAt: s.startedAt ?? Date.now() };
+    const key = on ? JSON.stringify(row) : "off";
+    if (key === this.reported) return;
+    this.reported = key;
+    try { // the registry is best-effort: it must never break the broadcast that follows
+      const lobby = this.lobby();
+      this.ctx.waitUntil((on ? lobby.reportLive(row) : lobby.unlist(s.roomId)).catch(() => { this.reported = null; }));
+    } catch { this.reported = null; }
   }
 
   private ttl() {
@@ -243,6 +273,7 @@ export class Room extends DurableObject {
     const clientId = typeof p.clientId === "string" && p.clientId ? p.clientId : null;
     const sid = this.att(ws).sid;
     s.created = true;
+    s.listed = p.listPublicly === true;
     s.players.X = sid;
     s.names.X = validateDisplayName(p.displayName);
     const gameId = validateGameId(p.gameId); // roomManager.js:81 falls back to ttt for an unknown id
@@ -416,6 +447,8 @@ export class Room extends DurableObject {
       : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
+    if (!s.moves) s.startedAt = Date.now();
+    s.moves++;
     clearOffer(s);
     await this.save();
     this.publish(ws);
@@ -430,6 +463,8 @@ export class Room extends DurableObject {
       clearRequest(s);
       clearOffer(s);
       clearLast(s);
+      s.moves = 0;
+      s.startedAt = null;
     }, ws);
     if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
   }
@@ -478,6 +513,8 @@ export class Room extends DurableObject {
     clearRequest(s);
     clearOffer(s);
     clearLast(s);
+    s.moves = 0;
+    s.startedAt = null;
     await this.save();
     this.publish(ws);
     this.broadcast({ t: "gameReset", d: { roomId: s.roomId, gameId, reason: "gameSwitch" } });
@@ -595,6 +632,7 @@ export class Room extends DurableObject {
     const ghosts = Object.keys(s.voice).filter((k) => !live.has(k));
     for (const k of ghosts) { delete s.voice[k]; this.others("", { t: "voice:user-left", d: { socketId: k } }); }
     if (ghosts.length) void this.save();
+    this.report(s);
     const nameOf = (k: Seat) => {
       const sid = s.players[k];
       return !sid ? null : (s.names[k] ?? (sid.length > 8 ? `${sid.slice(0, 5)}…` : sid));
