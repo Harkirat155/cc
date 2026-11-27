@@ -64,7 +64,7 @@ export default [
   // Backend: Node server (ESM)
   {
     name: 'node-backend',
-    files: ['server/**/*.js'],
+    files: ['server/**/*.js', 'worker/scripts/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
@@ -77,6 +77,8 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         setImmediate: 'readonly',
+        WebSocket: 'readonly', // Node 22+ globals, used by worker/scripts
+        performance: 'readonly',
       },
     },
     rules: {
