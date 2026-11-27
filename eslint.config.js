@@ -104,7 +104,7 @@ export default [
   // Tooling config files (ESM style)
   {
     name: 'tooling-configs-esm',
-    files: ['eslint.config.js', 'vite.config.js', 'jest.config.js'],
+    files: ['eslint.config.js', 'vite.config.js', 'jest.config.js', 'playwright.config.js', 'e2e/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
