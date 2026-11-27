@@ -110,6 +110,15 @@ describe("Arena page", () => {
       expect(region.textContent).toMatch(/Loading/);
     });
 
+    it("gives two bots whose names differ only by space and underscore different regions", async () => {
+      const two = { games: { ttt: [{ name: "Ada Bot", rating: 1216, games: 1, wins: 1, draws: 0, losses: 0 }, { name: "Ada_Bot", rating: 1184, games: 1, wins: 0, draws: 0, losses: 1 }] } };
+      window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [] } : two) }));
+      show();
+      const a = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
+      const b = screen.getByRole("button", { name: "Ada_Bot: last 10 games" });
+      expect(a.getAttribute("aria-controls")).not.toBe(b.getAttribute("aria-controls"));
+    });
+
     it("says so when the games cannot be loaded", async () => {
       stub({ ok: false, status: 500 });
       show();

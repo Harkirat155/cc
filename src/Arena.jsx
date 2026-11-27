@@ -109,7 +109,7 @@ function Arena() {
                   <tr key={b.name} className="border-t border-foreground/10">
                     <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">
                       {BOT_NAME.test(b.name)
-                        ? <button type="button" aria-label={`${b.name}: last 10 games`} aria-expanded={open === `${id}/${b.name}`} aria-controls={`recent-${id}-${b.name.replace(/\s/g, "_")}`} className="font-medium underline-offset-4 hover:underline" onClick={() => toggle(`${id}/${b.name}`, b.name)}>{b.name}</button>
+                        ? <button type="button" aria-label={`${b.name}: last 10 games`} aria-expanded={open === `${id}/${b.name}`} aria-controls={`recent-${id}-${encodeURIComponent(b.name)}`} className="font-medium underline-offset-4 hover:underline" onClick={() => toggle(`${id}/${b.name}`, b.name)}>{b.name}</button>
                         : b.name}
                       {room && (
                         <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
@@ -119,7 +119,7 @@ function Arena() {
                         <input readOnly aria-label={`Badge Markdown for ${b.name}`} value={badgeMd(base, b.name, id)} onFocus={(e) => e.target.select()} className="mt-1 block w-full rounded border border-foreground/20 bg-transparent px-1 text-xs font-normal" />
                       )}
                       {open === `${id}/${b.name}` && (() => { const r = recent[`${id}/${b.name}`]; return (
-                        <div id={`recent-${id}-${b.name.replace(/\s/g, "_")}`} aria-live="polite" className="mt-1 text-xs font-normal text-foreground/70">
+                        <div id={`recent-${id}-${encodeURIComponent(b.name)}`} aria-live="polite" className="mt-1 text-xs font-normal text-foreground/70">
                           {r === "error" ? <p role="alert">Could not load this bot's games</p>
                             : !r || r === "loading" ? <p>Loading…</p>
                             : r.games.length === 0 ? <p>No rated games recorded since {SINCE}</p>
