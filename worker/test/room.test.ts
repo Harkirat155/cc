@@ -307,6 +307,29 @@ describe("game: reset, scores, new-game requests", () => {
     expect(await latest((d) => d.board[0] === "X" && d.scores[0] === 0)).toMatchObject({ scores: [0, 0] });
   });
 
+  // Deliberately stricter than Express, which lets any socket in the room run these four.
+  it("ignores resetGame, resetScores and new-game requests from a spectator", async () => {
+    const { a, b, roomId, mv, stored } = await pair();
+    const s = await open(`/ws/room/${roomId}`);
+    expect(await s.call("joinRoom", { roomId })).toEqual({ player: "spectator" });
+    for (const [p, c] of XWINS) mv(p ? b : a, c);
+    await a.wait((f) => f.t === "gameUpdate" && f.d.winner === "X");
+    const n = a.frames.length;
+    s.send("resetScores", { roomId });
+    s.send("resetGame", { roomId });
+    s.send("requestNewGame", { roomId });
+    s.send("cancelNewGameRequest", { roomId });
+    a.send("updateDisplayName", { roomId, displayName: "Al" }); // flush marker
+    await a.wait((f) => f.t === "gameUpdate" && f.d.roster.XName === "Al", n);
+    const tail = a.frames.slice(n);
+    expect(tail.filter((f) => f.t === "gameUpdate")).toHaveLength(1);
+    expect(tail.some((f) => f.t === "gameReset")).toBe(false);
+    const st = await stored();
+    expect(st.state.scores).toEqual([1, 0]);
+    expect(st.state.board.slice(0, 3)).toEqual(["X", "X", "X"]);
+    expect(st.newGameRequester).toBeNull();
+  });
+
   it("requestNewGame and cancel ride on gameUpdate", async () => {
     const { a, b, roomId, stored } = await pair();
     b.send("requestNewGame", { roomId });

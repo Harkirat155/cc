@@ -235,13 +235,15 @@ export class Room extends DurableObject {
     return s?.created && validateRoomId(roomId) === s.roomId ? s : null;
   }
 
-  // Run an unacked room-level mutation, save, publish. The mutation runs before the first await.
-  private async game(p: Msg, fn: (s: RoomState) => void, ws: WebSocket) {
+  // Run an unacked room-level mutation from a seated player, save, publish. The mutation runs before the
+  // first await. Express lets spectators run these too; seating them is deliberately stricter.
+  private async game(p: Msg, fn: (s: RoomState) => void, ws: WebSocket): Promise<boolean> {
     const s = this.room(p.roomId);
-    if (!s) return;
+    if (!s || this.slot(s, ws) < 0) return false;
     fn(s);
     await this.save();
     this.publish(ws);
+    return true;
   }
 
   private slot(s: RoomState, ws: WebSocket): 0 | 1 | -1 {
@@ -273,14 +275,14 @@ export class Room extends DurableObject {
 
   // gameHandlers.js:108. The slot that moved last does not start the next game (nextStarterSlot).
   private async resetGame(ws: WebSocket, p: Msg) {
-    await this.game(p, (s) => {
+    const ran = await this.game(p, (s) => {
       const prev = s.state;
       const over = prev?.status === "win" || prev?.status === "draw";
       s.state = { ...getRules(s.gameId).createInitialState(), turn: over && prev.turn === 0 ? 1 : 0, scores: prev?.scores ? [...prev.scores] : [0, 0] };
       clearRequest(s);
       clearLast(s);
     }, ws);
-    if (this.room(p.roomId)) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
+    if (ran) this.broadcast({ t: "gameReset", d: { roomId: this.s!.roomId } });
   }
 
   // gameHandlers.js:150. Emits before the ack, as Express does.
