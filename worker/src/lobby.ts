@@ -5,7 +5,8 @@ import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from 
 type Msg = Record<string, unknown>;
 interface Att { sid: string }
 const LIVE_MAX = 50;
-const LIVE_STALE_MS = 60 * 60_000;
+const LIVE_STALE_MS = 10 * 60_000; // no move in 10 min is not a live game
+const LIVE_ROWS_MAX = 200; // bounds the table against listPublicly spam between reads
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -25,6 +26,8 @@ export class Lobby extends DurableObject {
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO live (room_id, game_id, x_name, o_name, moves, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       r.roomId, r.gameId, r.x, r.o, r.moves, r.startedAt, Date.now());
+    this.ctx.storage.sql.exec(
+      "DELETE FROM live WHERE room_id NOT IN (SELECT room_id FROM live ORDER BY updated_at DESC LIMIT ?)", LIVE_ROWS_MAX);
   }
 
   unlist(roomId: string): void {

@@ -225,8 +225,10 @@ export class Room extends DurableObject {
     const key = on ? JSON.stringify(row) : "off";
     if (key === this.reported) return;
     this.reported = key;
-    const lobby = this.lobby();
-    this.ctx.waitUntil((on ? lobby.reportLive(row) : lobby.unlist(s.roomId)).catch(() => { this.reported = null; }));
+    try { // the registry is best-effort: it must never break the broadcast that follows
+      const lobby = this.lobby();
+      this.ctx.waitUntil((on ? lobby.reportLive(row) : lobby.unlist(s.roomId)).catch(() => { this.reported = null; }));
+    } catch { this.reported = null; }
   }
 
   private ttl() {

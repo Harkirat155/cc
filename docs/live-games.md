@@ -14,7 +14,7 @@ over) and only if it is public:
 
 Every other room (the "Create room" button, a bare `createRoom`) is never listed. A listed room leaves the
 list when the game ends, a player leaves, the board is reset or the game switched. A row nobody refreshed for
-an hour is dropped. At most 50 rows, newest game first.
+10 minutes (no move played) is dropped until its next move. At most 50 rows, newest game first.
 
 ## Response
 
