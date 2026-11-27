@@ -13,6 +13,9 @@ export function apiBase() {
   return base.replace(/^ws/, "http");
 }
 
+// Markdown for a bot's README: the badge image links back to this page.
+const badgeMd = (base, name, game) => `[![CrissCross rating](${base}/api/arena/badge/${encodeURIComponent(name)}.svg?game=${game})](https://harkirat155.github.io/cc/arena)`;
+
 function Arena() {
   const [games, setGames] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
@@ -84,6 +87,7 @@ function Arena() {
                       {room && (
                         <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
                       )}
+                      <button type="button" className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4" onClick={() => navigator.clipboard?.writeText(badgeMd(base, b.name, id))}>Badge</button>
                     </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>

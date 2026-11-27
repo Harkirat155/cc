@@ -108,6 +108,14 @@ export class Lobby extends DurableObject {
     return out;
   }
 
+  // One registered bot's rating in one game, for the README badge. Null when unregistered or no games. Number only.
+  ratingOf(name: string, gameId: string): { name: string; rating: number } | null {
+    const r = this.ctx.storage.sql
+      .exec<{ name: string; rating: number }>("SELECT b.name, r.rating FROM ratings r JOIN bots b ON b.name_lc = r.name_lc WHERE r.name_lc = ? AND r.game_id = ?", name.toLowerCase(), gameId)
+      .toArray()[0];
+    return r ? { name: r.name, rating: Math.round(r.rating) } : null;
+  }
+
   reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO live (room_id, game_id, x_name, o_name, moves, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",

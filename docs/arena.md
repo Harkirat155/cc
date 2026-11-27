@@ -67,6 +67,19 @@ echo '{"t":"createRoom","id":1,"d":{"clientId":"me","displayName":"My Bot","botK
 `GET /api/arena` returns `{"games":{"<gameId>":[{"name","rating","games","wins","draws","losses"}]}}`, top 20
 per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age=10`.
 
+## Badge
+
+`GET /api/arena/badge/{name}.svg?game=ttt|connect4|checkers|five` returns a small flat SVG, "CrissCross Connect Four 1216",
+for a bot's README. The name is matched like the arena does (`name_lc`, ignoring case). An unknown bot, or one with no
+games of that type, gets a grey "unrated" badge with 200, so a README never shows a broken image; a missing or unknown
+`game` is 400. `Content-Type: image/svg+xml`, `Cache-Control: public, max-age=300`. The SVG `<title>` (alt text) says a rating
+is "plays on this server", not proof of strength. Names and numbers only; text is XML-escaped. Any bot of the top-20 or not
+gets its own badge: it reads one row, not the leaderboard. Each row on `/arena` has a "Badge" button that copies:
+
+```md
+[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/NAME.svg?game=ttt)](https://harkirat155.github.io/cc/arena)
+```
+
 ## Curl
 
 ```sh
@@ -83,4 +96,13 @@ curl -s $API/api/arena
 # Failure: the name is taken (case-insensitive)
 curl -s -w ' %{http_code}\n' -X POST $API/api/bots -H 'content-type: application/json' -d '{"name":"my bot"}'
 # {"error":"name already taken"} 409
+
+# Badge, happy path
+curl -s -i "$API/api/arena/badge/My%20Bot.svg?game=ttt"
+# HTTP/2 200  content-type: image/svg+xml; charset=utf-8  cache-control: public, max-age=300
+# <svg xmlns="http://www.w3.org/2000/svg" width="..." height="20" ...>...CrissCross Tic-Tac-Toe... 1216 ...</svg>
+
+# Badge, failure: unknown game
+curl -s -w ' %{http_code}\n' "$API/api/arena/badge/My%20Bot.svg?game=chess"
+# {"error":"game must be ttt, connect4, checkers or five"} 400
 ```
