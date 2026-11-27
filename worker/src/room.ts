@@ -205,7 +205,7 @@ export class Room extends DurableObject {
     }
     // 1) rebind by clientId
     const mapped = clientId ? s.seatByClient[clientId] : undefined;
-    if (!role && mapped === "X" || mapped === "O") {
+    if (!role && (mapped === "X" || mapped === "O")) {
       if (!s.players[mapped] || s.players[mapped] === sid) {
         s.players[mapped] = sid;
         if (name) s.names[mapped] = name;
