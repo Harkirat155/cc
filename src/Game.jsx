@@ -418,6 +418,7 @@ const Game = () => {
                 gameId={gameState?.gameId}
                 playerInfo={gameState?.playerInfo}
                 onReset={resetGame}
+                onFriend={handleCreateMatch}
               />
             </div>
           </div>

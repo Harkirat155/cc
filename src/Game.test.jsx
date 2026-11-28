@@ -55,3 +55,16 @@ describe("home doors", () => {
     expect(screen.getByText("daily page")).toBeTruthy();
   });
 });
+
+describe("end of a local game", () => {
+  it("shows today's puzzle and a friend door once someone wins", () => {
+    home();
+    const squares = () => screen.getAllByRole("button", { name: /^Square/ });
+    expect(screen.queryByRole("link", { name: /Try today.s puzzle/ })).toBeNull();
+    for (const i of [0, 3, 1, 4, 2]) fireEvent.click(squares()[i]);
+    expect(screen.getByRole("status").textContent).toMatch(/wins/);
+    expect(screen.getByRole("link", { name: /Try today.s puzzle/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Play a friend/ }));
+    expect(beacons()).toContain("end_friend");
+  });
+});
