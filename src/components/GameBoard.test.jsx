@@ -56,3 +56,15 @@ test("the last move is announced politely once, not on re-render", () => {
   update(third);
   expect(live()).toHaveTextContent("Red dropped in column 1");
 });
+
+test("a move and its answer landing together, or a cleared board, announce nothing", () => {
+  const first = drop(empty(), 3, "Red");
+  const { update } = renderBoard(first);
+  const live = () => document.querySelector('[aria-live="polite"]');
+  update(drop(first, 3, "Yellow"));
+  expect(live()).toHaveTextContent("Yellow dropped in column 4");
+  update(drop(drop(first, 3, "Yellow"), 5, "Red", "Yellow")); // two new discs at once: the page narrates them
+  expect(live()).toHaveTextContent("Yellow dropped in column 4");
+  update(empty()); // new game
+  expect(live()).toHaveTextContent("");
+});

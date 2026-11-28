@@ -53,9 +53,12 @@ const GameBoard = ({
   if (prevSquares !== squares) {
     setPrevSquares(squares);
     if (gameId === "connect4") {
-      let added = -1;
-      squares.forEach((v, i) => { if (v && !prevSquares[i]) added = i; });
-      if (added >= 0) setAnnouncement(`${colourName(squares[added])} dropped in column ${(added % cols) + 1}`);
+      // Exactly one new disc is a move to say; several at once (Daily applies a move and its answer together,
+      // and narrates both itself) or a cleared board say nothing.
+      const added = [];
+      squares.forEach((v, i) => { if (v && !prevSquares[i]) added.push(i); });
+      if (added.length === 1) setAnnouncement(`${colourName(squares[added[0]])} dropped in column ${(added[0] % cols) + 1}`);
+      else if (!squares.some(Boolean)) setAnnouncement("");
     }
   }
   const onSquareClickRef = useRef(onSquareClick);
