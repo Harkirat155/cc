@@ -11,7 +11,7 @@ import { liveUrl } from "./Live";
 const KEY = "cc.daily";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DAYS = 400;
-const FIRST_DAY = "2026-11-27"; // the day the puzzle launched; /daily/:date opens a date from here to today
+export const FIRST_DAY = "2026-11-27"; // the day the puzzle launched; /daily/:date opens a date from here to today
 const MARKS = ["R", "Y"];
 const COLOR = ["Red", "Yellow"];
 
@@ -19,7 +19,7 @@ const COLOR = ["Red", "Yellow"];
 // solved on that day's own puzzle. Records written before streaks have no `days`; their `date` counts if solved.
 // `pastTries` maps a past date to the tries spent on it so far, so leaving and coming back keeps the count; it never touches
 // the latest-day fields. A streak is consecutive UTC days solved, whenever each was solved: solving yesterday's puzzle late counts.
-const readStore = () => {
+export const readStore = () => {
   try {
     const s = JSON.parse(window.localStorage.getItem(KEY));
     if (s && typeof s === "object" && !Array.isArray(s)) {
@@ -289,6 +289,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
           </div>
         )}
         {done && shown === null && <PlayNow game={game} />}
+        <Link to="/daily/archive" className="text-sm text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">Past puzzles</Link>
         {(past || done) && (
           <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
             {past ? "Back to today's" : "Try yesterday's"}

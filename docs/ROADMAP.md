@@ -21,6 +21,11 @@
   to `/daily?via=d`; arrivals count as `daily_link` (item 4, built). Only the date is in the link, so no result number
   is read from a URL. Kill rule: No daily_link tally hits within 4 weeks (by 2026-12-26).
 
+- A month of daily puzzles (built, not yet live): `/daily` has a quiet "Past puzzles" link to `/daily/archive`, a Monday-first month
+  grid per UTC month from launch to today, newest first (`src/DailyArchive.jsx`, helpers in `src/dailyGrid.js`). Each day links to
+  `/daily/{date}` (today to `/daily`) and reads "solved", "tried" or "not tried" from the `cc.daily` record on this device.
+  Nothing new is stored or sent; one `daily_archive` tally per page open. Streak rule unchanged.
+
 - A shared daily link opens the shared puzzle: `/d/{date}` now sends the browser to `/daily/{date}?via=d`, which plays
   that date's puzzle (launch day to today UTC; anything else shows today's with a note). Tries on past dates are kept
   per date in the `cc.daily` record (`pastTries`), and a past solve never changes today's record.
@@ -44,10 +49,6 @@ Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a s
 a player who misses a day has no way to see or catch up on it, a live game has no way to say "nice move" without voice,
 and the platform has had the same three games since launch. Next, in need order:
 
-1. **A month of daily puzzles (exploit).** Seen by: a returning player who missed days. Changes: `/daily` links to
-   `/daily/archive`, a month grid from launch to today UTC; each day shows its game and "solved" or "not tried" from the
-   `cc.daily` record on this device, and opens `/daily/{date}`. Data: none new; the date rule and the local record.
-   Streak rule unchanged (a late solve of yesterday still counts; older days never change the streak).
 2. **Quick reactions in a game (exploit).** Seen by: two players in a room without voice. Changes: four fixed reactions
    (👍 😮 😅 🤝) under the board; a tap shows it beside the sender's seat for 3 s on both screens, one per 2 s per seat,
    never stored, never free text (no moderation needed). Data: one new room event relayed by the Worker's Room, rate

@@ -11,6 +11,7 @@ const Arena = lazy(() => import('./Arena'));
 const ArenaBot = lazy(() => import('./ArenaBot'));
 const Replay = lazy(() => import('./Replay'));
 const Daily = lazy(() => import('./Daily'));
+const DailyArchive = lazy(() => import('./DailyArchive'));
 
 function LoadingScreen() {
   return (
@@ -67,6 +68,7 @@ function App() {
           <Route path="/arena/:name" element={<ArenaBot />} />
           <Route path="/replay/:id" element={<Replay />} />
           <Route path="/daily" element={<Daily />} />
+          <Route path="/daily/archive" element={<DailyArchive />} />
           <Route path="/daily/:date" element={<Daily />} />
         </Routes>
       </Suspense>
