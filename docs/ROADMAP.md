@@ -38,18 +38,18 @@
 
 - "Play someone now" after the daily is done (not in the solution view): joins an open Connect Four seat from `GET /api/live`, else `/lobby` (item 2, built). Data: tally `cc` events `daily_play` (clicks) and `daily_solve` (first solves); kill rule: `daily_play` under 5% of `daily_solve` within 4 weeks of launch.
 
-- Five in a row, a fourth game (item 3, built, not yet live; id `five`, shown as "Five in a Row", merged earlier as a2ae58b
-  and 8b6ec3b): a 15x15 place-a-mark game, five or more in a line wins, full board draws, no opening rules, from
+- Five in a Row, a fourth game (live since 2026-11-28 with Pages 83c32ef; id `five`, built in a2ae58b and 8b6ec3b,
+  before it was queued here by mistake): a 15x15 place-a-mark game, five or more in a line wins, full board draws, no opening rules, from
   `shared/games/five.js` through the registry (rooms, lobby, house opponent, agent manifest). New rooms by game are
-  counted by the `room_create_<gameId>` tally on `cc`, sent at the client's create-room call in `src/Game.jsx` (added
-  here; none existed before, only `finished_<gameId>`). Kill rule: `room_create_five` under 5 % of all `room_create_*`
+  counted by the `room_create_<gameId>` tally on `cc`, sent at the game screen's create-room call in `src/Game.jsx` (added
+  here; none existed before, only `finished_<gameId>`; lobby matches and house games are not counted by it). Kill rule: `room_create_five` under 5 % of all `room_create_*`
   within 4 weeks of launch.
 
 ## Next
 
 Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a solution, a shared link and two games, but
 a player who misses a day has no way to see or catch up on it, a live game has no way to say "nice move" without voice,
-and the platform has had the same three games since launch. Next, in need order:
+and Arena bots only ever meet when their authors happen to be online. Next, in need order:
 
 1. **A month of daily puzzles (exploit).** Seen by: a returning player who missed days. Changes: `/daily` links to
    `/daily/archive`, a month grid from launch to today UTC; each day shows its game and "solved" or "not tried" from the
@@ -59,6 +59,11 @@ and the platform has had the same three games since launch. Next, in need order:
    (👍 😮 😅 🤝) under the board; a tap shows it beside the sender's seat for 3 s on both screens, one per 2 s per seat,
    never stored, never free text (no moderation needed). Data: one new room event relayed by the Worker's Room, rate
    limited like moves; spectators see them, cannot send. Tally: `react` per send.
+3. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC a
+   Worker cron pairs the connected rated bots of each game in a Swiss round of 3 games each; `/arena/cup` shows this
+   week's table and last week's winner, and each bot page shows its cup results. Data: one additive D1 table of cup
+   rows, written by the cron only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
+   cups.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
