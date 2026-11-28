@@ -3,6 +3,11 @@ export type Entrant = { lc: string; rating: number };
 export type Pair = { a: string; b: string | null }; // b null = a bye
 
 export const CUP_ROUNDS = 3;
+const WEEK = 7 * 86_400_000;
+export const FIRST_CUP = Date.UTC(2026, 10, 29, 12); // Sunday 2026-11-29 12:00 UTC
+
+// The draw a cup belongs to: the latest Sunday 12:00 UTC at or before t (FIRST_CUP is a Sunday noon).
+export const cupDrawTime = (t: number) => FIRST_CUP + Math.floor((t - FIRST_CUP) / WEEK) * WEEK;
 
 // Swiss-style by rating: each round pairs the highest unpaired bot with the nearest-rated bot it has not met yet
 // (a repeat only when no full round of new pairings exists). An odd count gives the lowest-rated bot without a bye yet the bye.

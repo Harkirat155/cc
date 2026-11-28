@@ -11,7 +11,6 @@
       { "name": "LOBBY", "class_name": "Lobby" }
     ]
   },
-  // Weekly Arena cup: Sunday 12:00 UTC. Cron Triggers are on the free plan.
-  "triggers": { "crons": ["0 12 * * SUN"] },
+  // No cron trigger: the account's 5 free ones are taken (code 10072). The weekly cup is drawn lazily (Lobby.ensureCup).
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Lobby"] }]
 }

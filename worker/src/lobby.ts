@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { genCode, validateGameId } from "./validation";
-import { pairRounds } from "./cup";
+import { FIRST_CUP, cupDrawTime, pairRounds } from "./cup";
 import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from "./feedbackStore";
 
 type Msg = Record<string, unknown>;
@@ -89,6 +89,7 @@ export class Lobby extends DurableObject {
   // `replay` is the move list the Room held at settlement (first = the seat that moved first); without it the game has no replay.
   recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1, replay?: Replay): "rated" | "skipped" | "limit" {
     // One transaction: the settled mark, the house counter, both rating upserts and the history rows land together or not at all.
+    this.ensureCup(Date.now()); // draw this week's cup before the game that may settle one of its pairings
     return this.ctx.storage.transactionSync(() => this.settle(id, gameId, a, b, score, replay));
   }
 
@@ -141,9 +142,10 @@ export class Lobby extends DurableObject {
     return out;
   }
 
-  // The weekly cup (docs/arena.md), run by the Sunday cron. Entrants per game: listed registered bots with a rated game of that type in
+  // The weekly cup (docs/arena.md), drawn for Sunday 12:00 UTC by ensureCup. Entrants per game: listed registered bots with a rated game of that type in
   // the last 7 days. Writes the entrants and 3 rounds of pairings once per (week, game); the results are the rated games the pairings produce.
   runCup(now: number): void {
+    if (now < FIRST_CUP) return; // no cup before the first one, from any path
     const sql = this.ctx.storage.sql;
     const week = new Date(now).toISOString().slice(0, 10);
     for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
@@ -152,7 +154,7 @@ export class Lobby extends DurableObject {
         const ents = sql.exec<{ lc: string; rating: number }>(
           `SELECT r.name_lc AS lc, r.rating FROM ratings r JOIN bots b ON b.name_lc = r.name_lc
            WHERE r.game_id = ? AND r.name_lc NOT IN (SELECT name_lc FROM unlisted_bots)
-             AND EXISTS (SELECT 1 FROM bot_games g WHERE g.name_lc = r.name_lc AND g.game_id = r.game_id AND g.at >= ?)`, game_id, now - CUP_WEEK_MS).toArray();
+             AND EXISTS (SELECT 1 FROM bot_games g WHERE g.name_lc = r.name_lc AND g.game_id = r.game_id AND g.at >= ? AND g.at < ?)`, game_id, now - CUP_WEEK_MS, now).toArray();
         sql.exec("INSERT INTO cup_runs (week, game_id, entrants, at) VALUES (?, ?, ?, ?)", week, game_id, ents.length, now);
         if (ents.length < 2) return;
         for (const e of ents) sql.exec("INSERT INTO cup_entries (week, game_id, name_lc, rating) VALUES (?, ?, ?, ?)", week, game_id, e.lc, e.rating);
@@ -161,9 +163,19 @@ export class Lobby extends DurableObject {
     }
   }
 
+  // No cron (the account's 5 free cron triggers are taken): the first rated game or cup page visit after Sunday 12:00 UTC
+  // draws that Sunday's cup, as the cron would have, and the Sunday before it if a quiet week left that one undrawn.
+  // runCup is idempotent per (week, game) and counts only games before the draw.
+  ensureCup(now: number): void {
+    const t = cupDrawTime(now);
+    this.runCup(t - CUP_WEEK_MS);
+    this.runCup(t);
+  }
+
   // This week's table and last week's (the two newest cups). Names and numbers only; opponents[i] is round i+1's paired bot (null: bye). A pairing's result is the next rated game
   // between the two bots, in that game type, inside the cup's 7 days; points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
   listCup() {
+    this.ensureCup(Date.now());
     const sql = this.ctx.storage.sql;
     const weeks = sql.exec<{ week: string; at: number }>("SELECT week, MIN(at) AS at FROM cup_runs GROUP BY week ORDER BY week DESC LIMIT 2").toArray();
     const names = new Map(sql.exec<{ name_lc: string; name: string }>("SELECT name_lc, name FROM bots").toArray().map((b) => [b.name_lc, b.name]));
