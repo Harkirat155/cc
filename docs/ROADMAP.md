@@ -28,7 +28,7 @@
 - See the winning line: a solved or given-up day offers "Show the solution", stepping one winning line a move per
   press on the same board, derived from `shared/daily.js` (`solutionLine`), nothing stored (item 1, built).
 
-- A different game on some days (item 3, built, not yet live): every fourth UTC day (day number % 4 === 3, first on
+- A different game on some days (item 3, live 2026-11-28, Pages 83c32ef, cc-api c35f38bb): every fourth UTC day (day number % 4 === 3, first on
   2026-11-30) the daily is a Tic-Tac-Toe position, win now or block their only threat, one move, from
   `gameForDate` / `tttPuzzleForDate` in `shared/daily.js`; the Worker's `/d/{date}` card names the same game. Same
   solve, tries, share text (it adds "Tic-Tac-Toe") and "Play someone now" (an open Tic-Tac-Toe seat, else `/lobby`).
@@ -36,23 +36,25 @@
   `/d/`) and `daily_play_ttt`. Kill rule: over 4 weeks of live Tic-Tac-Toe days, `daily_link_ttt` or
   `daily_solve_ttt` per Tic-Tac-Toe day below `daily_link` or `daily_solve` per Connect Four day. Checkers not built.
 
-Finding (2026-11-28): the daily puzzle is the only reason to come back each day, but a solve leaves nothing that
-carries over to tomorrow, and a shared replay link unfurls as the generic card. Next, keep daily players, make the
-board readable to everyone, and let a replay travel. All three reuse what exists: the daily engine and its
-localStorage record, the shared GameBoard, and the stored replays.
-
-1. **A daily streak.** Seen by: anyone who solved yesterday's puzzle. Changes: `/daily` shows "Day N in a row" from
-   the solves already kept on this device (localStorage only, nothing sent), the result line gains the streak, and a
-   solved or given-up day offers "Try yesterday's". Data: the date and the existing local record; no server change.
-2. **A Connect Four board a screen reader can read.** Seen by: a screen-reader user on `/daily` or in a game.
-   Changes: each column describes its discs bottom to top ("Column 3: red, yellow, 2 empty") as well as "Drop piece
-   in column 3"; the last move is announced. Data: the board state already rendered. (Was the accessibility debt.)
-   Built: column buttons name their discs, a full column reads "full", and a polite live region announces each move.
-3. **Replay links that unfurl (explore).** Seen by: someone a bot author sends a replay to. Changes: the Worker serves
-   `/r/{id}` as a small HTML page whose title and description name both bots, the game and the result, with the
-   static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4
-   weeks of launch. Data: the stored replay row; read-only.
 - "Play someone now" after the daily is done (not in the solution view): joins an open Connect Four seat from `GET /api/live`, else `/lobby` (item 2, built). Data: tally `cc` events `daily_play` (clicks) and `daily_solve` (first solves); kill rule: `daily_play` under 5% of `daily_solve` within 4 weeks of launch.
+
+## Next
+
+Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a solution, a shared link and two games, but
+a player who misses a day has no way to see or catch up on it, a live game has no way to say "nice move" without voice,
+and the platform has had the same three games since launch. Next, in need order:
+
+1. **A month of daily puzzles (exploit).** Seen by: a returning player who missed days. Changes: `/daily` links to
+   `/daily/archive`, a month grid from launch to today UTC; each day shows its game and "solved" or "not tried" from the
+   `cc.daily` record on this device, and opens `/daily/{date}`. Data: none new; the date rule and the local record.
+   Streak rule unchanged (a late solve of yesterday still counts; older days never change the streak).
+2. **Quick reactions in a game (exploit).** Seen by: two players in a room without voice. Changes: four fixed reactions
+   (👍 😮 😅 🤝) under the board; a tap shows it beside the sender's seat for 3 s on both screens, one per 2 s per seat,
+   never stored, never free text (no moderation needed). Data: one new room event relayed by the Worker's Room, rate
+   limited like moves; spectators see them, cannot send. Tally: `react` per send.
+3. **Five in a row, a fourth game (explore).** Seen by: anyone in the lobby. Changes: a 15x15 place-a-mark game where
+   five in a line wins (no opening rules), playable in rooms, the lobby, against the house and in the Arena, through the
+   `shared/games/` registry (`add-new-game`). Kill rule: under 5 % of new rooms within 4 weeks of launch choose it.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
