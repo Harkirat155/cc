@@ -113,7 +113,7 @@ the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTT
    downloads a calendar file (`.ics`, a daily event at the UTC reset, made on the device), so people come back without an
    account or push permission. Data: tally `daily_remind`. Judge by `daily_play` from returning days.
 
-7. **Play with no signal (built; exploit).** Seen by: anyone who installed the app or opened it before, then lost signal (the
+7. **Play with no signal (live 2026-11-28, PR #113, a091495; exploit).** Seen by: anyone who installed the app or opened it before, then lost signal (the
    manifest says standalone but nothing was cached, so the installed app showed nothing). Changes: a hand-written service worker
    (`src/sw/worker.js`, decisions in `src/sw/core.js`, bundled to `dist/sw.js` by `scripts/swBuild.js` from the vite build) keeps
    the built app shell, every route chunk and the prerendered pages on the phone, so `/`, local play, play-the-computer and the
