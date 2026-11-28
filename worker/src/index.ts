@@ -83,8 +83,9 @@ app.get("/ws/lobby", async (c) => {
 
 // Public, read-only list of listed games in progress (docs/live-games.md). No socket or client ids.
 app.get("/api/live", async (c) => {
-  const games = await c.env.LOBBY.getByName("lobby").listLive();
-  return c.json({ games }, 200, { "Cache-Control": "public, max-age=5" });
+  const lobby = c.env.LOBBY.getByName("lobby");
+  const [games, open] = [await lobby.listLive(), await lobby.listOpen()];
+  return c.json({ games, open }, 200, { "Cache-Control": "public, max-age=5" });
 });
 
 // Agent Arena (docs/arena.md): register a bot name once for a secret key, read the public rated leaderboard.

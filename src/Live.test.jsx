@@ -17,6 +17,13 @@ describe("Live page", () => {
     expect(screen.getByRole("link", { name: "Watch" }).getAttribute("href")).toBe("/room/K7P2M");
   });
 
+  it("lists an open seat as Waiting with a Join link to its room", async () => {
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [{ roomId: "AB234", gameId: "connect4", name: "Ada", since: Date.now() }] }) });
+    show();
+    expect(await screen.findByText("Waiting: Ada · Connect Four")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Join" }).getAttribute("href")).toBe("/room/AB234");
+  });
+
   it("says when nothing is live, and states the listing rule", async () => {
     window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [] }) });
     show();

@@ -155,13 +155,22 @@ export class Lobby extends DurableObject {
   // Newest game first, at most LIVE_MAX. A row nobody refreshed for LIVE_STALE_MS is a room that vanished
   // without telling us (eviction, deploy), so it is dropped here rather than listed as live.
   listLive() {
+    return this.liveRows(">").map((r) => ({ roomId: r.room_id, gameId: r.game_id, players: [r.x_name ?? "Anonymous", r.o_name ?? "Anonymous"], moves: r.moves, startedAt: r.started_at }));
+  }
+
+  // Listed rooms with one seat filled and no move played (a live row with moves = 0), newest first, same staleness rule.
+  // The room reports an unnamed filled seat as "Anonymous" and an empty seat as null, so the first non-null name is the waiter.
+  listOpen() {
+    return this.liveRows("=").map((r) => ({ roomId: r.room_id, gameId: r.game_id, name: r.x_name ?? r.o_name ?? "Anonymous", since: r.started_at }));
+  }
+
+  private liveRows(cmp: ">" | "=") {
     const sql = this.ctx.storage.sql;
     sql.exec("DELETE FROM live WHERE updated_at < ?", Date.now() - LIVE_STALE_MS);
     return sql
       .exec<{ room_id: string; game_id: string; x_name: string | null; o_name: string | null; moves: number; started_at: number }>(
-        "SELECT room_id, game_id, x_name, o_name, moves, started_at FROM live ORDER BY started_at DESC LIMIT ?", LIVE_MAX)
-      .toArray()
-      .map((r) => ({ roomId: r.room_id, gameId: r.game_id, players: [r.x_name ?? "Anonymous", r.o_name ?? "Anonymous"], moves: r.moves, startedAt: r.started_at }));
+        `SELECT room_id, game_id, x_name, o_name, moves, started_at FROM live WHERE moves ${cmp} 0 ORDER BY started_at DESC LIMIT ?`, LIVE_MAX)
+      .toArray();
   }
 
   // addPlayer, lobbyManager.js:26. Same checks in the same order, same messages.

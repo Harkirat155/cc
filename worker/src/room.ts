@@ -124,6 +124,7 @@ export class Room extends DurableObject {
   private s: RoomState | null = null;
   private armed = false; // an alarm is known to be set, so frames skip the getAlarm read
   private reported: string | null = null; // last listing state sent to the Lobby registry, so unchanged publishes send nothing
+  private openedAt: number | null = null; // when this room began waiting with an open seat (in memory: resets if the room restarts)
   private after: (() => void)[] = []; // broadcasts that follow the ack, as io emits after ack() in roomHandlers.js
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -259,8 +260,16 @@ export class Room extends DurableObject {
   // names, game, move count and start time leave the room; never socket ids or client ids.
   private report(s: RoomState) {
     if (!s.listed) return;
-    const on = this.live(s) && s.moves > 0;
-    const row = { roomId: s.roomId, gameId: s.gameId, x: s.names.X, o: s.names.O, moves: s.moves, startedAt: s.startedAt ?? Date.now() };
+    // A row with moves = 0 is an open seat: one seat filled, nothing played, and the empty seat claimable by a
+    // tokenless join (not held by a lobby match's token or for a returning creator, as joinRoom's held()).
+    // Two seats and no move is unlisted.
+    const empty = (["X", "O"] as const).filter((k) => !s.players[k]);
+    const held = (k: Seat) => Object.values(s.seatTokens).some((q) => q.seat === k && q.exp > Date.now()) || (k === "X" && !!s.abandonAt);
+    const waiting = s.state?.status === "active" && s.moves === 0 && empty.length === 1 && !held(empty[0]);
+    this.openedAt = waiting ? (this.openedAt ?? Date.now()) : null;
+    const on = (this.live(s) && s.moves > 0) || waiting;
+    const nm = (k: "X" | "O") => (s.players[k] ? s.names[k] ?? "Anonymous" : null);
+    const row = { roomId: s.roomId, gameId: s.gameId, x: nm("X"), o: nm("O"), moves: s.moves, startedAt: s.startedAt ?? this.openedAt ?? Date.now() };
     const key = on ? JSON.stringify(row) : "off";
     if (key === this.reported) return;
     this.reported = key;
