@@ -5,15 +5,39 @@ import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.
 import GameBoard from "./components/GameBoard";
 
 const KEY = "cc.daily";
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_DAYS = 400;
 const MARKS = ["R", "Y"];
 const COLOR = ["Red", "Yellow"];
 
-const load = (date) => {
+// The record is {date, tries, solved} for the latest day played (the original shape) plus `days`, the UTC dates
+// solved on that day's own puzzle. Records written before streaks have no `days`; their `date` counts if solved.
+// A streak is consecutive UTC days solved, whenever each was solved: solving yesterday's puzzle late counts.
+const readStore = () => {
   try {
     const s = JSON.parse(window.localStorage.getItem(KEY));
-    if (s && s.date === date) return { tries: s.tries || 1, solved: Boolean(s.solved) };
+    if (s && typeof s === "object" && !Array.isArray(s)) {
+      const today = todayUtc();
+      const listed = [...(Array.isArray(s.days) ? s.days : []), ...(s.solved ? [s.date] : [])];
+      const days = [...new Set(listed.filter((d) => typeof d === "string" && DAY.test(d) && d <= today))].sort().slice(-MAX_DAYS);
+      return { ...s, days };
+    }
   } catch { /* storage unavailable or corrupt: start fresh */ }
-  return { tries: 1, solved: false };
+  return { days: [] };
+};
+
+const load = (date) => {
+  const s = readStore();
+  return s.date === date ? { tries: s.tries || 1, solved: Boolean(s.solved) } : { tries: 1, solved: false };
+};
+
+const dayBefore = (date) => todayUtc(new Date(Date.parse(`${date}T00:00:00Z`) - 86400000));
+
+const streakTo = (date, days) => {
+  const set = new Set(days);
+  let n = 0;
+  for (let d = date; set.has(d); d = dayBefore(d)) n++;
+  return n;
 };
 
 const drop = (board, col, mark) => {
@@ -23,8 +47,8 @@ const drop = (board, col, mark) => {
   return next;
 };
 
-export const resultLine = (date, tries) =>
-  `CrissCross daily ${date} · solved in ${tries} ${tries === 1 ? "try" : "tries"} · harkirat155.github.io/cc/daily`;
+export const resultLine = (date, tries, streak = 1) =>
+  `CrissCross daily ${date} · solved in ${tries} ${tries === 1 ? "try" : "tries"}${streak >= 2 ? ` · day ${streak} in a row` : ""} · harkirat155.github.io/cc/daily`;
 
 function CopyResult({ text }) {
   const [state, setState] = useState(""); // "" | "ok" | "failed"
@@ -46,18 +70,22 @@ function CopyResult({ text }) {
 
 // Keys the puzzle by date and moves to the new one at the next 00:00 UTC.
 function Daily() {
-  const [date, setDate] = useState(() => todayUtc());
+  const [today, setToday] = useState(() => todayUtc());
+  const [past, setPast] = useState(false);
   useEffect(() => {
-    const next = Date.parse(`${date}T00:00:00Z`) + 86400000;
-    const t = window.setTimeout(() => setDate(todayUtc()), Math.max(next - Date.now(), 0) + 50);
+    const next = Date.parse(`${today}T00:00:00Z`) + 86400000;
+    const t = window.setTimeout(() => { setToday(todayUtc()); setPast(false); }, Math.max(next - Date.now(), 0) + 50);
     return () => window.clearTimeout(t);
-  }, [date]);
-  return <DailyPuzzle key={date} date={date} />;
+  }, [today]);
+  const date = past ? dayBefore(today) : today;
+  return <DailyPuzzle key={date} date={date} past={past} onSwitch={() => setPast(!past)} />;
 }
 
-function DailyPuzzle({ date }) {
+function DailyPuzzle({ date, past, onSwitch }) {
   const puzzle = useMemo(() => puzzleForDate(date), [date]);
-  const [saved, setSaved] = useState(() => load(date));
+  const [saved, setSaved] = useState(() => (past ? { tries: 1, solved: false } : load(date)));
+  const [days, setDays] = useState(() => readStore().days);
+  const [already] = useState(() => past && days.includes(date)); // tries for past days are session-only: no new result line
   const [board, setBoard] = useState(puzzle.board);
   const [left, setLeft] = useState(puzzle.n);
   const [slipped, setSlipped] = useState(false);
@@ -65,11 +93,16 @@ function DailyPuzzle({ date }) {
   const status = useRef(null);
   const me = puzzle.turn;
 
+  // Yesterday's puzzle never rewrites today's record; it only adds its date to `days`.
   const save = (next) => {
     setSaved(next);
-    try { window.localStorage.setItem(KEY, JSON.stringify({ date, ...next })); } catch { /* ignore */ }
+    const keep = next.solved ? [...new Set([...readStore().days, date])].sort().slice(-MAX_DAYS) : readStore().days;
+    if (next.solved) setDays(keep);
+    const rec = past ? { ...readStore(), days: keep } : { date, ...next, days: keep };
+    try { window.localStorage.setItem(KEY, JSON.stringify(rec)); } catch { /* ignore */ }
   };
-  const done = saved.solved || slipped;
+  const done = saved.solved || slipped || already;
+  const streak = streakTo(date, days);
 
   const play = (col) => {
     if (done || board[col] !== "") return;
@@ -104,7 +137,7 @@ function DailyPuzzle({ date }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
         <Link to="/" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← CrissCross</Link>
         <header className="self-start">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{past ? " · yesterday's" : ""}</h1>
           <p className="mt-2 text-foreground/70">One puzzle a day, the same for everyone. New puzzle at 00:00 UTC.</p>
           <p className="mt-2 font-medium">{COLOR[me]} to move: win in {puzzle.n} of your moves.</p>
         </header>
@@ -119,11 +152,17 @@ function DailyPuzzle({ date }) {
           disabled={done}
         />
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
-          {saved.solved ? (
+          {already ? (
+            <>
+              <p className="font-semibold">Already solved.</p>
+              <p className="mt-1 text-sm">Day {streak} in a row</p>
+            </>
+          ) : saved.solved ? (
             <>
               <p className="font-semibold">Solved.</p>
-              <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries)}</p>
-              <div className="mt-2"><CopyResult text={resultLine(date, saved.tries)} /></div>
+              <p className="mt-1 text-sm">Day {streak} in a row</p>
+              <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak)}</p>
+              <div className="mt-2"><CopyResult text={resultLine(date, saved.tries, streak)} /></div>
             </>
           ) : slipped ? (
             <>
@@ -134,6 +173,11 @@ function DailyPuzzle({ date }) {
             <p className="text-sm text-foreground/70">{note || `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`}</p>
           )}
         </div>
+        {(past || done) && (
+          <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+            {past ? "Back to today's" : "Try yesterday's"}
+          </button>
+        )}
       </div>
     </main>
   );
