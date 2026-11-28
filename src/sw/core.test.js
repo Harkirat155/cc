@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { cacheName, staleCaches, routeFor, fallbackKeys, buildAssetList } from './core.js';
+import { cacheName, staleCaches, routeFor, fallbackKeys, buildAssetList, activateCleanup, shellFor } from './core.js';
 
 const ctx = { origin: 'https://harkirat155.github.io', base: '/cc/', precache: new Set(['/cc/index.html', '/cc/assets/a-1.js', '/cc/icons/icon-192x192.svg']) };
 const req = (path, extra = {}) => ({ method: 'GET', mode: 'no-cors', url: `https://harkirat155.github.io${path}`, ...extra });
@@ -49,5 +49,30 @@ describe('buildAssetList', () => {
     expect(buildAssetList(files, '/cc/')).toEqual([
       '/cc/assets/a.css', '/cc/assets/b.js', '/cc/daily/index.html', '/cc/icons/icon-192x192.svg', '/cc/index.html', '/cc/manifest.json',
     ]);
+  });
+});
+
+// A tiny CacheStorage: { name: { key: body } }.
+const fakeCaches = (data) => ({
+  keys: async () => Object.keys(data),
+  delete: async (n) => delete data[n],
+  open: async (n) => ({ match: async (k) => (data[n] && data[n][k]) || undefined }),
+});
+
+describe('activateCleanup', () => {
+  test('deletes only our older caches, keeps the current and foreign ones', async () => {
+    const data = { 'cc-shell-old': {}, 'cc-shell-new': {}, 'other-app': {} };
+    await activateCleanup(fakeCaches(data), 'cc-shell-new');
+    expect(Object.keys(data)).toEqual(['cc-shell-new', 'other-app']);
+  });
+});
+
+describe('shellFor', () => {
+  test('answers from the current version only, never an older shell', async () => {
+    const data = { 'cc-shell-old': { '/cc/index.html': 'OLD' }, 'cc-shell-new': { '/cc/index.html': 'NEW', '/cc/daily/index.html': 'DAILY' } };
+    const c = fakeCaches(data);
+    expect(await shellFor(c, 'cc-shell-new', '/cc/daily', '/cc/')).toBe('DAILY');
+    expect(await shellFor(c, 'cc-shell-new', '/cc/room/X', '/cc/')).toBe('NEW');
+    expect(await shellFor(fakeCaches({ 'cc-shell-old': { '/cc/index.html': 'OLD' }, 'cc-shell-new': {} }), 'cc-shell-new', '/cc/', '/cc/')).toBeUndefined();
   });
 });

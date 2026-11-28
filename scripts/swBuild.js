@@ -11,7 +11,7 @@ const walk = (dir, rel = '') =>
   });
 
 // Bundle src/sw/worker.js into <dist>/sw.js with the list of built files and a version made from their bytes.
-export async function buildWorker(dist, base) {
+export async function buildWorker(dist, base, { kill = false } = {}) {
   const files = buildAssetList(walk(dist), base);
   const hash = crypto.createHash('sha256');
   for (const url of files) {
@@ -19,7 +19,7 @@ export async function buildWorker(dist, base) {
   }
   const version = hash.digest('hex').slice(0, 12);
   await build({
-    entryPoints: [path.resolve('src/sw/worker.js')],
+    entryPoints: [path.resolve(kill ? 'src/sw/kill.js' : 'src/sw/worker.js')],
     outfile: path.join(dist, 'sw.js'),
     bundle: true,
     minify: true,

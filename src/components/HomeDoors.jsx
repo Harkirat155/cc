@@ -33,7 +33,8 @@ const HomeDoors = ({ onComputer, onFriend }) => {
     </button>
     <button
       type="button"
-      className={DOOR}
+      className={`${DOOR} disabled:cursor-not-allowed disabled:opacity-50`}
+      disabled={!online}
       onClick={() => { tally("cc", "door_friend"); onFriend(); }}
     >
       <Body title="Play a friend" hint={online ? "Send a link" : "Needs a signal"} />

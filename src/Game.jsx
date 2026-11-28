@@ -379,7 +379,7 @@ const Game = () => {
               }}
             />
           )}
-          {paramRoomId && !online && <NoSignal>This room needs a connection.</NoSignal>}
+          {paramRoomId && !online && <NoSignal onPlay={() => { setOpponent({ mode: "computer" }); resetGame(); navigate("/"); }}>This room needs a connection.</NoSignal>}
           {!isMultiplayer && history.length <= 1 && (
             <HomeDoors
               onComputer={() => { setOpponent({ mode: "computer" }); resetGame(); }}

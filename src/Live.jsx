@@ -58,7 +58,9 @@ function Live() {
           </p>
         </header>
 
-        {(failed || !online) && <NoSignal>{`Could not load the list. Retrying every ${REFRESH_MS / 1000} seconds.`}</NoSignal>}
+        {!online
+          ? <NoSignal />
+          : failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the list. Retrying every {REFRESH_MS / 1000} seconds.</p>}
         {!failed && games === null && <p className="text-foreground/60">Loading…</p>}
         {!failed && games?.length === 0 && (
           <p className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">

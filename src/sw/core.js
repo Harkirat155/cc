@@ -30,3 +30,17 @@ const SKIP = /(^|\/)(sw\.js|404\.html|robots\.txt|sitemap\.xml|llms\.txt|agent-m
 // Files of the build output (relative, posix) to keep on the phone, as absolute URLs under base.
 export const buildAssetList = (files, base) =>
   files.filter((f) => !SKIP.test(f)).map((f) => `${base}${f}`).sort();
+
+// Delete our older caches. Runs on activate, which (without skipWaiting) happens only once no page uses the old worker.
+export const activateCleanup = async (cacheStorage, current) =>
+  Promise.all(staleCaches(await cacheStorage.keys(), current).map((n) => cacheStorage.delete(n)));
+
+// The cached page for an offline navigation, from the current version's cache only.
+export async function shellFor(cacheStorage, current, pathname, base) {
+  const cache = await cacheStorage.open(current);
+  for (const key of fallbackKeys(pathname, base)) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
+  return undefined;
+}

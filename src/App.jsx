@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
+import lazy from './lib/lazyReload';
 import './index.css';
 import { Routes, Route } from 'react-router-dom';
 import { AppTooltipProvider } from './components/ui/Tooltip';

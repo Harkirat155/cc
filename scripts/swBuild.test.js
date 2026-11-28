@@ -31,3 +31,15 @@ describe('buildWorker', () => {
     expect((await buildWorker(dist, '/cc/')).version).not.toBe(a);
   });
 });
+
+describe('kill switch', () => {
+  test('buildWorker with kill emits the self-removing worker, no asset list', async () => {
+    const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-sw-'));
+    write(dist, 'index.html', '<html>1</html>');
+    await buildWorker(dist, '/cc/', { kill: true });
+    const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8');
+    expect(sw).toContain('unregister');
+    expect(sw).not.toContain('addAll');
+    fs.rmSync(dist, { recursive: true, force: true });
+  });
+});

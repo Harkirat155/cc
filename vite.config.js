@@ -11,7 +11,7 @@ const prerender = () => {
     apply: 'build',
     configResolved: (c) => { outDir = c.build.outDir; },
     // The worker's file list is read after prerendering so the per-route pages are in it.
-    closeBundle: async () => { prerenderRoutes(outDir); await buildWorker(outDir, '/cc/'); },
+    closeBundle: async () => { prerenderRoutes(outDir); await buildWorker(outDir, '/cc/', { kill: process.env.CC_SW_KILL === '1' }); },
   };
 };
 
