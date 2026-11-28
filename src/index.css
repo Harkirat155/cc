@@ -346,3 +346,8 @@
   outline: 2px solid #6366f1;
   outline-offset: 2px;
 }
+
+/* Script-focused landmarks (a page's h1, a status region) are not controls: no ring. */
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}

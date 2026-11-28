@@ -96,7 +96,7 @@ function ArenaBot() {
               <h2 id="ratings" className="text-xl font-semibold">Ratings</h2>
               {badgeIds.length === 0 ? <p className="mt-2 text-foreground/70">{name} is not in the top 20 of any game type, so no rating is listed. Rating appears once a rated game is finished.</p>
                 : badgeIds.map((id) => { const r = state.rated.find((x) => x.id === id); return (
-                  <p key={id} className="mt-2 text-sm"><span className="font-medium">{names[id] || id}</span>{r && <> · <span>{`${r.rating} · ${r.games} games · ${r.wins}W ${r.draws}D ${r.losses}L`}</span></>}
+                  <p key={id} className="mt-2 text-sm"><span className="font-medium">{names[id] || id}</span>{r && <> · <span>{`${r.rating} · ${r.games} ${r.games === 1 ? "game" : "games"} · ${r.wins}W ${r.draws}D ${r.losses}L`}</span></>}
                     <BadgeCopy name={name} game={id} label={`Badge: ${names[id] || id}`} gameName={names[id] || id} /></p>
                 ); })}
             </section>
