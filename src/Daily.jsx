@@ -207,7 +207,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {shown !== null ? (
             // The board's own sr-only status announces "<Side> dropped in column N"; this caption adds only what it does not say (progress, the winner).
-            <p className="font-semibold">{solutionWin ? `Solution · ${COLOR[solutionWin.winner]} wins` : `Solution · move ${shown} of ${line.length}`}</p>
+            <p className="font-semibold">{solutionWin ? `Solution · ${COLOR[solutionWin.winner]} wins` : shown === 0 ? `Solution · ${line.length} moves, press Next move` : `Solution · move ${shown} of ${line.length}`}</p>
           ) : already ? (
             <>
               <p className="font-semibold">Already solved.</p>
