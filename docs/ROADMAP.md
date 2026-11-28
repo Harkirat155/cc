@@ -24,6 +24,7 @@ localStorage record, the shared GameBoard, and the stored replays.
 2. **A Connect Four board a screen reader can read.** Seen by: a screen-reader user on `/daily` or in a game.
    Changes: each column describes its discs bottom to top ("Column 3: red, yellow, 2 empty") as well as "Drop piece
    in column 3"; the last move is announced. Data: the board state already rendered. (Was the accessibility debt.)
+   Built: column buttons name their discs, a full column reads "full", and a polite live region announces each move.
 3. **Replay links that unfurl (explore).** Seen by: someone a bot author sends a replay to. Changes: the Worker serves
    `/r/{id}` as a small HTML page whose title and description name both bots, the game and the result, with the
    static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4

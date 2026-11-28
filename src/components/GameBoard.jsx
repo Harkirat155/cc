@@ -45,6 +45,22 @@ const GameBoard = ({
   const [pendingCell, setPendingCell] = useState(null);
   const [pendingFor, setPendingFor] = useState(squares);
   if (pendingFor !== squares) { setPendingFor(squares); setPendingCell(null); }
+  // Connect Four: say the newest disc once per move in a polite live region (derived from the board diff).
+  const [prevSquares, setPrevSquares] = useState(squares);
+  const [announcement, setAnnouncement] = useState("");
+  const colourName = (value) =>
+    (paletteForValue(value, playerInfo, palette)?.label || "Disc").replace(/^Player /, "");
+  if (prevSquares !== squares) {
+    setPrevSquares(squares);
+    if (gameId === "connect4") {
+      // Exactly one new disc is a move to say; several at once (Daily applies a move and its answer together,
+      // and narrates both itself) or a cleared board say nothing.
+      const added = [];
+      squares.forEach((v, i) => { if (v && !prevSquares[i]) added.push(i); });
+      if (added.length === 1) setAnnouncement(`${colourName(squares[added[0]])} dropped in column ${(added[0] % cols) + 1}`);
+      else if (!squares.some(Boolean)) setAnnouncement("");
+    }
+  }
   const onSquareClickRef = useRef(onSquareClick);
   onSquareClickRef.current = onSquareClick;
 
@@ -66,9 +82,15 @@ const GameBoard = ({
         <div className="flex gap-1 sm:gap-2">
           {Array.from({ length: cols }).map((_, col) => {
             const isHighlighted = activeColumn === col;
-            const columnIsFull = Array.from({ length: rows }).every(
-              (_, row) => squares[row * cols + col]
-            );
+            const discs = [];
+            for (let row = rows - 1; row >= 0; row--) {
+              const v = squares[row * cols + col];
+              if (v) discs.push(colourName(v).toLowerCase());
+            }
+            const columnIsFull = discs.length === rows;
+            const empties = rows - discs.length;
+            const contents = [...discs, columnIsFull ? "full" : `${empties} empty`].join(", ");
+            const columnLabel = `Column ${col + 1}: ${contents}${columnIsFull ? "" : `. Drop piece in column ${col + 1}`}`;
 
             return (
               <button
@@ -84,7 +106,7 @@ const GameBoard = ({
                   "group flex flex-col gap-1 rounded-2xl p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:p-1.5",
                   isHighlighted ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.04]"
                 )}
-                aria-label={`Drop piece in column ${col + 1}`}
+                aria-label={columnLabel}
               >
                 {Array.from({ length: rows }).map((__, row) => {
                   const index = row * cols + col;
@@ -108,6 +130,7 @@ const GameBoard = ({
             );
           })}
         </div>
+        <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
       </BoardFrame>
     );
   }
