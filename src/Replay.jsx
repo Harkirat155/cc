@@ -24,10 +24,6 @@ export function rebuild(gameId, first, moves) {
 function Replay() {
   const { id = "" } = useParams();
   const { search } = useLocation();
-  // Arrivals through a shared /r/ link (worker adds ?via=r): the replay-links bet's kill-rule signal. Counts only.
-  useEffect(() => {
-    if (new window.URLSearchParams(search).get("via") === "r") tally("cc", "replay_link");
-  }, [search]);
   const [res, setRes] = useState("loading"); // loading | error | missing | the replay
   const [at, setAt] = useState(0);
   const gen = useRef(0);
@@ -58,19 +54,33 @@ function Replay() {
 
   // The Worker's /r/{id} page carries the link preview, then sends the browser on to this page.
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const timer = useRef(0);
+  const link = `${badgeBase()}/r/${encodeURIComponent(id)}`;
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${badgeBase()}/r/${encodeURIComponent(id)}`);
+      await navigator.clipboard.writeText(link);
+      setCopyFailed(false);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard refused: the button stays "Copy link" */ }
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 2000);
+    } catch { setCopied(false); setCopyFailed(true); }
   };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const loaded = typeof res === "object";
   const built = useMemo(() => {
     if (!loaded) return null;
     try { return rebuild(res.gameId, res.first, res.moves); } catch { return false; }
   }, [loaded, res]);
+
+  // Arrivals through a shared /r/ link (worker adds ?via=r): the replay-links bet's kill-rule signal. Counted once per id, only for a replay that loaded and rebuilt.
+  const counted = useRef("");
+  useEffect(() => {
+    if (!built || counted.current === id) return;
+    counted.current = id;
+    if (new window.URLSearchParams(search).get("via") === "r") tally("cc", "replay_link");
+  }, [built, id, search]);
 
   useEffect(() => {
     if (!built) return undefined;
@@ -119,7 +129,9 @@ function Replay() {
               <p role="status" aria-live="polite" className="text-sm font-medium">Move {at} of {total}</p>
               <button type="button" className={btn} disabled={at === total} onClick={() => setAt(at + 1)}>Next</button>
             </div>
-            <button type="button" className={btn} onClick={copyLink}>{copied ? "Copied" : "Copy link"}</button>
+            <button type="button" className={btn} onClick={copyLink}>{copied ? "Copied" : copyFailed ? "Copy failed: select the link below" : "Copy link"}</button>
+            <p role="status" aria-live="polite" className="sr-only">{copied ? "Copied" : ""}</p>
+            {copyFailed && <input readOnly aria-label="Replay link" value={link} onFocus={(e) => e.target.select()} className="block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-xs" />}
           </>
         )}
       </div>

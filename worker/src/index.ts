@@ -146,13 +146,13 @@ app.get("/r/:id", async (c) => {
   // The RPC stub types `moves: unknown[]` as never, so restore the declared shape.
   const r = (id.length <= 64 ? await c.env.LOBBY.getByName("lobby").getReplay(id) : null) as ReturnType<Lobby["getReplay"]>;
   if (!r) {
-    return c.html(`<!doctype html><meta charset="utf-8"><title>Replay not found · CrissCross</title><p>No replay with this link. <a href="${PAGES}/arena">Back to the Arena</a></p>`, 404, HTML_HEADERS);
+    return c.html(`<!doctype html><meta charset="utf-8"><title>Replay not found · CrissCross</title><p>No replay with this link. <a href="${PAGES}/arena">Back to the Arena</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
   }
   const [x, o] = r.players;
   const game = Object.hasOwn(BADGE_GAMES, r.gameId) ? BADGE_GAMES[r.gameId] : r.gameId;
-  const outcome = r.result === "draw" ? `${x} drew with ${o}` : r.result === "X" ? `${x} beat ${o}` : `${o} beat ${x}`;
+  const outcome = r.result === "X" ? `${x} beat ${o}` : r.result === "O" ? `${o} beat ${x}` : `${x} drew with ${o}`;
   const title = html(`${outcome} at ${game} · CrissCross replay`);
-  const desc = html(`A ${game} game in ${r.moves.length} moves. Watch it move by move.`);
+  const desc = html(`A ${game} game in ${r.moves.length} ${r.moves.length === 1 ? "move" : "moves"}. Watch it move by move.`);
   const url = html(new URL(`/r/${encodeURIComponent(id)}`, c.req.url).href);
   // ?via=r lets the replay page count arrivals through shared links (the roadmap's kill rule); crawlers never follow the refresh.
   const to = html(`${PAGES}/replay/${encodeURIComponent(id)}?via=r`);

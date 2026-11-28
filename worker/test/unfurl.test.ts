@@ -60,7 +60,18 @@ describe("GET /r/:id", () => {
       const r = await get(`/r/${id}`);
       expect(r.status).toBe(404);
       expect(r.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(r.headers.get("cache-control")).toBe("no-store");
       expect(await r.text()).toContain('href="https://harkirat155.github.io/cc/arena"');
     }
+  });
+
+  it("says '1 move' for one move and 'N moves' otherwise", async () => {
+    await seed("m1", "ttt", "Alpha", "Beta", "X", [MOVES[0]]);
+    expect(await (await get("/r/m1")).text()).toContain("A Tic-Tac-Toe game in 1 move. Watch");
+  });
+
+  it("credits only X or O with a win; any other result is a draw", async () => {
+    await seed("w1", "ttt", "Alpha", "Beta", "weird", MOVES);
+    expect(await (await get("/r/w1")).text()).toContain("<title>Alpha drew with Beta at");
   });
 });
