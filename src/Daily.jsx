@@ -229,6 +229,9 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const viewBoard = shown === null ? board : line.slice(0, shown).reduce(place, puzzle.board);
   const end = shown === null ? null : (isTtt ? ttt : connect4).checkTerminal({ board: viewBoard });
   const solutionWin = end?.status === "win" ? end : null;
+  // Tic-Tac-Toe boards have no move announcer of their own (GameBoard speaks Connect Four drops only), so the caption says where the mark went.
+  const last = isTtt && shown > 0 ? line[shown - 1] : null;
+  const step = last ? `${last.mark} at row ${Math.floor(last.cell / 3) + 1}, column ${(last.cell % 3) + 1} · ` : "";
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
@@ -254,7 +257,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {shown !== null ? (
             // The board's own sr-only status announces "<Side> dropped in column N"; this caption adds only what it does not say (progress, the winner).
-            <p className="font-semibold">{solutionWin ? `Solution · ${names[solutionWin.winner]} wins` : shown === 0 ? `Solution · ${line.length} ${line.length === 1 ? "move" : "moves"}, press Next move` : `Solution · move ${shown} of ${line.length}`}</p>
+            <p className="font-semibold">{solutionWin ? `Solution · ${step}${names[solutionWin.winner]} wins` : shown === 0 ? `Solution · ${line.length} ${line.length === 1 ? "move" : "moves"}, press Next move` : `Solution · ${step}move ${shown} of ${line.length}`}</p>
           ) : already ? (
             <>
               <p className="font-semibold">Already solved.</p>

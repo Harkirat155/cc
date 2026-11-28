@@ -536,6 +536,15 @@ describe("a Tic-Tac-Toe day", () => {
     expect(screen.getByText(/^Solution ·/).textContent).toMatch(p.kind === "win" ? /wins$/ : /move 1 of 1$/);
   });
 
+  it("the solution step says which mark goes where (the board's own announcer is Connect Four only)", () => {
+    show();
+    fireEvent.click(cell(wrong(p)));
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    const a = p.answers[0];
+    expect(screen.getByText(/^Solution ·/).textContent).toContain(`${["X", "O"][p.turn]} at row ${Math.floor(a / 3) + 1}, column ${(a % 3) + 1}`);
+  });
+
   it("Play someone now joins an open Tic-Tac-Toe seat, not a Connect Four one", async () => {
     window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [{ roomId: "CF111", gameId: "connect4", name: "Cy" }, { roomId: "TT222", gameId: "ttt", name: "Ada" }] }) });
     show();
