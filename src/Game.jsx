@@ -21,6 +21,7 @@ import RoomActions from "./components/RoomActions";
 import useGameSounds from "./hooks/useGameSounds";
 import { viewerSlotFor } from "./utils/sound";
 import useOpponent from "./hooks/useOpponent";
+import useInviteArrival from "./hooks/useInviteArrival";
 import { getGamePalette } from "./components/games/palette";
 import { tally } from "./lib/tally";
 
@@ -32,6 +33,7 @@ const Game = () => {
   // gameId='connect4'. Unknown values fall through and the server picks the
   // default ('ttt'), so this is safe to feed user input.
   const requestedGameId = searchParams.get("game") || null;
+  useInviteArrival();
   const { opponent, botSlot, setOpponent } = useOpponent();
   const {
     run: runWalkthrough,
@@ -427,6 +429,7 @@ const Game = () => {
         canResetScore={canResetScore}
         isMultiplayer={isMultiplayer}
         roomId={roomId}
+        gameId={gameState?.gameId || requestedGameId}
         onNewGame={resetGame}
         onResetScores={resetScores}
         onCreateMatch={handleCreateMatch}

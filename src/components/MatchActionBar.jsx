@@ -42,13 +42,14 @@ const MatchActionBar = ({
   canResetScore,
   isMultiplayer,
   roomId,
+  gameId,
   onNewGame,
   onResetScores,
   onCreateMatch,
   onFindMatch,
   onLeaveRoom,
 }) => {
-  const { copied, share } = useShare({ roomId });
+  const { copied, share } = useShare({ roomId, gameId });
   const { width } = useWindowSize();
   const isCompact = width > 0 && width < COMPACT_ACTION_BAR_WIDTH;
   const moreButtonRef = useRef(null);

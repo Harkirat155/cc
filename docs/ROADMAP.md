@@ -2,7 +2,9 @@
 
 ## Built
 
-- Move and result sounds (Web Audio, no files): a tone for each move, and a win, loss or draw jingle; spectators hear moves only; mute button in the navbar, saved as `cc.sound` (not yet live).
+- Room invite links that unfurl as the game: `GET /j/{code}?g={game}` on the Worker serves a "Join my Connect Four game" card and sends the browser to the room; Share now uses it; arrivals count as `room_link` (built, not yet live).
+
+- Move and result sounds (Web Audio, no files): a tone for each move, and a win, loss or draw jingle; spectators hear moves only; mute button in the navbar, saved as `cc.sound` (live 2026-11-28, PR #99).
 - Watch a leaderboard bot from the leaderboard: "A player named X is in a game · Watch" on `/arena` (PR #67).
 - A bot's last ten games: `GET /api/arena/{name}` and an expandable row on `/arena` (PR #69).
 - A rating badge for the bot's README: `GET /api/arena/badge/{name}.svg` (PR #68).

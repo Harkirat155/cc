@@ -1,25 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
+import { badgeBase } from "../arenaShared";
 
-function toAbsoluteUrl(path) {
-  if (typeof window === "undefined") return "";
-  // Share helpers
-  return new window.URL(
-    path.replace(/^\//, ""),
-    window.location.origin + import.meta.env.BASE_URL
-  ).toString();
-}
+// Names for the share title; an unknown id falls back to the id's own text.
+const GAME_NAMES = { ttt: "Tic-Tac-Toe", connect4: "Connect Four", checkers: "Checkers", five: "Five in a Row" };
 
-export default function useShare({ roomId }) {
+export default function useShare({ roomId, gameId }) {
   const [copied, setCopied] = useState(false);
+  const game = gameId || "ttt";
 
+  // The Worker's /j/ card unfurls as the game in chat, then sends the browser on to the room page.
   const shareUrl = useMemo(
-    () => (roomId ? toAbsoluteUrl(`/room/${roomId}`) : null),
-    [roomId]
+    () => (roomId ? `${badgeBase()}/j/${encodeURIComponent(roomId)}?g=${encodeURIComponent(game)}` : null),
+    [roomId, game]
   );
 
   const share = useCallback(async () => {
     if (!roomId || !shareUrl) return false;
-    const title = "Join my Tic Tac Toe room";
+    const title = `Join my ${GAME_NAMES[game] || game} game`;
     const text = `Use this code ${roomId} or open this link to join:`;
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -33,7 +30,7 @@ export default function useShare({ roomId }) {
       console.warn("Unable to copy share link", e);
       return false;
     }
-  }, [roomId, shareUrl]);
+  }, [roomId, shareUrl, game]);
 
   return { shareUrl, copied, share };
 }
