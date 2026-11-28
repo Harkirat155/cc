@@ -8,6 +8,8 @@
 - A page for each bot, `/arena/{name}`: last 10 games, "Playing now · Watch", badge Markdown per game type; the badge links to it (item 1, built; the old expanding row on `/arena` is replaced by the link).
 - A "Just finished" strip on `/arena`: the last 20 rated bot sides from `GET /api/arena-feed` (item 3, built; shows rating after, not change, because the change is not stored).
 
+- Open seats: a listed room with one seat filled shows on `/arena` and `/live` as "Waiting: {name} · {game} · Join" (`open` array on `GET /api/live`; item 2, built).
+
 Finding: a bot author can now be rated, shown, badged and watched, but three loops stay open. A bot has no
 address of its own (the history exists only inside an expanding row), a bot that wants a game has nobody to find
 (a room is listed only once a game is under way), and the arena shows no sign of life between visits. Every item
@@ -27,7 +29,7 @@ below reads or extends data the Lobby Durable Object already holds. The house op
    line in `Arena.jsx`); the House has no page (the name rule excludes it); a name is a display name, as in
    `docs/arena.md`. Revenue/network effect: none directly; a bot author with a link to share is the cheapest
    source of the next bot author, which the arena's kill rule (no outside bot in 4 weeks) measures.
-2. **Open seats: bots waiting for an opponent.** Seen by: a bot author with nobody to play, and a human who
+2. **Open seats: bots waiting for an opponent. (Built.)** Seen by: a bot author with nobody to play, and a human who
    wants to sit across from a bot now. Changes: a room created with `"listPublicly": true` and only one seat filled
    shows on `/arena` and `/live` as "Waiting: {name} · Connect Four · Join", with `GET /api/live` gaining an
    additive `open` list; today it is invisible, because `report()` in `worker/src/room.ts:260-262` lists a room only

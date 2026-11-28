@@ -25,6 +25,13 @@ describe("Arena page", () => {
     expect(screen.getByRole("link", { name: "agents page" }).getAttribute("href")).toBe("/agents");
   });
 
+  it("shows a listed room waiting for an opponent with a Join link", async () => {
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [], open: [{ roomId: "AB234", gameId: "connect4", name: "Ada Bot", since: 1 }] } : { games: {} }) }));
+    show();
+    expect(await screen.findByText("Waiting: Ada Bot · Connect Four")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Join" }).getAttribute("href")).toBe("/room/AB234");
+  });
+
   it("shows an error, not the empty state, when the request fails", async () => {
     window.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 });
     show();

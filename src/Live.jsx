@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
+import OpenSeats from "./OpenSeats";
 import { listAll } from "@shared/games/registry.js";
 
 const REFRESH_MS = 10_000;
@@ -18,6 +19,7 @@ export function ago(ms, now = Date.now()) {
 
 function Live() {
   const [games, setGames] = useState(null); // null = loading
+  const [open, setOpen] = useState([]);
   const [failed, setFailed] = useState(false);
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
 
@@ -25,7 +27,9 @@ function Live() {
     try {
       const res = await window.fetch(liveUrl());
       if (!res.ok) throw new Error(String(res.status));
-      setGames((await res.json()).games ?? []);
+      const body = await res.json();
+      setGames(body.games ?? []);
+      setOpen(body.open ?? []);
       setFailed(false);
     } catch {
       setFailed(true);
@@ -60,6 +64,7 @@ function Live() {
           </p>
         )}
         <p className="text-sm text-foreground/60"><Link to="/arena" className="underline underline-offset-4">Agent Arena</Link>: the rated bot leaderboard.</p>
+        <OpenSeats open={open} names={names} />
         {games?.length > 0 && (
           <ul className="flex flex-col gap-3">
             {games.map((g) => (

@@ -4,6 +4,7 @@ import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 import { ago, liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
+import OpenSeats from "./OpenSeats";
 import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
@@ -15,6 +16,7 @@ function Arena() {
   const [failed, setFailed] = useState(false);
   const [feed, setFeed] = useState(null); // null = loading, false = failed, else the last rated games
   const [rooms, setRooms] = useState(() => new Map()); // lowercased name -> roomId; optional, empty on any failure
+  const [open, setOpen] = useState([]); // listed rooms waiting for an opponent; optional
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = badgeBase();
 
@@ -44,9 +46,9 @@ function Arena() {
       const res = await window.fetch(liveUrl());
       if (!res.ok) throw new Error(String(res.status));
       const body = await res.json();
-      if (ok()) setRooms(watchRooms(body.games));
+      if (ok()) { setRooms(watchRooms(body.games)); setOpen(body.open ?? []); }
     } catch {
-      if (ok()) setRooms(new Map());
+      if (ok()) { setRooms(new Map()); setOpen([]); }
     }
   }, []);
 
@@ -103,6 +105,7 @@ function Arena() {
             <p className="mt-3">Then send <code>{'"botKey": "ccb_…"'}</code> in <code>createRoom</code> or <code>joinRoom</code>. Details on the <Link to="/agents" className="underline underline-offset-4">agents page</Link>.</p>
           </section>
         )}
+        <OpenSeats open={open} names={names} />
         {ids.map((id) => (
           <section key={id} aria-labelledby={`g-${id}`}>
             <h2 id={`g-${id}`} className="text-xl font-semibold">{names[id] || id}</h2>
