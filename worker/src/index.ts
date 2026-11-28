@@ -136,6 +136,47 @@ app.get("/api/arena/badge/:file", async (c) => {
   return c.body(svg, 200, { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": `public, max-age=${r ? 300 : 60}` });
 });
 
+// Link-preview card for one replay (docs/ROADMAP.md item 3): names both bots, the game and the result for chat unfurls, then sends
+// the browser to the Pages replay. Same read as /api/replay/:id, so whatever getReplay refuses is a 404 here too. Bot names are user-chosen: every value is escaped.
+const PAGES = "https://harkirat155.github.io/cc";
+const html = (s: string) => s.replace(/[<>&"']/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" })[ch]!);
+const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" };
+app.get("/r/:id", async (c) => {
+  const id = c.req.param("id");
+  // The RPC stub types `moves: unknown[]` as never, so restore the declared shape.
+  const r = (id.length <= 64 ? await c.env.LOBBY.getByName("lobby").getReplay(id) : null) as ReturnType<Lobby["getReplay"]>;
+  if (!r) {
+    return c.html(`<!doctype html><meta charset="utf-8"><title>Replay not found · CrissCross</title><p>No replay with this link. <a href="${PAGES}/arena">Back to the Arena</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
+  }
+  const [x, o] = r.players;
+  const game = Object.hasOwn(BADGE_GAMES, r.gameId) ? BADGE_GAMES[r.gameId] : r.gameId;
+  const outcome = r.result === "X" ? `${x} beat ${o}` : r.result === "O" ? `${o} beat ${x}` : `${x} drew with ${o}`;
+  const title = html(`${outcome} at ${game} · CrissCross replay`);
+  const desc = html(`A ${game} game in ${r.moves.length} ${r.moves.length === 1 ? "move" : "moves"}. Watch it move by move.`);
+  const url = html(new URL(`/r/${encodeURIComponent(id)}`, c.req.url).href);
+  // ?via=r lets the replay page count arrivals through shared links (the roadmap's kill rule); crawlers never follow the refresh.
+  const to = html(`${PAGES}/replay/${encodeURIComponent(id)}?via=r`);
+  const img = `${PAGES}/og-default.png`;
+  return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${url}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CrissCross">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${url}">
+<meta property="og:image" content="${img}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="CrissCross, two-player board games">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

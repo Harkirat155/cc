@@ -1,6 +1,6 @@
 import React from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import checkers from "@shared/games/checkers.js";
 import Replay, { rebuild } from "./Replay";
 
@@ -51,7 +51,7 @@ describe("replay page", () => {
     stub({ ok: true, json: async () => ({ ...body, moves: body.moves.slice(0, 3) }) });
     const { unmount } = show();
     await screen.findByText("Move 0 of 3");
-    const cells = () => screen.getAllByRole("button").filter((b) => !["Previous", "Next"].includes(b.textContent));
+    const cells = () => screen.getAllByRole("button").filter((b) => !["Previous", "Next", "Copy link"].includes(b.textContent));
     expect(cells().length).toBeGreaterThan(8);
     expect(cells().every((b) => b.disabled)).toBe(true);
     unmount();
@@ -118,5 +118,106 @@ describe("replay page", () => {
     stub({ ok: true, json: async () => ({ ...body, moves: [{ type: "place", cell: 4 }, { type: "place", cell: 4 }] }) });
     show();
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not be replayed/);
+  });
+
+  it("copies the unfurling /r/{id} link from the Worker, not the Pages URL", async () => {
+    stub({ ok: true, json: async () => body });
+    const writeText = jest.fn().mockResolvedValue();
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith("https://cc-api.harkirat-hira.workers.dev/r/r1");
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+});
+
+describe("arrivals from a shared /r/ link", () => {
+  const visit = (path, strict = false) => {
+    const ui = <MemoryRouter initialEntries={[path]}><Routes><Route path="/replay/:id" element={<Replay />} /></Routes></MemoryRouter>;
+    return render(strict ? <React.StrictMode>{ui}</React.StrictMode> : ui);
+  };
+  const hits = () => beacon.mock.calls.map(([u]) => u).filter((u) => u.includes("e=replay_link"));
+  let beacon;
+  beforeEach(() => {
+    beacon = jest.fn(() => true);
+    Object.defineProperty(window.navigator, "sendBeacon", { value: beacon, configurable: true });
+  });
+
+  it("counts one replay_link hit once the replay has loaded through /r/", async () => {
+    stub({ ok: true, json: async () => body });
+    visit("/replay/r1?via=r");
+    expect(hits()).toHaveLength(0);
+    await screen.findByText("Move 0 of 5");
+    expect(hits()).toHaveLength(1);
+    expect(hits()[0]).toContain("p=cc");
+  });
+
+  it("counts once under StrictMode double effects", async () => {
+    stub({ ok: true, json: async () => body });
+    visit("/replay/r1?via=r", true);
+    await screen.findByText("Move 0 of 5");
+    expect(hits()).toHaveLength(1);
+  });
+
+  it("counts nothing when the page is opened directly", async () => {
+    stub({ ok: true, json: async () => body });
+    visit("/replay/r1");
+    await screen.findByText("Move 0 of 5");
+    expect(hits()).toHaveLength(0);
+  });
+
+  it("counts nothing on a 404, a 500 or moves that do not replay", async () => {
+    stub({ ok: false, status: 404 });
+    let u = visit("/replay/r1?via=r");
+    await screen.findByText(/No replay with this link/);
+    u.unmount();
+    stub({ ok: false, status: 500 });
+    u = visit("/replay/r1?via=r");
+    await screen.findByText(/Could not load/);
+    u.unmount();
+    stub({ ok: true, json: async () => ({ ...body, moves: [{ type: "place", cell: 4 }, { type: "place", cell: 4 }] }) });
+    visit("/replay/r1?via=r");
+    await screen.findByText(/could not be replayed/);
+    expect(hits()).toHaveLength(0);
+  });
+});
+
+describe("copy link", () => {
+  afterEach(() => { delete navigator.clipboard; jest.useRealTimers(); });
+  it("announces Copied in a polite status", async () => {
+    stub({ ok: true, json: async () => body });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: jest.fn().mockResolvedValue() } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+    await screen.findByRole("button", { name: "Copied" });
+    const live = screen.getAllByRole("status").find((e) => e.textContent === "Copied");
+    expect(live.getAttribute("aria-live")).toBe("polite");
+  });
+  it("shows the link as selectable text when the clipboard refuses or is missing", async () => {
+    stub({ ok: true, json: async () => body });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: jest.fn().mockRejectedValue(new Error("no")) } });
+    const u = show();
+    fireEvent.click(await screen.findByRole("button", { name: /Copy link|Copy failed/ }));
+    const box = await screen.findByLabelText(/Replay link/);
+    expect(box.value).toBe("https://cc-api.harkirat-hira.workers.dev/r/r1");
+    expect(box.readOnly).toBe(true);
+    u.unmount();
+    delete navigator.clipboard;
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: /Copy link|Copy failed/ }));
+    expect((await screen.findByLabelText(/Replay link/)).value).toMatch(/\/r\/r1$/);
+  });
+  it("clears the previous timer before setting a new one", async () => {
+    stub({ ok: true, json: async () => body });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: jest.fn().mockResolvedValue() } });
+    show();
+    const b = await screen.findByRole("button", { name: "Copy link" });
+    const spy = jest.spyOn(window, "clearTimeout");
+    fireEvent.click(b);
+    await screen.findByRole("button", { name: "Copied" });
+    const before = spy.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Copied" }));
+    await waitFor(() => expect(spy.mock.calls.length).toBeGreaterThan(before));
+    spy.mockRestore();
   });
 });
