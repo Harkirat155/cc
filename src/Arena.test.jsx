@@ -59,15 +59,15 @@ describe("Arena page", () => {
 
   it("lists just-finished games above the tables, linking only a name that could have a page", async () => {
     const feed = { ok: true, json: async () => ({ feed: [
-      { name: "Grace Bot", gameId: "ttt", result: "win", ratingAfter: 1216, at: 1 },
-      { name: "House (easy)", gameId: "connect4", result: "draw", ratingAfter: 1200, at: 0 },
+      { name: "Grace Bot", gameId: "ttt", result: "win", ratingAfter: 1216, at: Date.now() - 5 * 60_000 },
+      { name: "House (easy)", gameId: "connect4", result: "draw", ratingAfter: 1200, at: Date.now() - 3 * 86_400_000 },
     ] }) };
     window.fetch = routed(feed);
     show();
     const strip = await screen.findByRole("region", { name: "Just finished" });
-    expect(strip.textContent).toMatch(/since 2026-11-28/);
-    expect(strip.textContent).toMatch(/Grace Bot.*Tic-Tac-Toe.*Won.*1216/);
-    expect(strip.textContent).toMatch(/House \(easy\).*Connect Four.*Drew.*1200/);
+    expect(strip.textContent).toMatch(/The last 2 rated results since 2026-11-28, one line per bot, so a game between two bots shows twice/);
+    expect(strip.textContent).toMatch(/Grace Bot · Tic-Tac-Toe · Won · rating 1216 · 5 min ago/);
+    expect(strip.textContent).toMatch(/House \(easy\) · Connect Four · Drew · rating 1200 · 3 d ago/);
     const links = strip.querySelectorAll("a");
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute("href")).toBe("/arena/Grace%20Bot");
@@ -85,6 +85,13 @@ describe("Arena page", () => {
     expect(await screen.findByText("Ada Bot")).toBeTruthy();
     expect(screen.getByText("Recent games are not available right now.")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("treats a malformed feed as unavailable, not as an empty arena", async () => {
+    window.fetch = routed({ ok: true, json: async () => ({ items: [] }) });
+    show();
+    expect(await screen.findByText("Recent games are not available right now.")).toBeTruthy();
+    expect(screen.queryByText(/No rated games finished/)).toBeNull();
   });
 
   it("maps a ws base to http", () => {

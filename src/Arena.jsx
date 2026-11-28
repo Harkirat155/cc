@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
-import { liveUrl } from "./Live";
+import { ago, liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
 import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, validName } from "./arenaShared";
 
@@ -18,36 +18,43 @@ function Arena() {
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = badgeBase();
 
+  const gen = useRef(0); // a slower, older refresh must not overwrite a newer one
+
   const load = useCallback(async () => {
+    const mine = ++gen.current;
+    const ok = () => gen.current === mine;
     try {
       const res = await window.fetch(`${apiBase()}/api/arena`);
       if (!res.ok) throw new Error(String(res.status));
-      setGames((await res.json()).games ?? {});
-      setFailed(false);
+      const body = await res.json();
+      if (ok()) { setGames(body.games ?? {}); setFailed(false); }
     } catch {
-      setFailed(true);
+      if (ok()) setFailed(true);
     }
     try {
       const res = await window.fetch(`${apiBase()}/api/arena-feed`);
       if (!res.ok) throw new Error(String(res.status));
       const body = await res.json();
-      setFeed(Array.isArray(body.feed) ? body.feed : []);
+      if (!Array.isArray(body.feed)) throw new Error("no feed list");
+      if (ok()) setFeed(body.feed);
     } catch {
-      setFeed(false);
+      if (ok()) setFeed(false);
     }
     try {
       const res = await window.fetch(liveUrl());
       if (!res.ok) throw new Error(String(res.status));
-      setRooms(watchRooms((await res.json()).games));
+      const body = await res.json();
+      if (ok()) setRooms(watchRooms(body.games));
     } catch {
-      setRooms(new Map());
+      if (ok()) setRooms(new Map());
     }
   }, []);
 
   useEffect(() => {
     load();
     const t = window.setInterval(load, REFRESH_MS);
-    return () => window.clearInterval(t);
+    const g = gen;
+    return () => { g.current++; window.clearInterval(t); };
   }, [load]);
 
   const ids = Object.keys(games ?? {});
@@ -72,12 +79,12 @@ function Arena() {
               ? <p className="mt-2 text-sm text-foreground/60">No rated games finished since {SINCE}.</p>
               : (
                 <>
-                  <p className="mt-1 text-sm text-foreground/60">The last {feed.length} rated games since {SINCE}, one line per bot.</p>
+                  <p className="mt-1 text-sm text-foreground/60">The last {feed.length} rated {feed.length === 1 ? "result" : "results"} since {SINCE}, one line per bot, so a game between two bots shows twice.</p>
                   <ul className="mt-2 text-sm">
                     {feed.map((g, i) => (
                       <li key={i} className="border-t border-foreground/10 py-1.5">
                         {validName(g.name) ? <Link to={`/arena/${encodeURIComponent(g.name)}`} className="font-medium underline-offset-4 hover:underline">{g.name}</Link> : <span className="font-medium">{g.name}</span>}
-                        {` · ${names[g.gameId] || g.gameId} · ${VERB[g.result] ?? g.result} · ${g.ratingAfter}`}
+                        {` · ${names[g.gameId] || g.gameId} · ${VERB[g.result] ?? g.result} · rating ${g.ratingAfter} · ${ago(g.at)}`}
                       </li>
                     ))}
                   </ul>

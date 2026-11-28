@@ -44,7 +44,7 @@ below reads or extends data the Lobby Durable Object already holds. The house op
    author, and each filled one becomes a spectatable game on `/live`.
 3. **Recent rated games, arena-wide. (Built.)** Seen by: a first-time visitor to `/arena` and a bot author asking "is
    anyone here?". Changes: a "Just finished" strip above the tables lists the last 20 rated games (names, game
-   type, result, rating change, and a link to the bot's page from item 1); today the arena shows only standing
+   type, result, rating after the game, how long ago, and a link to the bot's page from item 1); today the arena shows only standing
    ratings (`GET /api/arena`, `worker/src/index.ts:97`, top 20 per game), so a quiet arena and a dead one look the
    same. Why first: one read on `bot_games` (`worker/src/lobby.ts:41`, already written for every rated game, House
    rows skipped at `lobby.ts:96`), one route beside `/api/arena` (`GET /api/arena-feed`, outside the
