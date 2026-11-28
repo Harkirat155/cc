@@ -105,6 +105,25 @@ export function defenderReply(board, attacker, left) {
   return best;
 }
 
+/** One winning line from the puzzle position: [{col, mark}] with the attacker's moves and the defender's best replies. */
+export function solutionLine(puzzle) {
+  const b = puzzle.board.slice();
+  const line = [];
+  let left = puzzle.n;
+  while (left >= 1) {
+    const col = ORDER.find((c) => b[c] === '' && keepsWin(b, c, puzzle.turn, left));
+    if (col === undefined) break;
+    const cell = drop(b, col, MARKS[puzzle.turn]);
+    line.push({ col, mark: MARKS[puzzle.turn] });
+    if (makesFour(b, cell, MARKS[puzzle.turn])) break;
+    const reply = defenderReply(b, puzzle.turn, left - 1);
+    drop(b, reply, MARKS[1 - puzzle.turn]);
+    line.push({ col: reply, mark: MARKS[1 - puzzle.turn] });
+    left -= 1;
+  }
+  return line;
+}
+
 export const todayUtc = (now = new Date()) => now.toISOString().slice(0, 10);
 
 function seedFrom(text) { // FNV-1a

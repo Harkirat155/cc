@@ -1,5 +1,5 @@
 import connect4 from './games/connect4.js';
-import { canWin, keepsWin, defenderReply, puzzleForDate } from './daily.js';
+import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine } from './daily.js';
 
 const play = (cols) => {
   let state = connect4.createInitialState();
@@ -85,5 +85,25 @@ describe('puzzleForDate', () => {
     const ns = new Set();
     for (let d = 1; d <= 30; d++) ns.add(puzzleForDate(`2026-12-${String(d).padStart(2, '0')}`).n);
     expect([...ns].sort()).toEqual([2, 3]);
+  });
+});
+
+describe('solutionLine', () => {
+  test.each(['2026-11-27', '2026-11-28', '2026-11-29', '2026-12-01', '2026-12-05'])('%s: a legal line that ends in a win within n of the attacker moves', (date) => {
+    const puzzle = puzzleForDate(date);
+    const line = solutionLine(puzzle);
+    let state = { ...connect4.createInitialState(), board: puzzle.board.slice(), turn: puzzle.turn };
+    let mine = 0;
+    let status = 'active';
+    line.forEach(({ col, mark }, i) => {
+      const slot = mark === 'R' ? 0 : 1;
+      expect(slot).toBe(i % 2 === 0 ? puzzle.turn : 1 - puzzle.turn);
+      if (slot === puzzle.turn) mine++;
+      ({ state } = connect4.applyMove(state, { type: 'place', cell: col }, slot));
+      status = connect4.checkTerminal(state).status;
+    });
+    expect(status).toBe('win');
+    expect(connect4.checkTerminal(state).winnerSlot ?? puzzle.turn).toBe(puzzle.turn);
+    expect(mine).toBeLessThanOrEqual(puzzle.n);
   });
 });

@@ -121,6 +121,79 @@ describe("daily page", () => {
   });
 });
 
+// Reads the board back from the rendered column labels ("Column 3: red, yellow, 2 empty").
+const boardOnScreen = () => {
+  const board = Array(42).fill("");
+  COLS.forEach((c) => {
+    const label = screen.getByRole("button", { name: new RegExp(`^Column ${c + 1}:`) }).getAttribute("aria-label");
+    const discs = label.replace(/^Column \d+: /, "").split(". ")[0].split(", ").filter((w) => w === "red" || w === "yellow");
+    discs.forEach((w, i) => { board[(5 - i) * 7 + c] = w === "red" ? "R" : "Y"; });
+  });
+  return board;
+};
+
+describe("show the solution", () => {
+  const slipped = () => {
+    const p = puzzleForDate(DATE);
+    show();
+    drop(slip(p));
+    return p;
+  };
+
+  it("is not offered while the puzzle is still in play", () => {
+    show();
+    expect(screen.queryByRole("button", { name: "Show the solution" })).toBeNull();
+  });
+
+  it("after a slip, steps a winning line one move per press and ends in a win within n of the player's moves", () => {
+    const p = slipped();
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    expect(boardOnScreen()).toEqual(p.board);
+    expect(screen.getByRole("button", { name: /Drop piece in column 4$/ }).disabled).toBe(true);
+    let presses = 0;
+    let before = boardOnScreen().filter(Boolean).length;
+    while (screen.queryByRole("button", { name: "Next move" }) && !screen.getByRole("button", { name: "Next move" }).disabled) {
+      fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+      presses++;
+      const now = boardOnScreen().filter(Boolean).length;
+      expect(now).toBe(before + 1);
+      before = now;
+      expect(presses).toBeLessThan(10);
+    }
+    const end = boardOnScreen();
+    const result = connect4.checkTerminal({ board: end });
+    expect(result.status).toBe("win");
+    expect(end.filter(Boolean).length - p.board.filter(Boolean).length).toBeLessThanOrEqual(2 * p.n - 1);
+    const mark = ["R", "Y"][p.turn];
+    expect(end.filter((v, i) => v && v !== p.board[i] && v === mark).length).toBeLessThanOrEqual(p.n);
+  });
+
+  it("announces each shown move once and leaves the record untouched; Back restores the player's board", () => {
+    const p = slipped();
+    const record = window.localStorage.getItem("cc.daily");
+    const mine = boardOnScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(screen.getAllByText(/dropped in column \d$/)).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Back to my board" }));
+    expect(boardOnScreen()).toEqual(mine);
+    expect(screen.getByText("That lets them off the hook")).toBeTruthy();
+    expect(window.localStorage.getItem("cc.daily")).toBe(record);
+    expect(p).toBeTruthy();
+  });
+
+  it("is offered after a solve and keeps the share line", () => {
+    const p = puzzleForDate(DATE);
+    show();
+    solve(p);
+    const record = window.localStorage.getItem("cc.daily");
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to my board" }));
+    expect(window.localStorage.getItem("cc.daily")).toBe(record);
+    expect(screen.getByText(/solved in 1 try/)).toBeTruthy();
+  });
+});
+
 describe("share result", () => {
   const solved = () => { show(); solve(puzzleForDate(DATE)); };
   afterEach(() => { delete navigator.share; });

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
-import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.js";
+import { defenderReply, keepsWin, puzzleForDate, solutionLine, todayUtc } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
@@ -131,6 +131,8 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const [left, setLeft] = useState(puzzle.n);
   const [slipped, setSlipped] = useState(false);
   const [note, setNote] = useState("");
+  const [shown, setShown] = useState(null); // null = my board; else how many moves of the winning line are on the board
+  const line = useMemo(() => solutionLine(puzzle), [puzzle]);
   const status = useRef(null);
   const me = puzzle.turn;
 
@@ -171,9 +173,14 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
     setBoard(puzzle.board);
     setLeft(puzzle.n);
     setSlipped(false);
+    setShown(null);
     setNote("Board reset.");
     status.current?.focus();
   };
+
+  // The solution view is derived: the puzzle's start position plus the first `shown` moves of the line. Nothing is saved.
+  const viewBoard = shown === null ? board : line.slice(0, shown).reduce((b, m) => drop(b, m.col, m.mark), puzzle.board);
+  const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -186,14 +193,14 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
           <p className="mt-2 font-medium">{COLOR[me]} to move: win in {puzzle.n} of your moves.</p>
         </header>
         <GameBoard
-          squares={board}
+          squares={viewBoard}
           onSquareClick={play}
           winningSquares={[]}
           rows={6}
           cols={7}
           playerInfo={connect4.playerInfo}
           boardSpec={connect4.boardSpec}
-          disabled={done}
+          disabled={done || shown !== null}
         />
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {already ? (
@@ -217,6 +224,15 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
             <p className="text-sm text-foreground/70">{note || `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`}</p>
           )}
         </div>
+        {done && shown === null && (
+          <button type="button" onClick={() => setShown(0)} className={pill}>Show the solution</button>
+        )}
+        {shown !== null && (
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={() => setShown(shown + 1)} disabled={shown >= line.length} className={pill}>Next move</button>
+            <button type="button" onClick={() => setShown(null)} className={pill}>Back to my board</button>
+          </div>
+        )}
         {(past || done) && (
           <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
             {past ? "Back to today's" : "Try yesterday's"}
