@@ -74,22 +74,26 @@
 
 ## Next
 
-Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a solution, a shared link and two games, but
-Arena bots only ever meet when their authors happen to be online. Next, in need order:
+Finding (2026-11-28, 7-day tally): 28 visitors and 15 home views, but `daily_play` 1, `rush_start` 5 (some test runs) and
+`online_game` 2. The home `/` (`src/Game.jsx`) opened on an empty board with one small text line holding the only links to
+`/daily` and `/rush`, so most visitors never found them. Next, in need order:
 
-2. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC the
-   Worker pairs (drawn by the first rated game or cup visit after noon; no free cron slot) the connected rated bots of each game in a Swiss round of 3 games each; `/arena/cup` shows this
-   week's table and last week's winner, and each bot page shows its cup results. Data: additive cup tables in the Lobby
-   Durable Object (no D1 in this Worker), written by the draw only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
-   cups.
+1. **Doors on the first-visit home (built; exploit).** Seen by: every visitor who lands on `/` before a first move. Changes:
+   `src/components/HomeDoors.jsx`, rendered by `src/Game.jsx` above the score panel while the board has no moves: four doors,
+   "Today's puzzle" (`/daily`), "Puzzle Rush" (`/rush`), "Play the computer" (switches the opponent control, board stays) and
+   "Play a friend" (creates a room, same call as the action bar). After the first move the old one-line links return. Data:
+   tally `cc` events `door_daily`, `door_rush`, `door_computer`, `door_friend`, one per tap. Compare with `daily_play`,
+   `rush_start`, `online_game` the week after launch; if the doors do not at least double `rush_start` plus `daily_play`, rework the copy.
 
-3. **Puzzle Rush (built, awaiting review; explore).** Seen by: anyone who finished the daily and wants more. Changes: `/rush` is a
-   3 minute run of daily-style puzzles across the four games (Tic-Tac-Toe first, then Connect Four, Five in a Row, Checkers),
-   the same run for everyone each UTC day (`shared/rush.js`, seeded `rush-{day}-{slot}` through the daily's own generators and
-   solvers). A move that lets the win slip skips that puzzle (no retry). Score is puzzles solved; best of the day is kept in
-   `localStorage` (`cc.rush`); "Share result" shares "I solved N puzzles in 3 minutes on CrissCross Rush" + the `/rush` link.
-   One quiet link each from the done daily and the home page. Data: tally `cc` events `rush_start`, `rush_finish`. Kill rule:
-   fewer than 20 `rush_finish` in the 3 weeks after launch: remove the route and the links.
+2. **A finished game leads somewhere (exploit).** Seen by: players at the result of a local, computer or online game
+   (`src/components/WinnerCard.jsx`, `src/components/ResultModal.jsx`). Changes: below the result, three quiet doors: rematch, "Try today's
+   puzzle" and "Play a friend", so a finished game is not a dead end. Data: tally `cc` events `end_daily`, `end_friend`.
+   Judge by `online_game` and `daily_play` per `finished_*` the week after.
+
+3. **A challenge link after Rush (explore).** Seen by: anyone who finished a Rush run (`src/Rush.jsx`). Changes: "Share result"
+   already shares the score; add "Beat my N" on `/rush?beat=N` (a number in the URL, shown as a target, never read as a result), so
+   a shared run brings the sender's friends into the same day's puzzles. Data: tally `rush_beat_link` per arrival. Kill rule:
+   fewer than 5 `rush_beat_link` in 4 weeks: remove the parameter.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
