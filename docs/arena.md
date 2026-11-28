@@ -96,7 +96,7 @@ Each game row also carries `replayId` when a replay exists (older games omit it,
 ## Weekly cup
 
 Every Sunday 12:00 UTC a cup is set up per game type. There is no cron (the account's 5 free cron triggers are taken): the first rated game or
-`GET /api/arena/cup` at or after Sunday 12:00 UTC draws that Sunday's cup (`ensureCup` → `runCup` in `worker/src/lobby.ts`, counting only games
+`GET /api/arena/cup` at or after Sunday 12:00 UTC draws that Sunday's cup, and the Sunday before if a quiet week left it undrawn (`ensureCup` → `runCup` in `worker/src/lobby.ts`, counting only games
 before the draw time), exactly as a cron would; `scheduled` in `worker/src/index.ts` stays for a trigger added back later. Entrants: listed (not unlisted) registered bots with a rated game of that type in the last 7 days; the House and guests never enter. Three
 rounds, paired by rating at the draw (`pairRounds`, `worker/src/cup.ts`): nearest-rated first, nobody meets twice when a full round of new
 pairings exists, an odd count gives the lowest-rated bot without one its bye. Pairings are fixed at the draw from the rating snapshot, not from cup

@@ -142,8 +142,9 @@ describe("GET /api/arena/cup", () => {
 
   it("leaks no internal ids, hashes or socket ids", async () => {
     await reg("Ada Bot", "Grace Bot");
+    vi.setSystemTime(SUN - 1000);
     await play("g1", "ttt", "Ada Bot", "Grace Bot", 1);
-    await runCup(Date.now() + 1000);
+    await runCup();
     const text = await (await cup()).text();
     expect(text).toContain("Ada Bot");
     for (const bad of ["SECRETHASH", "key_hash", "sid", "clientId", "socketId", "replay", "name_lc", "bot_game_id", "g1"]) expect(text).not.toContain(bad);
@@ -174,12 +175,33 @@ describe("cup drawn without a cron (the free plan's 5 cron triggers are taken)",
     });
     vi.setSystemTime(SUN + 1000);
     await play("lazy1", "ttt", "Ada Bot", "Linus Bot", 1); // Linus first plays after the draw: not an entrant
-    expect(await sql((s) => s.exec("SELECT week, game_id, entrants FROM cup_runs").toArray())).toEqual([{ week: "2026-12-06", game_id: "ttt", entrants: 2 }]);
+    expect(await sql((s) => s.exec("SELECT week, game_id, entrants FROM cup_runs ORDER BY week").toArray())).toEqual([{ week: "2026-11-29", game_id: "ttt", entrants: 0 }, { week: "2026-12-06", game_id: "ttt", entrants: 2 }]);
     expect(await sql((s) => s.exec("SELECT name_lc, rating FROM cup_entries ORDER BY name_lc").toArray())).toEqual([{ name_lc: "ada bot", rating: 1250 }, { name_lc: "grace bot", rating: 1220 }]);
     await play("lazy2", "ttt", "Ada Bot", "Grace Bot", 1);
-    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM cup_runs").one().n)).toBe(1);
+    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM cup_runs").one().n)).toBe(2); // drawn once each
     const t = ((await (await cup()).json()) as any).current.games.ttt.table;
     expect(t[0]).toEqual({ name: "Ada Bot", points: 1, games: 1, results: ["win", "pending", "pending"], opponents: ["Grace Bot", "Grace Bot", "Grace Bot"] });
+  });
+
+  it("a quiet week does not lose its cup: the first visit after it draws the missed Sunday too", async () => {
+    await reg("Ada Bot", "Grace Bot");
+    await sql((s) => {
+      for (const n of ["ada bot", "grace bot"]) {
+        s.exec("INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, 'ttt', 1200, 1, 1, 0, 0)", n);
+        s.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, 'ttt', 'guest', 'win', 1200, ?)", n, SUN - DAY);
+      }
+    });
+    vi.setSystemTime(SUN + 7 * DAY + 5); // nothing ran from before SUN until a week later
+    const body = (await (await cup()).json()) as any;
+    expect([body.current.week, body.last.week]).toEqual(["2026-12-13", "2026-12-06"]);
+    expect(body.last.games.ttt.entrants).toBe(2);
+  });
+
+  it("the cron path keeps the first-cup guard", async () => {
+    await reg("Ada Bot");
+    await sql((s) => s.exec("INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES ('ada bot', 'ttt', 1200, 1, 1, 0, 0)"));
+    await scheduled(Date.UTC(2026, 10, 22, 12)); // a Sunday before the first cup
+    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM cup_runs").one().n)).toBe(0);
   });
 
   it("a cup page visit after Sunday noon draws it too; nothing is drawn before the first cup Sunday", async () => {

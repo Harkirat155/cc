@@ -145,6 +145,7 @@ export class Lobby extends DurableObject {
   // The weekly cup (docs/arena.md), drawn for Sunday 12:00 UTC by ensureCup. Entrants per game: listed registered bots with a rated game of that type in
   // the last 7 days. Writes the entrants and 3 rounds of pairings once per (week, game); the results are the rated games the pairings produce.
   runCup(now: number): void {
+    if (now < FIRST_CUP) return; // no cup before the first one, from any path
     const sql = this.ctx.storage.sql;
     const week = new Date(now).toISOString().slice(0, 10);
     for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
@@ -163,9 +164,12 @@ export class Lobby extends DurableObject {
   }
 
   // No cron (the account's 5 free cron triggers are taken): the first rated game or cup page visit after Sunday 12:00 UTC
-  // draws that Sunday's cup, as the cron would have. runCup is idempotent per (week, game) and counts only games before the draw.
+  // draws that Sunday's cup, as the cron would have, and the Sunday before it if a quiet week left that one undrawn.
+  // runCup is idempotent per (week, game) and counts only games before the draw.
   ensureCup(now: number): void {
-    if (now >= FIRST_CUP) this.runCup(cupDrawTime(now));
+    const t = cupDrawTime(now);
+    this.runCup(t - CUP_WEEK_MS);
+    this.runCup(t);
   }
 
   // This week's table and last week's (the two newest cups). Names and numbers only; opponents[i] is round i+1's paired bot (null: bye). A pairing's result is the next rated game
