@@ -83,6 +83,14 @@ Arena bots only ever meet when their authors happen to be online. Next, in need 
    Durable Object (no D1 in this Worker), written by the draw only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
    cups.
 
+3. **Puzzle Rush (built, awaiting review; explore).** Seen by: anyone who finished the daily and wants more. Changes: `/rush` is a
+   3 minute run of daily-style puzzles across the four games (Tic-Tac-Toe first, then Connect Four, Five in a Row, Checkers),
+   the same run for everyone each UTC day (`shared/rush.js`, seeded `rush-{day}-{slot}` through the daily's own generators and
+   solvers). A move that lets the win slip skips that puzzle (no retry). Score is puzzles solved; best of the day is kept in
+   `localStorage` (`cc.rush`); "Share result" shares "I solved N puzzles in 3 minutes on CrissCross Rush" + the `/rush` link.
+   One quiet link each from the done daily and the home page. Data: tally `cc` events `rush_start`, `rush_finish`. Kill rule:
+   fewer than 20 `rush_finish` in the 3 weeks after launch: remove the route and the links.
+
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
 

@@ -59,7 +59,7 @@ const streakTo = (date, days) => {
   return n;
 };
 
-const ckCell = (cell) => `row ${Math.floor(cell / 8) + 1}, column ${(cell % 8) + 1}`;
+export const ckCell = (cell) => `row ${Math.floor(cell / 8) + 1}, column ${(cell % 8) + 1}`;
 
 const drop = (board, col, mark) => {
   const next = board.slice();
@@ -74,10 +74,8 @@ export const shareText = (date, tries, streak = 1, game = "connect4") =>
 export const shareLink = (date) => `${badgeBase()}/d/${date}`;
 export const resultLine = (date, tries, streak = 1, game = "connect4") => `${shareText(date, tries, streak, game)} ${shareLink(date)}`;
 
-function ShareResult({ date, tries, streak, game }) {
+export function ShareResult({ text, url }) {
   const [state, setState] = useState(""); // "" | "ok" | "failed"
-  const text = shareText(date, tries, streak, game);
-  const url = shareLink(date);
   const share = async () => {
     try {
       if (navigator.share) { await navigator.share({ text, url }); return; }
@@ -105,7 +103,7 @@ function ShareResult({ date, tries, streak, game }) {
 const fiveRc = (cell) => ({ row: Math.floor(cell / 15) - FIVE_WINDOW.top + 1, col: (cell % 15) - FIVE_WINDOW.left + 1 });
 const FIVE_PALETTE = getGamePalette("five");
 
-function FiveWindow({ squares, onCell, winning, disabled }) {
+export function FiveWindow({ squares, onCell, winning, disabled }) {
   const { top, left, size } = FIVE_WINDOW;
   return (
     <div className="mx-auto w-full max-w-sm rounded-xl border border-foreground/10 bg-foreground/[0.02] p-1 shadow-2xl" data-tour="board">
@@ -359,7 +357,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
               <p className="font-semibold">Solved.</p>
               <p className="mt-1 text-sm">Day {streak} in a row</p>
               <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak, game)}</p>
-              <div className="mt-2"><ShareResult date={date} tries={saved.tries} streak={streak} game={game} /></div>
+              <div className="mt-2"><ShareResult text={shareText(date, saved.tries, streak, game)} url={shareLink(date)} /></div>
             </>
           ) : slipped ? (
             <>
@@ -380,6 +378,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
           </div>
         )}
         {done && shown === null && <PlayNow game={game} />}
+        {done && shown === null && <Link to="/rush" className="text-sm text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">Puzzle Rush: 3 minutes</Link>}
         <Link to="/daily/archive" className="text-sm text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">Past puzzles</Link>
         {(past || done) && (
           <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">

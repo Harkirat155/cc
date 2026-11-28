@@ -378,6 +378,7 @@ const Game = () => {
           {!isMultiplayer && (
             <p className="-mt-4 text-sm text-foreground/60">
               Daily puzzle: win in 2 or 3. <Link to="/daily" className="underline underline-offset-4">Play today&apos;s</Link>
+              {" · "}<Link to="/rush" className="underline underline-offset-4">Puzzle Rush</Link>
             </p>
           )}
           <ScorePanel
