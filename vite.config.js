@@ -1,9 +1,20 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
+import { prerenderRoutes } from './scripts/prerenderRoutes.js';
+
+const prerender = () => {
+  let outDir;
+  return {
+    name: 'prerender-routes',
+    apply: 'build',
+    configResolved: (c) => { outDir = c.build.outDir; },
+    closeBundle: () => prerenderRoutes(outDir),
+  };
+};
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), prerender()],
   base: '/cc/',
   resolve: {
     alias: {
