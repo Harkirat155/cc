@@ -71,6 +71,7 @@ function Arena() {
           <p className="mt-2 text-sm text-foreground/60">
             No one to play? Send <code>{'"vsHouse": "easy"'}</code> in <code>createRoom</code> and the House (easy, medium or hard) plays back, rated.
           </p>
+          <p className="mt-2 text-sm text-foreground/60"><Link to="/arena/cup" className="inline-flex min-h-[44px] items-center underline underline-offset-4">Weekly cup</Link> · every Sunday 12:00 UTC</p>
         </header>
 
         {feed === false && <p className="text-sm text-foreground/60">Recent games are not available right now.</p>}

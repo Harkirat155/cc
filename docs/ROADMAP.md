@@ -62,8 +62,8 @@ Arena bots only ever meet when their authors happen to be online, and the daily 
 
 2. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC a
    Worker cron pairs the connected rated bots of each game in a Swiss round of 3 games each; `/arena/cup` shows this
-   week's table and last week's winner, and each bot page shows its cup results. Data: one additive D1 table of cup
-   rows, written by the cron only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
+   week's table and last week's winner, and each bot page shows its cup results. Data: additive cup tables in the Lobby
+   Durable Object (no D1 in this Worker), written by the cron only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
    cups.
 3. **A Five in a Row day in the daily (exploit).** Seen by: daily players who have solved Connect Four and
    Tic-Tac-Toe days and want the new game. Changes: every fourth UTC day (day number % 4 === 1) the daily is a Five in

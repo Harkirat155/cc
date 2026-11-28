@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { genCode, validateGameId } from "./validation";
+import { pairRounds } from "./cup";
 import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from "./feedbackStore";
 
 type Msg = Record<string, unknown>;
@@ -17,6 +18,7 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 // outside BOT_NAME, so the exact names cannot be registered; RESERVED also catches "House easy", "house-easy", "HOUSE_HARD".
 const HOUSE_NAMES: Record<string, string> = { "house (easy)": "House (easy)", "house (medium)": "House (medium)", "house (hard)": "House (hard)" };
 const RESERVED = /^house(easy|medlum|hard)$/; // compared after 0->o, 1/i->l and stripping everything else
+const CUP_WEEK_MS = 7 * 86_400_000;
 const HOUSE_DAILY = 20; // rated house games per bot per UTC day; later ones are played but unrated
 type Replay = { first: 0 | 1; moves: unknown[] };
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
@@ -46,11 +48,16 @@ export class Lobby extends DurableObject {
     // Replays of rated games (GET /api/replay/:id). Additive: rows are only ever inserted, one per settled game, for games rated after this shipped. replay_links ties a bot_games row to its replay.
     sql.exec("CREATE TABLE IF NOT EXISTS replays (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, x_name TEXT NOT NULL, o_name TEXT NOT NULL, x_lc TEXT, o_lc TEXT, first INTEGER NOT NULL, result TEXT NOT NULL, moves TEXT NOT NULL, at INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS replay_links (bot_game_id INTEGER PRIMARY KEY, replay_id TEXT NOT NULL)");
+    // Weekly cup (docs/arena.md). Additive: rows are only ever inserted, by runCup. Scores are not stored: they are read off bot_games.
+    sql.exec("CREATE TABLE IF NOT EXISTS cup_runs (week TEXT NOT NULL, game_id TEXT NOT NULL, entrants INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (week, game_id))");
+    sql.exec("CREATE TABLE IF NOT EXISTS cup_entries (week TEXT NOT NULL, game_id TEXT NOT NULL, name_lc TEXT NOT NULL, rating REAL NOT NULL, PRIMARY KEY (week, game_id, name_lc))");
+    sql.exec("CREATE TABLE IF NOT EXISTS cup_pairings (week TEXT NOT NULL, game_id TEXT NOT NULL, round INTEGER NOT NULL, a_lc TEXT NOT NULL, b_lc TEXT, PRIMARY KEY (week, game_id, round, a_lc))");
     sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206'), ('cc-launch-check')");
   }
 
   async registerBot(name: unknown, ip: string, unlisted = false): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
     if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
+    if (name.toLowerCase() === "cup") return { status: 409, body: { error: "name reserved" } }; // GET /api/arena/cup is a route, not a bot page
     if (RESERVED.test(name.toLowerCase().replace(/0/g, "o").replace(/[1i]/g, "l").replace(/[^a-z]/g, ""))) return { status: 409, body: { error: "name reserved" } };
     const sql = this.ctx.storage.sql;
     const now = Date.now();
@@ -132,6 +139,64 @@ export class Lobby extends DurableObject {
       if (rows.length) out[game_id] = rows; // a type rated only by unlisted bots is left out, not shown as an empty table
     }
     return out;
+  }
+
+  // The weekly cup (docs/arena.md), run by the Sunday cron. Entrants per game: listed registered bots with a rated game of that type in
+  // the last 7 days. Writes the entrants and 3 rounds of pairings once per (week, game); the results are the rated games the pairings produce.
+  runCup(now: number): void {
+    const sql = this.ctx.storage.sql;
+    const week = new Date(now).toISOString().slice(0, 10);
+    for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
+      this.ctx.storage.transactionSync(() => {
+        if (sql.exec("SELECT 1 FROM cup_runs WHERE week = ? AND game_id = ?", week, game_id).toArray().length) return;
+        const ents = sql.exec<{ lc: string; rating: number }>(
+          `SELECT r.name_lc AS lc, r.rating FROM ratings r JOIN bots b ON b.name_lc = r.name_lc
+           WHERE r.game_id = ? AND r.name_lc NOT IN (SELECT name_lc FROM unlisted_bots)
+             AND EXISTS (SELECT 1 FROM bot_games g WHERE g.name_lc = r.name_lc AND g.game_id = r.game_id AND g.at >= ?)`, game_id, now - CUP_WEEK_MS).toArray();
+        sql.exec("INSERT INTO cup_runs (week, game_id, entrants, at) VALUES (?, ?, ?, ?)", week, game_id, ents.length, now);
+        if (ents.length < 2) return;
+        for (const e of ents) sql.exec("INSERT INTO cup_entries (week, game_id, name_lc, rating) VALUES (?, ?, ?, ?)", week, game_id, e.lc, e.rating);
+        pairRounds(ents).forEach((round, i) => round.forEach((p) => sql.exec("INSERT INTO cup_pairings (week, game_id, round, a_lc, b_lc) VALUES (?, ?, ?, ?, ?)", week, game_id, i + 1, p.a, p.b)));
+      });
+    }
+  }
+
+  // This week's table and last week's (the two newest cups). Names and numbers only. A pairing's result is the next rated game
+  // between the two bots, in that game type, inside the cup's 7 days; points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
+  listCup() {
+    const sql = this.ctx.storage.sql;
+    const weeks = sql.exec<{ week: string; at: number }>("SELECT week, MIN(at) AS at FROM cup_runs GROUP BY week ORDER BY week DESC LIMIT 2").toArray();
+    const names = new Map(sql.exec<{ name_lc: string; name: string }>("SELECT name_lc, name FROM bots").toArray().map((b) => [b.name_lc, b.name]));
+    const view = (w: { week: string; at: number }) => {
+      const games: Record<string, { entrants: number; table: { name: string; points: number; games: number; results: string[] }[]; winner: { name: string; points: number } | null }> = {};
+      for (const run of sql.exec<{ game_id: string; entrants: number }>("SELECT game_id, entrants FROM cup_runs WHERE week = ? ORDER BY game_id", w.week).toArray()) {
+        const rating = new Map(sql.exec<{ name_lc: string; rating: number }>("SELECT name_lc, rating FROM cup_entries WHERE week = ? AND game_id = ?", w.week, run.game_id).toArray().map((e) => [e.name_lc, e.rating]));
+        const played = new Map<string, string[]>(); // "a|b" -> a's results against b, oldest first
+        for (const g of sql.exec<{ name_lc: string; opponent: string; result: string }>("SELECT name_lc, opponent, result FROM bot_games WHERE game_id = ? AND at >= ? AND at < ? ORDER BY id", run.game_id, w.at, w.at + CUP_WEEK_MS).toArray()) {
+          const opp = g.opponent.toLowerCase();
+          if (rating.has(g.name_lc) && rating.has(opp)) played.set(`${g.name_lc}|${opp}`, [...(played.get(`${g.name_lc}|${opp}`) ?? []), g.result]);
+        }
+        const side = new Map([...rating.keys()].map((lc) => [lc, { points: 0, games: 0, results: [] as string[] }]));
+        const flip = { win: "loss", loss: "win", draw: "draw" } as Record<string, string>;
+        const pts = { win: 1, draw: 0.5, loss: 0 } as Record<string, number>;
+        for (const p of sql.exec<{ a_lc: string; b_lc: string | null }>("SELECT a_lc, b_lc FROM cup_pairings WHERE week = ? AND game_id = ? ORDER BY round, rowid", w.week, run.game_id).toArray()) {
+          const a = side.get(p.a_lc)!;
+          if (!p.b_lc) { a.results.push("bye"); a.points += 1; continue; }
+          const b = side.get(p.b_lc)!;
+          const res = played.get(`${p.a_lc}|${p.b_lc}`)?.shift();
+          if (!res) { a.results.push("pending"); b.results.push("pending"); continue; }
+          played.get(`${p.b_lc}|${p.a_lc}`)?.shift(); // the same game, from the other side
+          a.results.push(res); b.results.push(flip[res] ?? res);
+          a.points += pts[res] ?? 0; b.points += pts[flip[res] ?? res] ?? 0; a.games++; b.games++;
+        }
+        const table = [...side].map(([lc, s]) => ({ lc, name: names.get(lc) ?? lc, ...s }))
+          .sort((x, y) => y.points - x.points || rating.get(y.lc)! - rating.get(x.lc)! || (x.lc < y.lc ? -1 : 1))
+          .map(({ name, points, games: n, results }) => ({ name, points, games: n, results }));
+        games[run.game_id] = { entrants: run.entrants, table, winner: table[0]?.points > 0 ? { name: table[0].name, points: table[0].points } : null };
+      }
+      return { week: w.week, games };
+    };
+    return { current: weeks[0] ? view(weeks[0]) : null, last: weeks[1] ? view(weeks[1]) : null };
   }
 
   // The last 20 rated bot sides across the arena, newest first (one row per bot per game). Names and numbers only.
