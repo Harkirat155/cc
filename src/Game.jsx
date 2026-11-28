@@ -297,7 +297,9 @@ const Game = () => {
   }, [roomId, navigate, paramRoomId]);
 
   const handleCreateMatch = useCallback(() => {
-    createRoom(gameState?.gameId || requestedGameId);
+    const gameId = gameState?.gameId || requestedGameId;
+    tally("cc", `room_create_${gameId || "ttt"}`);
+    createRoom(gameId);
   }, [createRoom, gameState?.gameId, requestedGameId]);
 
   const handleFindMatch = useCallback(() => {
