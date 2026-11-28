@@ -40,9 +40,12 @@ export class Lobby extends DurableObject {
     // A bot's per-game history (GET /api/arena/:name), written with the rating in recordGame. Additive: rows exist only for games rated after this table shipped. id is an internal order, never served.
     sql.exec("CREATE TABLE IF NOT EXISTS bot_games (id INTEGER PRIMARY KEY AUTOINCREMENT, name_lc TEXT NOT NULL, game_id TEXT NOT NULL, opponent TEXT NOT NULL, result TEXT NOT NULL, rating_after REAL NOT NULL, at INTEGER NOT NULL)");
     sql.exec("CREATE INDEX IF NOT EXISTS bot_games_by_bot ON bot_games (name_lc, id)");
+    // Operator test bots stay rated but off the leaderboard and the feed (registration with "unlisted": true). Additive: rows are only ever inserted.
+    sql.exec("CREATE TABLE IF NOT EXISTS unlisted_bots (name_lc TEXT PRIMARY KEY)");
+    sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206')");
   }
 
-  async registerBot(name: unknown, ip: string): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
+  async registerBot(name: unknown, ip: string, unlisted = false): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
     if (typeof name !== "string" || !BOT_NAME.test(name) || name !== name.trim()) return { status: 400, body: { error: "name must be 3-24 characters: letters, digits, space, _ or -, no leading or trailing space" } };
     if (RESERVED.test(name.toLowerCase().replace(/0/g, "o").replace(/[1i]/g, "l").replace(/[^a-z]/g, ""))) return { status: 409, body: { error: "name reserved" } };
     const sql = this.ctx.storage.sql;
@@ -59,6 +62,7 @@ export class Lobby extends DurableObject {
       if (/UNIQUE|PRIMARY KEY|constraint/i.test(String(e))) return { status: 409, body: { error: "name already taken" } };
       throw e;
     }
+    if (unlisted) sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES (?)", name.toLowerCase());
     sql.exec("INSERT INTO bot_reg (ip_hash, at) VALUES (?, ?)", ipHash, now);
     return { status: 201, body: { name, key } };
   }
@@ -112,7 +116,7 @@ export class Lobby extends DurableObject {
     for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
       out[game_id] = sql
         .exec<{ name: string; rating: number; games: number; wins: number; draws: number; losses: number }>(
-          "SELECT COALESCE(b.name, r.name_lc) AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r LEFT JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? AND (b.name_lc IS NOT NULL OR r.name_lc LIKE 'house (%)') ORDER BY r.rating DESC, r.games DESC, name LIMIT ?", game_id, ARENA_TOP)
+          "SELECT COALESCE(b.name, r.name_lc) AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r LEFT JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? AND (b.name_lc IS NOT NULL OR r.name_lc LIKE 'house (%)') AND r.name_lc NOT IN (SELECT name_lc FROM unlisted_bots) ORDER BY r.rating DESC, r.games DESC, name LIMIT ?", game_id, ARENA_TOP)
         .toArray()
         .map((r) => ({ ...r, name: HOUSE_NAMES[r.name] ?? r.name, rating: Math.round(r.rating) }));
     }
@@ -123,7 +127,7 @@ export class Lobby extends DurableObject {
   listFeed(): { name: string; gameId: string; result: string; ratingAfter: number; at: number }[] {
     return this.ctx.storage.sql
       .exec<{ name: string; game_id: string; result: string; rating_after: number; at: number }>(
-        "SELECT COALESCE(b.name, g.name_lc) AS name, g.game_id, g.result, g.rating_after, g.at FROM bot_games g LEFT JOIN bots b ON b.name_lc = g.name_lc ORDER BY g.id DESC LIMIT 20")
+        "SELECT COALESCE(b.name, g.name_lc) AS name, g.game_id, g.result, g.rating_after, g.at FROM bot_games g LEFT JOIN bots b ON b.name_lc = g.name_lc WHERE g.name_lc NOT IN (SELECT name_lc FROM unlisted_bots) ORDER BY g.id DESC LIMIT 20")
       .toArray()
       .map((r) => ({ name: r.name, gameId: r.game_id, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
   }
@@ -137,7 +141,7 @@ export class Lobby extends DurableObject {
   }
 
   // A registered bot's last 10 rated games, newest first. Null when the name is not registered. Names and numbers only.
-  recentGames(name: string): { name: string; games: { gameId: string; opponent: string; result: string; ratingAfter: number; at: number }[] } | null {
+  recentGames(name: string): { name: string; unlisted?: true; games: { gameId: string; opponent: string; result: string; ratingAfter: number; at: number }[] } | null {
     const sql = this.ctx.storage.sql;
     const lc = name.toLowerCase();
     const bot = sql.exec<{ name: string }>("SELECT name FROM bots WHERE name_lc = ?", lc).toArray()[0];
@@ -146,7 +150,8 @@ export class Lobby extends DurableObject {
       .exec<{ game_id: string; opponent: string; result: string; rating_after: number; at: number }>("SELECT game_id, opponent, result, rating_after, at FROM bot_games WHERE name_lc = ? ORDER BY id DESC LIMIT 10", lc)
       .toArray()
       .map((r) => ({ gameId: r.game_id, opponent: r.opponent, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
-    return { name: bot.name, games };
+    const unlisted = sql.exec("SELECT 1 FROM unlisted_bots WHERE name_lc = ?", lc).toArray().length > 0;
+    return unlisted ? { name: bot.name, unlisted: true, games } : { name: bot.name, games };
   }
 
   reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {

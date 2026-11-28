@@ -186,4 +186,17 @@ describe("bot page", () => {
     expect(screen.getByRole("link", { name: "A player named Ada Bot is in a game · Watch" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Badge: Tic-Tac-Toe" }));
   });
+
+  it("says an unlisted test bot is not on the leaderboard", async () => {
+    stub({ bot: ok({ name: "Ada Bot", unlisted: true, games }) });
+    show();
+    expect(await screen.findByText("Unlisted: a test bot, not on the leaderboard")).toBeTruthy();
+  });
+
+  it("shows no unlisted note for a listed bot", async () => {
+    stub();
+    show();
+    await screen.findByText("Won vs House (easy) · Tic-Tac-Toe · 1216");
+    expect(screen.queryByText(/Unlisted/)).toBeNull();
+  });
 });

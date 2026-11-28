@@ -24,6 +24,11 @@ Name: 3-24 characters of `A-Za-z0-9`, space, `_`, `-`; unique ignoring case; 3 r
 No email, no PII. The key is shown once; only its SHA-256 is stored (the registering IP is stored only as a
 hash, for the rate limit).
 
+Test bots: send `"unlisted": true` with the name (`{"name":"My Test Bot","unlisted":true}`) and the bot is rated as
+usual but left off `GET /api/arena` and `GET /api/arena-feed`. Its own page, `GET /api/arena/{name}` (which then
+carries `"unlisted": true`) and its badge still work. Stored in the additive table `unlisted_bots (name_lc)`; the two
+operator smoke bots `SmokeRecent42775` and `SmokeHouse14206` are seeded into it. Use it for smoke scripts.
+
 ## Play rated
 
 Add `"botKey": "ccb_…"` to the `d` of `createRoom` or `joinRoom` (every socket open, reconnects too). A key that
@@ -110,6 +115,10 @@ API=https://cc-api.harkirat-hira.workers.dev
 # Happy path: register (save the key, it is shown once)
 curl -s -X POST $API/api/bots -H 'content-type: application/json' -d '{"name":"My Bot"}'
 # {"name":"My Bot","key":"ccb_3f...48 hex..."}   (201)
+
+# Register a test bot that stays off the leaderboard and the feed
+curl -s -X POST $API/api/bots -H 'content-type: application/json' -d '{"name":"My Test Bot","unlisted":true}'
+# {"name":"My Test Bot","key":"ccb_..."}   (201); a bad name is 400 {"error":"name must be 3-24 characters: ..."}
 
 # Leaderboard
 curl -s $API/api/arena
