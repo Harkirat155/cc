@@ -1,5 +1,6 @@
 import connect4 from './games/connect4.js';
-import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine } from './daily.js';
+import ttt from './games/ttt.js';
+import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine, gameForDate, tttPuzzleForDate, tttWinningCells } from './daily.js';
 
 const play = (cols) => {
   let state = connect4.createInitialState();
@@ -105,5 +106,44 @@ describe('solutionLine', () => {
     expect(status).toBe('win');
     expect(connect4.checkTerminal(state).winnerSlot ?? puzzle.turn).toBe(puzzle.turn);
     expect(mine).toBeLessThanOrEqual(puzzle.n);
+  });
+});
+
+describe('daily game by date', () => {
+  const days = Array.from({ length: 40 }, (_, i) => new Date(Date.UTC(2026, 10, 27 + i)).toISOString().slice(0, 10));
+
+  test('is decided by the date alone, with Connect Four on the launch days and Tic-Tac-Toe on a fixed subset', () => {
+    expect(gameForDate('2026-11-27')).toBe('connect4');
+    expect(gameForDate('2026-11-28')).toBe('connect4');
+    expect(gameForDate('2026-11-30')).toBe('ttt');
+    expect(days.map(gameForDate)).toEqual(days.map(gameForDate));
+    const ttt = days.filter((d) => gameForDate(d) === 'ttt').length;
+    expect(ttt).toBeGreaterThanOrEqual(8);
+    expect(ttt).toBeLessThanOrEqual(12);
+  });
+
+  test('every Tic-Tac-Toe day has a stable, solvable one-move puzzle, of both kinds across the month', () => {
+    const kinds = new Set();
+    for (const d of days.filter((x) => gameForDate(x) === 'ttt')) {
+      const p = tttPuzzleForDate(d);
+      expect(tttPuzzleForDate(d)).toEqual(p);
+      kinds.add(p.kind);
+      const me = ['X', 'O'][p.turn];
+      expect(p.board.filter((v) => v === 'X').length - p.board.filter((v) => v === 'O').length).toBe(p.turn === 0 ? 0 : 1);
+      expect(ttt.checkTerminal({ board: p.board }).status).toBe('active');
+      expect(p.answers.length).toBeGreaterThan(0);
+      for (const cell of p.answers) {
+        expect(p.board[cell]).toBe('');
+        const b = p.board.slice();
+        b[cell] = me;
+        if (p.kind === 'win') expect(ttt.checkTerminal({ board: b }).winner).toBe(p.turn);
+      }
+      if (p.kind === 'block') {
+        expect(tttWinningCells(p.board, me)).toEqual([]);
+        expect(p.answers).toEqual(tttWinningCells(p.board, ['O', 'X'][p.turn]));
+        expect(p.answers).toHaveLength(1);
+      }
+    }
+    expect([...kinds].sort()).toEqual(['block', 'win']);
   });
 });

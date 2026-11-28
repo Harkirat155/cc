@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import app from "../src/index";
 
 const get = (path: string) => app.fetch(new Request(`http://x${path}`), env);
@@ -20,6 +20,13 @@ describe("GET /d/:date", () => {
     expect(h).toContain('<meta property="og:url" content="http://x/d/2026-11-28">');
     expect(h).toContain('<meta http-equiv="refresh" content="0; url=https://harkirat155.github.io/cc/daily/2026-11-28?via=d">');
     expect(h).toContain('<a href="https://harkirat155.github.io/cc/daily/2026-11-28?via=d">');
+  });
+
+  it("names Tic-Tac-Toe on a Tic-Tac-Toe day (2026-11-30), by the same date rule as the page", async () => {
+    vi.useFakeTimers({ now: new Date("2026-12-01T12:00:00Z"), toFake: ["Date"] }); // the card refuses days that have not begun
+    const h = await (await get("/d/2026-11-30")).text().finally(() => vi.useRealTimers());
+    expect(h).toContain('content="A friend solved the 2026-11-30 Tic-Tac-Toe puzzle. Can you?"');
+    expect(h).not.toContain("Connect Four");
   });
 
   it("is a 404 no-store HTML page for a malformed, impossible or out-of-range date", async () => {

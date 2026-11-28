@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
-import { defenderReply, keepsWin, puzzleForDate, solutionLine, todayUtc } from "@shared/daily.js";
+import ttt from "@shared/games/ttt.js";
+import { GAME_NAMES, defenderReply, gameForDate, keepsWin, puzzleForDate, solutionLine, todayUtc, tttPuzzleForDate } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
@@ -62,14 +63,14 @@ const drop = (board, col, mark) => {
 };
 
 // The share text holds only numbers from this device's record. The link carries the date alone (the Worker's /d/:date card), so no result number is ever parsed from a URL.
-export const shareText = (date, tries, streak = 1) =>
-  `CrissCross Daily ${date} · solved in ${tries} ${tries === 1 ? "try" : "tries"}${streak >= 2 ? ` · ${streak} days in a row` : ""}`;
+export const shareText = (date, tries, streak = 1, game = "connect4") =>
+  `CrissCross Daily ${date}${game === "connect4" ? "" : ` · ${GAME_NAMES[game]}`} · solved in ${tries} ${tries === 1 ? "try" : "tries"}${streak >= 2 ? ` · ${streak} days in a row` : ""}`;
 export const shareLink = (date) => `${badgeBase()}/d/${date}`;
-export const resultLine = (date, tries, streak = 1) => `${shareText(date, tries, streak)} ${shareLink(date)}`;
+export const resultLine = (date, tries, streak = 1, game = "connect4") => `${shareText(date, tries, streak, game)} ${shareLink(date)}`;
 
-function ShareResult({ date, tries, streak }) {
+function ShareResult({ date, tries, streak, game }) {
   const [state, setState] = useState(""); // "" | "ok" | "failed"
-  const text = shareText(date, tries, streak);
+  const text = shareText(date, tries, streak, game);
   const url = shareLink(date);
   const share = async () => {
     try {
@@ -93,9 +94,9 @@ function ShareResult({ date, tries, streak }) {
   );
 }
 
-// "Play someone now": one fetch of GET /api/live when the day is done. A Connect Four seat waiting for a player is joined directly;
+// "Play someone now": one fetch of GET /api/live when the day is done. A seat of the day's own game waiting for a player is joined directly;
 // on no seat, a failure or a slow answer the link already points at the lobby, so it is never a spinner or a dead button.
-function PlayNow() {
+function PlayNow({ game }) {
   const [seat, setSeat] = useState(null);
   useEffect(() => {
     let live = true;
@@ -104,14 +105,14 @@ function PlayNow() {
         const res = await window.fetch(liveUrl());
         if (!res.ok) return;
         const body = await res.json();
-        const open = Array.isArray(body.open) ? body.open.find((o) => o?.gameId === "connect4" && typeof o.roomId === "string" && o.roomId) : null;
+        const open = Array.isArray(body.open) ? body.open.find((o) => o?.gameId === game && typeof o.roomId === "string" && o.roomId) : null;
         if (live && open) setSeat(open.roomId);
       } catch { /* the lobby link stays */ }
     })();
     return () => { live = false; };
-  }, []);
+  }, [game]);
   return (
-    <Link to={seat ? `/room/${encodeURIComponent(seat)}` : "/lobby"} onClick={() => tally("cc", "daily_play")} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+    <Link to={seat ? `/room/${encodeURIComponent(seat)}` : "/lobby"} onClick={() => tally("cc", game === "connect4" ? "daily_play" : `daily_play_${game}`)} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
       Play someone now
     </Link>
   );
@@ -125,10 +126,13 @@ function Daily() {
   // dropped from the address (replace, no new history entry) so a reload or a bookmark of this page never counts again.
   const { pathname, search, hash } = useLocation();
   const navigate = useNavigate();
+  const { date: asked } = useParams();
   useEffect(() => {
     const q = new window.URLSearchParams(search);
     if (q.get("via") !== "d") return;
-    tally("cc", "daily_link");
+    // /daily/:date?via=d is the date the link shared; the event is per game so the kill rule reads Tic-Tac-Toe days apart (Connect Four keeps `daily_link`).
+    const shared = isDay(asked, today) ? asked : today;
+    tally("cc", gameForDate(shared) === "connect4" ? "daily_link" : `daily_link_${gameForDate(shared)}`);
     q.delete("via");
     const rest = q.toString();
     navigate(`${pathname}${rest ? `?${rest}` : ""}${hash}`, { replace: true });
@@ -139,7 +143,6 @@ function Daily() {
     return () => window.clearTimeout(t);
   }, [today]);
   // /daily/:date opens that day's puzzle; a date outside launch..today shows today's with a note.
-  const { date: asked } = useParams();
   const dated = isDay(asked, today) && asked !== today;
   const date = dated ? asked : past ? dayBefore(today) : today;
   const onSwitch = () => (dated ? navigate("/daily") : setPast(!past));
@@ -148,7 +151,11 @@ function Daily() {
 
 function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const past = date !== today;
-  const puzzle = useMemo(() => puzzleForDate(date), [date]);
+  const game = gameForDate(date);
+  const isTtt = game === "ttt";
+  const marks = isTtt ? ["X", "O"] : MARKS;
+  const names = isTtt ? ["X", "O"] : COLOR;
+  const puzzle = useMemo(() => (isTtt ? tttPuzzleForDate(date) : puzzleForDate(date)), [date, isTtt]);
   const [saved, setSaved] = useState(() => (past ? loadPast(date) : load(date)));
   const [days, setDays] = useState(() => readStore().days);
   const [already] = useState(() => past && days.includes(date)); // a past day solved earlier shows no new result line
@@ -157,7 +164,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const [slipped, setSlipped] = useState(false);
   const [note, setNote] = useState("");
   const [shown, setShown] = useState(null); // null = my board; else how many moves of the winning line are on the board
-  const line = useMemo(() => solutionLine(puzzle), [puzzle]);
+  const line = useMemo(() => (isTtt ? [{ cell: puzzle.answers[0], mark: marks[puzzle.turn] }] : solutionLine(puzzle)), [puzzle, isTtt]); // eslint-disable-line react-hooks/exhaustive-deps
   const status = useRef(null);
   const me = puzzle.turn;
 
@@ -176,8 +183,21 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
 
   const play = (col) => {
     if (done || board[col] !== "") return;
+    if (isTtt) {
+      const solves = puzzle.answers.includes(col);
+      setBoard(board.map((v, i) => (i === col ? marks[me] : v)));
+      setNote(`You played row ${Math.floor(col / 3) + 1}, column ${(col % 3) + 1}${solves ? (puzzle.kind === "win" ? " and won." : " and blocked.") : "."}`);
+      if (solves) {
+        tally("cc", "daily_solve_ttt"); // once per day solved: `done` blocks any further move on this day
+        save({ ...saved, solved: true });
+      } else {
+        setSlipped(true);
+        save({ ...saved, tries: saved.tries + 1 });
+      }
+      return;
+    }
     const kept = keepsWin(board, col, me, left);
-    let next = drop(board, col, MARKS[me]);
+    let next = drop(board, col, marks[me]);
     if (connect4.checkTerminal({ board: next }).status === "win") {
       setBoard(next);
       setNote(`You dropped in column ${col + 1} and won.`);
@@ -186,7 +206,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
       return;
     }
     const reply = defenderReply(next, me, left - 1);
-    next = drop(next, reply, MARKS[1 - me]);
+    next = drop(next, reply, marks[1 - me]);
     setBoard(next);
     setNote(`You dropped in column ${col + 1}. They answered in column ${reply + 1}.`);
     if (!kept || left < 2 || connect4.checkTerminal({ board: next }).status !== "active") {
@@ -205,9 +225,13 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   };
 
   // The solution view is derived: the puzzle's start position plus the first `shown` moves of the line. Nothing is saved.
-  const viewBoard = shown === null ? board : line.slice(0, shown).reduce((b, m) => drop(b, m.col, m.mark), puzzle.board);
-  const end = shown === null ? null : connect4.checkTerminal({ board: viewBoard });
+  const place = (b, m) => (isTtt ? b.map((v, i) => (i === m.cell ? m.mark : v)) : drop(b, m.col, m.mark));
+  const viewBoard = shown === null ? board : line.slice(0, shown).reduce(place, puzzle.board);
+  const end = shown === null ? null : (isTtt ? ttt : connect4).checkTerminal({ board: viewBoard });
   const solutionWin = end?.status === "win" ? end : null;
+  // Tic-Tac-Toe boards have no move announcer of their own (GameBoard speaks Connect Four drops only), so the caption says where the mark went.
+  const last = isTtt && shown > 0 ? line[shown - 1] : null;
+  const step = last ? `${last.mark} at row ${Math.floor(last.cell / 3) + 1}, column ${(last.cell % 3) + 1} · ` : "";
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
@@ -215,25 +239,25 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
         <Link to="/" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← CrissCross</Link>
         <header className="self-start">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{isTtt ? " · Tic-Tac-Toe" : ""}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
           {unavailable && <p className="mt-2 font-medium">{"That puzzle isn't available, here is today's."}</p>}
           <p className="mt-2 text-foreground/70">One puzzle a day, the same for everyone. New puzzle at 00:00 UTC.</p>
-          <p className="mt-2 font-medium">{COLOR[me]} to move: win in {puzzle.n} of your moves.</p>
+          <p className="mt-2 font-medium">{isTtt ? `${names[me]} to move: ${puzzle.kind === "win" ? "win now" : "block their win"}.` : `${names[me]} to move: win in ${puzzle.n} of your moves.`}</p>
         </header>
         <GameBoard
           squares={viewBoard}
           onSquareClick={play}
           winningSquares={solutionWin?.line ?? []}
-          rows={6}
-          cols={7}
-          playerInfo={connect4.playerInfo}
-          boardSpec={connect4.boardSpec}
+          rows={isTtt ? 3 : 6}
+          cols={isTtt ? 3 : 7}
+          playerInfo={(isTtt ? ttt : connect4).playerInfo}
+          boardSpec={(isTtt ? ttt : connect4).boardSpec}
           disabled={done || shown !== null}
         />
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {shown !== null ? (
             // The board's own sr-only status announces "<Side> dropped in column N"; this caption adds only what it does not say (progress, the winner).
-            <p className="font-semibold">{solutionWin ? `Solution · ${COLOR[solutionWin.winner]} wins` : shown === 0 ? `Solution · ${line.length} moves, press Next move` : `Solution · move ${shown} of ${line.length}`}</p>
+            <p className="font-semibold">{solutionWin ? `Solution · ${step}${names[solutionWin.winner]} wins` : shown === 0 ? `Solution · ${line.length} ${line.length === 1 ? "move" : "moves"}, press Next move` : `Solution · ${step}move ${shown} of ${line.length}`}</p>
           ) : already ? (
             <>
               <p className="font-semibold">Already solved.</p>
@@ -243,8 +267,8 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
             <>
               <p className="font-semibold">Solved.</p>
               <p className="mt-1 text-sm">Day {streak} in a row</p>
-              <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak)}</p>
-              <div className="mt-2"><ShareResult date={date} tries={saved.tries} streak={streak} /></div>
+              <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak, game)}</p>
+              <div className="mt-2"><ShareResult date={date} tries={saved.tries} streak={streak} game={game} /></div>
             </>
           ) : slipped ? (
             <>
@@ -252,7 +276,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
               <button type="button" onClick={retry} className="mt-2 rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">Try again</button>
             </>
           ) : (
-            <p className="text-sm text-foreground/70">{note || `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`}</p>
+            <p className="text-sm text-foreground/70">{note || (isTtt ? `Try ${saved.tries}.` : `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`)}</p>
           )}
         </div>
         {done && shown === null && (
@@ -264,7 +288,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
             <button type="button" onClick={() => setShown(null)} className={pill}>Back to my board</button>
           </div>
         )}
-        {done && shown === null && <PlayNow />}
+        {done && shown === null && <PlayNow game={game} />}
         {(past || done) && (
           <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
             {past ? "Back to today's" : "Try yesterday's"}
