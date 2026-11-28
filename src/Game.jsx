@@ -17,6 +17,7 @@ import ScorePanel from "./components/ScorePanel";
 import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
 import OpponentControl from "./components/OpponentControl";
+import HomeDoors from "./components/HomeDoors";
 import RoomActions from "./components/RoomActions";
 import useGameSounds from "./hooks/useGameSounds";
 import { viewerSlotFor } from "./utils/sound";
@@ -375,7 +376,13 @@ const Game = () => {
               }}
             />
           )}
-          {!isMultiplayer && (
+          {!isMultiplayer && history.length <= 1 && (
+            <HomeDoors
+              onComputer={() => { setOpponent({ mode: "computer" }); resetGame(); }}
+              onFriend={handleCreateMatch}
+            />
+          )}
+          {!isMultiplayer && history.length > 1 && (
             <p className="-mt-4 text-sm text-foreground/60">
               Daily puzzle: win in 2 or 3. <Link to="/daily" className="underline underline-offset-4">Play today&apos;s</Link>
               {" · "}<Link to="/rush" className="underline underline-offset-4">Puzzle Rush</Link>
