@@ -175,7 +175,7 @@ export function puzzleForDate(date) {
 // CHECKERS_FROM starts the next rotation: from then on day number % 4 === 2 is Checkers, so no served puzzle changes.
 export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe', five: 'Five in a Row', checkers: 'Checkers' };
 const FIVE_FROM = '2026-11-29';
-export const CHECKERS_FROM = '2026-12-07';
+export const CHECKERS_FROM = '2026-12-03';
 export const gameForDate = (date) => {
   const n = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000) % 4;
   return n === 3 ? 'ttt' : n === 1 && date >= FIVE_FROM ? 'five' : n === 2 && date >= CHECKERS_FROM ? 'checkers' : 'connect4';

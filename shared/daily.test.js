@@ -160,7 +160,7 @@ describe('Five in a Row day', () => {
     expect(gameForDate('2026-11-30')).toBe('ttt');
     expect(gameForDate('2026-12-01')).toBe('connect4');
     expect(gameForDate('2026-12-02')).toBe('five');
-    expect(gameForDate('2026-12-03')).toBe('connect4');
+    expect(gameForDate('2026-12-03')).toBe('checkers');
     expect(gameForDate('2026-12-04')).toBe('ttt');
     expect(gameForDate('2026-12-06')).toBe('five');
     expect(fiveDays.every((d) => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86400000) % 4 === 1)).toBe(true);
@@ -210,7 +210,7 @@ describe('checkers days', () => {
 
   test('the rotation starts on CHECKERS_FROM and every day before keeps the game it always had', () => {
     expect(gameForDate(CHECKERS_FROM)).toBe('checkers');
-    expect(gameForDate('2026-12-03')).toBe('connect4'); // day number % 4 === 2, but before the start
+    expect(gameForDate('2026-11-29')).toBe('connect4'); // day number % 4 === 2, but before the start
     // The rule before the Checkers rotation (Tic-Tac-Toe, Five in a Row, Connect Four), written out by day number.
     const before = (d) => { const n = Math.floor(Date.parse(`${d}T00:00:00Z`) / 86400000) % 4; return n === 3 ? 'ttt' : n === 1 && d >= '2026-11-29' ? 'five' : 'connect4'; };
     for (let t = Date.parse('2026-11-27T00:00:00Z'); t < Date.parse(`${CHECKERS_FROM}T00:00:00Z`); t += 86400000) {

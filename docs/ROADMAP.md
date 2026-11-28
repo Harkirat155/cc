@@ -24,9 +24,9 @@
   to `/daily?via=d`; arrivals count as `daily_link` (item 4, built). Only the date is in the link, so no result number
   is read from a URL. Kill rule: No daily_link tally hits within 4 weeks (by 2026-12-26).
 
-- Checkers dailies (built, not yet live): from 2026-12-07 every fourth UTC day (day number % 4 === 2) is a Checkers "win in 2 or 3"
+- Checkers dailies (built, not yet live): from 2026-12-03 every fourth UTC day (day number % 4 === 2) is a Checkers "win in 2 or 3"
   (`checkersPuzzleForDate` in `shared/daily.js`, verified by an exhaustive search through `shared/games/checkers.js`' own moves, so
-  single jumps and optional captures, as that module has them). Days before 2026-12-07 keep their game. Tallies `daily_solve_checkers`,
+  single jumps and optional captures, as that module has them). Days before 2026-12-03 keep their game. Tallies `daily_solve_checkers`,
   `daily_play_checkers`, `daily_link_checkers`. Not live until the PR is merged and deployed.
 
 - A month of daily puzzles (built, not yet live): `/daily` has a quiet "Past puzzles" link to `/daily/archive`, a Monday-first month
