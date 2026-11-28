@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
+import SoundToggle from "./SoundToggle";
 import Mic from "lucide-react/dist/esm/icons/mic.js";
 import MicOff from "lucide-react/dist/esm/icons/mic-off.js";
 import Wifi from "lucide-react/dist/esm/icons/wifi.js";
@@ -113,6 +114,7 @@ const Navbar = ({
               </button>
             </Tooltip>
           )}
+          <SoundToggle />
           <ThemeToggle />
           <NavMenu actions={menuActions} panel={menuPanel} />
         </div>
