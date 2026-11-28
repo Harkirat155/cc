@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.js";
@@ -44,8 +44,18 @@ function CopyResult({ text }) {
   );
 }
 
+// Keys the puzzle by date and moves to the new one at the next 00:00 UTC.
 function Daily() {
-  const date = useMemo(() => todayUtc(), []);
+  const [date, setDate] = useState(() => todayUtc());
+  useEffect(() => {
+    const next = Date.parse(`${date}T00:00:00Z`) + 86400000;
+    const t = window.setTimeout(() => setDate(todayUtc()), Math.max(next - Date.now(), 0) + 50);
+    return () => window.clearTimeout(t);
+  }, [date]);
+  return <DailyPuzzle key={date} date={date} />;
+}
+
+function DailyPuzzle({ date }) {
   const puzzle = useMemo(() => puzzleForDate(date), [date]);
   const [saved, setSaved] = useState(() => load(date));
   const [board, setBoard] = useState(puzzle.board);
@@ -75,12 +85,13 @@ function Daily() {
     next = drop(next, reply, MARKS[1 - me]);
     setBoard(next);
     setNote(`You dropped in column ${col + 1}. They answered in column ${reply + 1}.`);
-    if (!kept || left < 2 || connect4.checkTerminal({ board: next }).status !== "active") setSlipped(true);
-    else setLeft(left - 1);
+    if (!kept || left < 2 || connect4.checkTerminal({ board: next }).status !== "active") {
+      setSlipped(true);
+      save({ ...saved, tries: saved.tries + 1 }); // the failed try is counted now, so a reload cannot undercount
+    } else setLeft(left - 1);
   };
 
   const retry = () => {
-    save({ ...saved, tries: saved.tries + 1 });
     setBoard(puzzle.board);
     setLeft(puzzle.n);
     setSlipped(false);
@@ -105,8 +116,9 @@ function Daily() {
           cols={7}
           playerInfo={connect4.playerInfo}
           boardSpec={connect4.boardSpec}
+          disabled={done}
         />
-        <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full text-center outline-none">
+        <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {saved.solved ? (
             <>
               <p className="font-semibold">Solved.</p>

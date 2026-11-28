@@ -1,6 +1,6 @@
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily from "./Daily";
 import { puzzleForDate, keepsWin, defenderReply } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
@@ -72,6 +72,43 @@ describe("daily page", () => {
     jest.setSystemTime(new Date("2026-11-29T00:00:01Z"));
     show();
     expect(screen.queryByText(/solved in/)).toBeNull();
+  });
+
+  it("counts a slip when it happens: slip, reload, solve says 2 tries", () => {
+    const p = puzzleForDate(DATE);
+    const first = show();
+    drop(slip(p));
+    first.unmount();
+    show();
+    solve(p);
+    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 2 tries · harkirat155.github.io/cc/daily")).toBeTruthy();
+  });
+
+  it("switches to the new puzzle at 00:00 UTC without unmounting", () => {
+    jest.useRealTimers();
+    jest.useFakeTimers({ now: new Date(`${DATE}T23:59:59Z`) });
+    const p = puzzleForDate(DATE);
+    show();
+    solve(p);
+    expect(screen.getByText(/solved in 1 try/)).toBeTruthy();
+    act(() => { jest.advanceTimersByTime(2000); });
+    expect(screen.getByText(/Daily puzzle · 2026-11-29/)).toBeTruthy();
+    expect(screen.queryByText(/solved in/)).toBeNull();
+    const next = puzzleForDate("2026-11-29");
+    solve(next);
+    expect(screen.getByText(/CrissCross daily 2026-11-29 · solved in 1 try/)).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("cc.daily")).date).toBe("2026-11-29");
+  });
+
+  it("disables the columns once solved or slipped, and focus lands on Try again", () => {
+    const p = puzzleForDate(DATE);
+    show();
+    drop(slip(p));
+    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(false);
+    solve(p);
+    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(true);
   });
 
   it("falls back to a hand-copy field when the clipboard refuses", async () => {

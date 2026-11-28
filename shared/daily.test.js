@@ -40,6 +40,30 @@ describe('daily solver', () => {
   });
 });
 
+describe('solver edge cases', () => {
+  test('n below 1 never wins, even with an immediate win on the board', () => {
+    expect(canWin(play([0, 0, 1, 1, 2, 2]), 0, 0)).toBe(false);
+  });
+
+  test('Yellow to move: worked by hand', () => {
+    // R c0, Y c2, R c0, Y c3, R c6 -> Yellow to move holding bottom c2,c3.
+    // Yellow c4 makes an open three on the bottom row (c1 and c5 both playable);
+    // Red has no four to make, so Yellow wins on its second move, not its first.
+    const b = play([0, 2, 0, 3, 6]);
+    expect(canWin(b, 1, 1)).toBe(false);
+    expect(canWin(b, 1, 2)).toBe(true);
+    expect(keepsWin(b, 4, 1, 2)).toBe(true);
+    expect(keepsWin(b, 5, 1, 2)).toBe(false);
+  });
+
+  test('a full board has no forced win', () => {
+    const board = Array.from({ length: 42 }, (_, i) => (((i % 7) + Math.floor(Math.floor(i / 7) / 2)) % 2 ? 'R' : 'Y'));
+    expect(connect4.checkTerminal({ board }).status).toBe('draw');
+    expect(canWin(board, 0, 3)).toBe(false);
+    expect(keepsWin(board, 0, 0, 2)).toBe(false);
+  });
+});
+
 describe('puzzleForDate', () => {
   test('is deterministic for a date and differs across dates', () => {
     expect(puzzleForDate('2026-11-28')).toEqual(puzzleForDate('2026-11-28'));

@@ -60,3 +60,5 @@ below reads or extends data the Lobby Durable Object already holds. The house op
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); game replays (no move log is stored); any paid service or custom domain.
+
+Accessibility debt: the shared Connect Four board announces each column as "Drop piece in column N" but does not describe which discs are where; add a per-column fill description to GameBoard (affects /daily and the main game).

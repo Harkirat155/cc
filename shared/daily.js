@@ -72,7 +72,7 @@ function forcedAfter(b, me, n) {
 }
 
 /** Side `turn` (0|1) to move can force a win within n of its own moves. */
-export const canWin = (board, turn, n) => attack(board.slice(), turn, n);
+export const canWin = (board, turn, n) => n >= 1 && attack(board.slice(), turn, n);
 
 /** After `turn` drops in `col`, is the win still forced within n moves (this one included)? */
 export function keepsWin(board, col, turn, n) {
