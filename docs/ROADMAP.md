@@ -90,9 +90,9 @@ Finding (2026-11-28, 7-day tally): 28 visitors and 15 home views, but `daily_pla
    puzzle" and "Play a friend", so a finished game is not a dead end. Data: tally `cc` events `end_daily`, `end_friend`.
    Judge by `online_game` and `daily_play` per `finished_*` the week after.
 
-3. **A challenge link after Rush (explore).** Seen by: anyone who finished a Rush run (`src/Rush.jsx`). Changes: "Share result"
+3. **A challenge link after Rush (built; explore).** Seen by: anyone who finished a Rush run (`src/Rush.jsx`). Changes: "Share result"
    already shares the score; add "Beat my N" on `/rush?beat=N` (a number in the URL, shown as a target, never read as a result), so
-   a shared run brings the sender's friends into the same day's puzzles. Data: tally `rush_beat_link` per arrival. Kill rule:
+   a shared run brings the sender's friends into the same day's puzzles. Built: "Challenge a friend" on the Rush end screen (a run with at least 1 solve) shares or copies `/rush?beat=N`; the start and end screens show the target (integer 1..999, else ignored; no sender identity). Data: tally `rush_beat_link` per press of the button (arrivals are not counted). Kill rule:
    fewer than 5 `rush_beat_link` in 4 weeks: remove the parameter.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in

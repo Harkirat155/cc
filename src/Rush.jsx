@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import ttt from "@shared/games/ttt.js";
 import checkers from "@shared/games/checkers.js";
@@ -14,6 +14,32 @@ const NAMES = { ttt: ["X", "O"], connect4: ["Red", "Yellow"], five: ["Blue", "Gr
 const SHAPE = { ttt: [3, 3, ttt], connect4: [6, 7, connect4], checkers: [8, 8, checkers] };
 export const RUSH_LINK = "https://harkirat155.github.io/cc/rush";
 export const rushShareText = (n) => `I solved ${n} ${n === 1 ? "puzzle" : "puzzles"} in 3 minutes on CrissCross Rush`;
+
+// A challenge target travels as a bare number in `?beat=N` (1..999); anything else is ignored.
+export const parseBeat = (v) => (/^[1-9]\d{0,2}$/.test(v || "") ? Number(v) : 0);
+export const beatLink = (n) => `${RUSH_LINK}?beat=${n}`;
+const beatVerdict = (score, target) =>
+  score > target ? `You beat ${target} with ${score}` : score === target ? `You tied ${target}, one more beats it` : `Not beaten: ${score} against ${target}`;
+
+function Challenge({ score }) {
+  const [state, setState] = useState(""); // "" | "ok" | "failed"
+  const url = beatLink(score);
+  const send = async () => {
+    tally("cc", "rush_beat_link");
+    try {
+      if (navigator.share) { await navigator.share({ text: `Beat my ${score} on CrissCross Rush`, url }); return; }
+    } catch (e) { if (e?.name === "AbortError") return; /* any other failure: fall back to copying */ }
+    try { await navigator.clipboard.writeText(url); setState("ok"); }
+    catch { setState("failed"); }
+  };
+  return (
+    <>
+      <button type="button" onClick={send} className="min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium">Challenge a friend</button>
+      {state === "ok" && <p role="status" className="text-sm text-foreground/70">Link copied</p>}
+      {state === "failed" && <input readOnly aria-label="Challenge link" value={url} onFocus={(e) => e.target.select()} className="block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm" />}
+    </>
+  );
+}
 
 const readBest = (day) => {
   try {
@@ -106,6 +132,7 @@ function Run({ day, onEnd }) {
 
 function Rush() {
   const day = useMemo(() => todayUtc(), []);
+  const target = parseBeat(useSearchParams()[0].get("beat"));
   const [phase, setPhase] = useState("intro"); // intro | run | done
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => readBest(day));
@@ -127,6 +154,7 @@ function Rush() {
           <header className="self-start">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Puzzle Rush</h1>
             <p className="mt-2 text-foreground/70">Solve as many puzzles as you can in 3 minutes, across Tic-Tac-Toe, Connect Four, Five in a Row and Checkers. A move that lets the win slip skips that puzzle. Same run for everyone today.</p>
+            {target > 0 && <p className="mt-2 text-lg font-semibold">Beat {target}</p>}
             {best > 0 && <p className="mt-2 text-sm text-foreground/70">Your best today: {best}</p>}
             <button type="button" onClick={start} className={`${pill} mt-4`}>Start</button>
           </header>
@@ -135,8 +163,10 @@ function Rush() {
         {phase === "done" && (
           <section className="flex flex-col items-center gap-3 text-center" role="status">
             <h1 className="text-3xl font-semibold tracking-tight">You solved {score} {score === 1 ? "puzzle" : "puzzles"}</h1>
+            {target > 0 && <p className="font-medium">{beatVerdict(score, target)}</p>}
             <p className="text-foreground/70">Best today: {best}</p>
             <ShareResult text={rushShareText(score)} url={RUSH_LINK} />
+            {score > 0 && <Challenge score={score} />}
             <button type="button" onClick={start} className={pill}>Run again</button>
           </section>
         )}
