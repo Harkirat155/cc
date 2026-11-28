@@ -10,24 +10,25 @@
 
 - Open seats: a listed room with one seat filled shows on `/arena` and `/live` as "Waiting: {name} · {game} · Join" (`open` array on `GET /api/live`; item 2, built).
 
-Finding: the arena works, but a first visit on a phone still sees test bots, a clipped table and a feed that cannot
-be followed. Next, a reason to come back daily and a reason to share a game. Every item reads or extends data the
-Lobby Durable Object already holds.
+- Arena tidy (PR #74), a daily puzzle at `/daily` (PR #75), replays of rated games (PR #77), and link previews for
+  `/daily`, `/arena`, `/lobby`, `/live` and `/agents` (PR #78).
 
-1. **Arena tidy. (Built, PR #74.)** Seen by: a first-time visitor to `/arena` on a phone.
-   Changes: operator test bots (`"unlisted": true` at registration, additive `unlisted_bots` table) leave the
-   leaderboard and "Just finished"; W, D and L share one column so the table fits 390 px; the strip's bot names link
-   to `/arena/{name}`; "The last rated result" reads right for one row. Data: `bots`, `ratings`, `bot_games`; one
-   new table, inserts only.
-2. **A daily puzzle. (Built, PR #75: `/daily`, Connect Four.)** Seen by: any visitor, and anyone a friend sends the result line to. Changes: one position per
-   day from the existing engines in `shared/games/`, "win in N", and a shareable result line (for example "CrissCross
-   daily 2026-12-01: solved in 2"). Data: the engines and the date; no stored user data.
-3. **Replays of rated games. (Built.)** Seen by: a bot author debugging a loss, and a visitor who sees a result in
-   "Just finished" and wants to see the game. Changes: store each rated game's moves additively (a new table keyed by
-   the settled game id, written in `recordGame`), and replay it from the bot page and from the strip. Data: the move
-   list the Room already holds at settlement; only games rated after it ships have a replay.
+Finding (2026-11-28): the daily puzzle is the only reason to come back each day, but a solve leaves nothing that
+carries over to tomorrow, and a shared replay link unfurls as the generic card. Next, keep daily players, make the
+board readable to everyone, and let a replay travel. All three reuse what exists: the daily engine and its
+localStorage record, the shared GameBoard, and the stored replays.
+
+1. **A daily streak.** Seen by: anyone who solved yesterday's puzzle. Changes: `/daily` shows "Day N in a row" from
+   the solves already kept on this device (localStorage only, nothing sent), the result line gains the streak, and a
+   solved or given-up day offers "Try yesterday's". Data: the date and the existing local record; no server change.
+2. **A Connect Four board a screen reader can read.** Seen by: a screen-reader user on `/daily` or in a game.
+   Changes: each column describes its discs bottom to top ("Column 3: red, yellow, 2 empty") as well as "Drop piece
+   in column 3"; the last move is announced. Data: the board state already rendered. (Was the accessibility debt.)
+3. **Replay links that unfurl (explore).** Seen by: someone a bot author sends a replay to. Changes: the Worker serves
+   `/r/{id}` as a small HTML page whose title and description name both bots, the game and the result, with the
+   static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4
+   weeks of launch. Data: the stored replay row; read-only.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
 
-Accessibility debt: the shared Connect Four board announces each column as "Drop piece in column N" but does not describe which discs are where; add a per-column fill description to GameBoard (affects /daily and the main game).
