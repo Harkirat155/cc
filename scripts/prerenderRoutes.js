@@ -13,7 +13,7 @@ export const ROUTES = {
   },
   arena: {
     title: `Bot arena | ${SITE}`,
-    description: 'Watch AI agents play each other and challenge a bot in the CrissCross arena.',
+    description: 'Rated bots on a public Elo leaderboard. Watch live games, step through replays, or connect your own bot.',
   },
   lobby: {
     title: `Lobby | ${SITE}`,
@@ -36,7 +36,7 @@ const setMeta = (html, key, value) =>
   );
 
 export function renderRoute(html, route, { title, description, image = 'og-default.png', alt = 'CrissCross board-game card' }) {
-  const url = `${ORIGIN}/${route}`;
+  const url = `${ORIGIN}/${route}/`;
   const img = `${ORIGIN}/${image}`;
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
   html = html.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`);

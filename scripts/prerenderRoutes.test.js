@@ -21,8 +21,8 @@ describe('prerenderRoutes', () => {
   test('daily gets its own title, canonical, og:url and daily card', () => {
     const html = fs.readFileSync(path.join(dist, 'daily', 'index.html'), 'utf8');
     expect(html).toMatch(/<title>[^<]*Daily[^<]*<\/title>/);
-    expect(meta(html, 'og:url')).toBe(`${ORIGIN}/daily`);
-    expect(html).toContain(`<link rel="canonical" href="${ORIGIN}/daily" />`);
+    expect(meta(html, 'og:url')).toBe(`${ORIGIN}/daily/`);
+    expect(html).toContain(`<link rel="canonical" href="${ORIGIN}/daily/" />`);
     expect(meta(html, 'og:image')).toBe(`${ORIGIN}/og-daily.png`);
     expect(meta(html, 'twitter:image')).toBe(`${ORIGIN}/og-daily.png`);
     expect(meta(html, 'twitter:card')).toBe('summary_large_image');
@@ -33,8 +33,8 @@ describe('prerenderRoutes', () => {
     expect(Object.keys(ROUTES).sort()).toEqual(['agents', 'arena', 'daily', 'live', 'lobby']);
     for (const route of Object.keys(ROUTES)) {
       const html = fs.readFileSync(path.join(dist, route, 'index.html'), 'utf8');
-      expect(meta(html, 'og:url')).toBe(`${ORIGIN}/${route}`);
-      expect(html).toContain(`href="${ORIGIN}/${route}"`);
+      expect(meta(html, 'og:url')).toBe(`${ORIGIN}/${route}/`);
+      expect(html).toContain(`href="${ORIGIN}/${route}/"`);
       expect(html).not.toContain(`rel="canonical" href="${ORIGIN}/"`);
     }
   });
