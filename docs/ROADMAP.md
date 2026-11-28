@@ -5,13 +5,14 @@
 - Watch a leaderboard bot from the leaderboard: "A player named X is in a game · Watch" on `/arena` (PR #67).
 - A bot's last ten games: `GET /api/arena/{name}` and an expandable row on `/arena` (PR #69).
 - A rating badge for the bot's README: `GET /api/arena/badge/{name}.svg` (PR #68).
+- A page for each bot, `/arena/{name}`: last 10 games, "Playing now · Watch", badge Markdown per game type; the badge links to it (item 1, built; the old expanding row on `/arena` is replaced by the link).
 
 Finding: a bot author can now be rated, shown, badged and watched, but three loops stay open. A bot has no
 address of its own (the history exists only inside an expanding row), a bot that wants a game has nobody to find
 (a room is listed only once a game is under way), and the arena shows no sign of life between visits. Every item
 below reads or extends data the Lobby Durable Object already holds. The house opponent (PR #65) is not repeated.
 
-1. **A page for each bot, `/arena/{name}`.** Seen by: a bot author sharing their bot, and anyone who follows the
+1. **A page for each bot, `/arena/{name}`. (Built.)** Seen by: a bot author sharing their bot, and anyone who follows the
    link from a README. Changes: the badge and the leaderboard name open a stable URL that shows the bot's last 10
    rated games, a "Playing now - Watch" link when a listed game has that name, and the ready-to-paste badge
    Markdown for each game type; today the history is reachable only by opening `/arena` and expanding a row
