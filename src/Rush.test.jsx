@@ -2,13 +2,14 @@
  * @jest-environment-options {"url": "https://harkirat155.github.io/cc/"}
  */
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Rush from "./Rush";
 import { rushPuzzle, rushSolve } from "@shared/rush.js";
 
 const DAY = "2026-11-28";
-const show = (search = "") => render(<MemoryRouter initialEntries={[`/rush${search}`]}><Rush /></MemoryRouter>);
+const Where = () => <output data-testid="where">{useLocation().search}</output>;
+const show = (search = "") => render(<MemoryRouter initialEntries={[`/rush${search}`]}><Rush /><Where /></MemoryRouter>);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -67,7 +68,7 @@ describe("rush page", () => {
       const writeText = jest.fn(() => Promise.resolve());
       Object.assign(window.navigator, { share: undefined, clipboard: { writeText } });
       await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Challenge a friend" })); });
-      expect(writeText).toHaveBeenCalledWith("https://harkirat155.github.io/cc/rush?beat=1");
+      expect(writeText).toHaveBeenCalledWith("https://cc-api.harkirat-hira.workers.dev/b/1");
       expect(screen.getByText("Link copied")).toBeTruthy();
       expect(beacons()).toContain("rush_beat_link");
     });
@@ -78,8 +79,21 @@ describe("rush page", () => {
       const share = jest.fn(() => Promise.resolve());
       Object.assign(window.navigator, { share });
       await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Challenge a friend" })); });
-      expect(share.mock.calls[0][0].url).toBe("https://harkirat155.github.io/cc/rush?beat=1");
+      expect(share.mock.calls[0][0].url).toBe("https://cc-api.harkirat-hira.workers.dev/b/1");
       expect(beacons()).toContain("rush_beat_link");
+    });
+
+    it("counts an arrival through a /b/ card once, and drops the marker but keeps the target", () => {
+      show("?beat=7&via=b");
+      expect(beacons().filter((e) => e === "rush_beat_arrival")).toHaveLength(1);
+      expect(screen.getByTestId("where").textContent).toBe("?beat=7");
+      expect(screen.getByText("Beat 7")).toBeTruthy();
+    });
+
+    it("counts no arrival without the marker or with another one", () => {
+      show("?beat=7");
+      show("?beat=7&via=j");
+      expect(beacons()).not.toContain("rush_beat_arrival");
     });
 
     it("offers no challenge after a run that solved nothing", () => {

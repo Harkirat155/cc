@@ -98,7 +98,7 @@ Finding (2026-11-28, 7-day tally): 28 visitors and 15 home views, but `daily_pla
 Next round (2026-11-28, after items 1–3 went live). The 8-day tally: 24 visitors and 5 `rush_start` on 2026-11-28, so Rush is
 the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTTP 404 on Pages, so chat apps showed no card.
 
-4. **The challenge card names the number (exploit; extends 3).** Seen by: whoever receives a "Challenge a friend" link. Changes:
+4. **The challenge card names the number (built; exploit; extends 3).** Seen by: whoever receives a "Challenge a friend" link. Changes:
    `beatLink(n)` points at a Worker page `/b/:n` (`worker/src/index.ts`, beside `/j/:roomId` and `/r/:id`) whose card says
    "Beat 7 in today's Puzzle Rush" and which sends the browser on to `/rush/?beat=N&via=b`; invalid N answers 404 like `/j/`. Data:
    tally `cc` `rush_beat_arrival`, once per arrival through `via=b`. Judge with item 3's rule: arrivals per `rush_beat_link`.

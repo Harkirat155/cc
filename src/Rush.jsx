@@ -8,6 +8,7 @@ import { RUSH_SECONDS, rushPuzzle, rushStep } from "@shared/rush.js";
 import GameBoard from "./components/GameBoard";
 import { FiveWindow, ShareResult } from "./Daily";
 import { liveUrl } from "./Live";
+import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
 
 const KEY = "cc.rush";
@@ -18,7 +19,8 @@ export const rushShareText = (n) => `I solved ${n} ${n === 1 ? "puzzle" : "puzzl
 
 // A challenge target travels as a bare number in `?beat=N` (1..999); anything else is ignored.
 export const parseBeat = (v) => (/^[1-9]\d{0,2}$/.test(v || "") ? Number(v) : 0);
-export const beatLink = (n) => `${RUSH_LINK}?beat=${n}`;
+// The Worker's /b/ card unfurls the target in chat, then sends the browser to /rush/?beat=N&via=b.
+export const beatLink = (n) => `${badgeBase()}/b/${n}`;
 const beatVerdict = (score, target) =>
   score > target ? `You beat ${target} with ${score}` : score === target ? `You tied ${target}, one more beats it` : `Not beaten: ${score} against ${target}`;
 
@@ -151,7 +153,16 @@ function Run({ day, onEnd, onMove }) {
 
 function Rush() {
   const day = useMemo(() => todayUtc(), []);
-  const target = parseBeat(useSearchParams()[0].get("beat"));
+  const [params, setParams] = useSearchParams();
+  const target = parseBeat(params.get("beat"));
+  // Arrivals through a /b/ card (the Worker adds via=b): counted once, then the marker is dropped (replace) so a reload never counts again.
+  useEffect(() => {
+    if (params.get("via") !== "b") return;
+    tally("cc", "rush_beat_arrival");
+    const q = new window.URLSearchParams(params);
+    q.delete("via");
+    setParams(q, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [phase, setPhase] = useState("intro"); // intro | run | done
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => readBest(day));
