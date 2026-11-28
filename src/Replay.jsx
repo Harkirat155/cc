@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import "@shared/games/index.js";
 import { get as rulesFor } from "@shared/games/registry.js";
 import GameBoard from "./components/GameBoard";
 import { apiBase, badgeBase } from "./arenaShared";
+import { tally } from "./lib/tally";
 
 const note = "rounded-2xl border border-foreground/10 p-4 text-foreground/70";
 const btn = "rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40";
@@ -22,6 +23,11 @@ export function rebuild(gameId, first, moves) {
 
 function Replay() {
   const { id = "" } = useParams();
+  const { search } = useLocation();
+  // Arrivals through a shared /r/ link (worker adds ?via=r): the replay-links bet's kill-rule signal. Counts only.
+  useEffect(() => {
+    if (new window.URLSearchParams(search).get("via") === "r") tally("cc", "replay_link");
+  }, [search]);
   const [res, setRes] = useState("loading"); // loading | error | missing | the replay
   const [at, setAt] = useState(0);
   const gen = useRef(0);

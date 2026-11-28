@@ -154,7 +154,8 @@ app.get("/r/:id", async (c) => {
   const title = html(`${outcome} at ${game} · CrissCross replay`);
   const desc = html(`A ${game} game in ${r.moves.length} moves. Watch it move by move.`);
   const url = html(new URL(`/r/${encodeURIComponent(id)}`, c.req.url).href);
-  const to = html(`${PAGES}/replay/${encodeURIComponent(id)}`);
+  // ?via=r lets the replay page count arrivals through shared links (the roadmap's kill rule); crawlers never follow the refresh.
+  const to = html(`${PAGES}/replay/${encodeURIComponent(id)}?via=r`);
   const img = `${PAGES}/og-default.png`;
   return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="description" content="${desc}">

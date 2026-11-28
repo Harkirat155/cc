@@ -36,8 +36,8 @@ describe("GET /r/:id", () => {
     expect(h).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(h).toContain('<meta property="og:url" content="http://x/r/u1">');
     expect(h).toContain('<link rel="canonical" href="http://x/r/u1">');
-    expect(h).toContain('<meta http-equiv="refresh" content="0; url=https://harkirat155.github.io/cc/replay/u1">');
-    expect(h).toContain('<a href="https://harkirat155.github.io/cc/replay/u1">');
+    expect(h).toContain('<meta http-equiv="refresh" content="0; url=https://harkirat155.github.io/cc/replay/u1?via=r">');
+    expect(h).toContain('<a href="https://harkirat155.github.io/cc/replay/u1?via=r">');
   });
 
   it("words a draw and a second-seat win", async () => {

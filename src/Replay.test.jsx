@@ -130,3 +130,25 @@ describe("replay page", () => {
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 });
+
+describe("arrivals from a shared /r/ link", () => {
+  const visit = (path) => render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/replay/:id" element={<Replay />} /></Routes></MemoryRouter>);
+  let beacon;
+  beforeEach(() => {
+    beacon = jest.fn(() => true);
+    Object.defineProperty(window.navigator, "sendBeacon", { value: beacon, configurable: true });
+    window.fetch = jest.fn(() => new Promise(() => {}));
+  });
+
+  it("counts one replay_link hit when the page is opened through /r/", () => {
+    visit("/replay/r1?via=r");
+    const hits = beacon.mock.calls.map(([u]) => u).filter((u) => u.includes("e=replay_link"));
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain("p=cc");
+  });
+
+  it("counts nothing when the page is opened directly", () => {
+    visit("/replay/r1");
+    expect(beacon.mock.calls.filter(([u]) => u.includes("e=replay_link"))).toHaveLength(0);
+  });
+});
