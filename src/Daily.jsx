@@ -5,6 +5,7 @@ import { defenderReply, keepsWin, puzzleForDate, solutionLine, todayUtc } from "
 import GameBoard from "./components/GameBoard";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
+import { liveUrl } from "./Live";
 
 const KEY = "cc.daily";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -92,6 +93,30 @@ function ShareResult({ date, tries, streak }) {
   );
 }
 
+// "Play someone now": one fetch of GET /api/live when the day is done. A Connect Four seat waiting for a player is joined directly;
+// on no seat, a failure or a slow answer the link already points at the lobby, so it is never a spinner or a dead button.
+function PlayNow() {
+  const [seat, setSeat] = useState(null);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await window.fetch(liveUrl());
+        if (!res.ok) return;
+        const body = await res.json();
+        const open = Array.isArray(body.open) ? body.open.find((o) => o?.gameId === "connect4" && typeof o.roomId === "string" && o.roomId) : null;
+        if (live && open) setSeat(open.roomId);
+      } catch { /* the lobby link stays */ }
+    })();
+    return () => { live = false; };
+  }, []);
+  return (
+    <Link to={seat ? `/room/${encodeURIComponent(seat)}` : "/lobby"} onClick={() => tally("cc", "daily_play")} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+      Play someone now
+    </Link>
+  );
+}
+
 // Keys the puzzle by date and moves to the new one at the next 00:00 UTC.
 function Daily() {
   const [today, setToday] = useState(() => todayUtc());
@@ -156,6 +181,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
     if (connect4.checkTerminal({ board: next }).status === "win") {
       setBoard(next);
       setNote(`You dropped in column ${col + 1} and won.`);
+      tally("cc", "daily_solve"); // once per day solved: `done` blocks any further move on this day
       save({ ...saved, solved: true });
       return;
     }
@@ -238,6 +264,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
             <button type="button" onClick={() => setShown(null)} className={pill}>Back to my board</button>
           </div>
         )}
+        {done && shown === null && <PlayNow />}
         {(past || done) && (
           <button type="button" onClick={onSwitch} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
             {past ? "Back to today's" : "Try yesterday's"}

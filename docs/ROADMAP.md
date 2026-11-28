@@ -44,12 +44,10 @@ localStorage record, the shared GameBoard, and the stored replays.
    `/r/{id}` as a small HTML page whose title and description name both bots, the game and the result, with the
    static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4
    weeks of launch. Data: the stored replay row; read-only.
+- "Play someone now" after the daily is done (not in the solution view): joins an open Connect Four seat from `GET /api/live`, else `/lobby` (item 2, built). Data: tally `cc` events `daily_play` (clicks) and `daily_solve` (first solves); kill rule: `daily_play` under 5% of `daily_solve` within 4 weeks of launch.
 
 ## Next
 
-2. **From the daily to a live game (explore).** Seen by: someone who just solved `/daily`. Changes: the result area
-   offers "Play someone now" to `/lobby` or the open seats on `/live`. Data: the existing `GET /api/live`. Kill rule:
-   under 5% of solves click it within 4 weeks of launch, measured by a new tally event.
 3. **A different game on alternate days (explore).** Seen by: a daily player who has seen every Connect Four puzzle
    shape. Changes: some days the puzzle is a Checkers or Tic-Tac-Toe position, with the same share card. Data: the
    game rules already in `shared/games/`. Kill rule: `daily_link` hits or return solves on those days fall below the
