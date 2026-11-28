@@ -4,7 +4,7 @@ import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 import { liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
-import { BOT_NAME, BadgeCopy, RULE, apiBase, badgeBase } from "./arenaShared";
+import { BadgeCopy, RULE, apiBase, badgeBase, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
 
@@ -74,13 +74,13 @@ function Arena() {
                 {games[id].map((b, i) => { const room = roomFor(rooms, id, b.name); return (
                   <tr key={b.name} className="border-t border-foreground/10">
                     <td className="py-2 pr-2">{i + 1}</td><td className="pr-2 font-medium">
-                      {BOT_NAME.test(b.name)
+                      {validName(b.name)
                         ? <Link to={`/arena/${encodeURIComponent(b.name)}`} className="font-medium underline-offset-4 hover:underline">{b.name}</Link>
                         : b.name}
                       {room && (
                         <Link to={`/room/${encodeURIComponent(room)}`} className="ml-2 text-xs font-normal text-foreground/70 underline underline-offset-4">A player named {b.name} is in a game · Watch</Link>
                       )}
-                      <BadgeCopy name={b.name} game={id} />
+                      <BadgeCopy name={b.name} game={id} gameName={names[id] || id} />
                     </td><td className="pr-2">{b.rating}</td>
                     <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
                   </tr>

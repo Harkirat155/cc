@@ -60,7 +60,7 @@ describe("Arena page", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: jest.fn().mockRejectedValue(new Error("denied")) } });
     show();
     fireEvent.click(await screen.findByRole("button", { name: "Badge" }));
-    const field = await screen.findByRole("textbox", { name: "Badge Markdown for Ada Bot" });
+    const field = await screen.findByRole("textbox", { name: "Badge Markdown for Ada Bot, Connect Four" });
     expect(field.value).toBe("[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/Ada%20Bot.svg?game=connect4)](https://harkirat155.github.io/cc/arena/Ada%20Bot)");
     expect(screen.getByRole("button", { name: "Copy failed: select the text below" })).toBeTruthy();
   });
