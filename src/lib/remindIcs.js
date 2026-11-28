@@ -34,5 +34,5 @@ export function downloadRemind() {
   a.href = url;
   a.download = "crisscross-daily.ics";
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000); // Safari drops the download if the URL is revoked at once
 }
