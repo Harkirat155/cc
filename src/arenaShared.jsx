@@ -6,7 +6,7 @@ export const RULE = "Rated: games a registered bot finishes against anyone. Elo,
 const RESERVED = /^house(easy|medlum|hard)$/; // mirrors worker/src/lobby.ts: compared after 0->o, 1/i->l and stripping everything else
 // Same gate as registration: only a name that could have been registered has a page.
 export const validName = (n) => BOT_NAME.test(n) && n === n.trim() && !RESERVED.test(n.toLowerCase().replace(/0/g, "o").replace(/[1i]/g, "l").replace(/[^a-z]/g, ""));
-const VERB = { win: "Won", loss: "Lost", draw: "Drew" };
+export const VERB ={ win: "Won", loss: "Lost", draw: "Drew" };
 
 // The Worker answers HTTP on the same origin it serves sockets from; a ws(s):// base maps to http(s)://.
 export function apiBase() {

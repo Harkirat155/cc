@@ -57,6 +57,50 @@ describe("Arena page", () => {
     expect(screen.queryByRole("link", { name: /Watch$/ })).toBeNull();
   });
 
+  const routed = (feed, arena = { games: { ttt: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }] } }) => jest.fn(async (url) => {
+    const u = String(url);
+    if (u.endsWith("/api/live")) return { ok: true, json: async () => ({ games: [] }) };
+    if (u.endsWith("/api/arena-feed")) return feed;
+    return { ok: true, json: async () => arena };
+  });
+
+  it("lists just-finished games above the tables, linking only a name that could have a page", async () => {
+    const feed = { ok: true, json: async () => ({ feed: [
+      { name: "Grace Bot", gameId: "ttt", result: "win", ratingAfter: 1216, at: Date.now() - 5 * 60_000 },
+      { name: "House (easy)", gameId: "connect4", result: "draw", ratingAfter: 1200, at: Date.now() - 3 * 86_400_000 },
+    ] }) };
+    window.fetch = routed(feed);
+    show();
+    const strip = await screen.findByRole("region", { name: "Just finished" });
+    expect(strip.textContent).toMatch(/The last 2 rated results since 2026-11-28, one line per bot, so a game between two bots shows twice/);
+    expect(strip.textContent).toMatch(/Grace Bot · Tic-Tac-Toe · Won · rating 1216 · 5 min ago/);
+    expect(strip.textContent).toMatch(/House \(easy\) · Connect Four · Drew · rating 1200 · 3 d ago/);
+    const links = strip.querySelectorAll("a");
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/arena/Grace%20Bot");
+  });
+
+  it("says plainly that nothing has finished, with no zeros", async () => {
+    window.fetch = routed({ ok: true, json: async () => ({ feed: [] }) });
+    show();
+    expect(await screen.findByText("No rated games finished since 2026-11-28.")).toBeTruthy();
+  });
+
+  it("keeps the leaderboard and shows a quiet note when the feed fails", async () => {
+    window.fetch = routed({ ok: false, status: 500 });
+    show();
+    expect(await screen.findByText("Ada Bot")).toBeTruthy();
+    expect(screen.getByText("Recent games are not available right now.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("treats a malformed feed as unavailable, not as an empty arena", async () => {
+    window.fetch = routed({ ok: true, json: async () => ({ items: [] }) });
+    show();
+    expect(await screen.findByText("Recent games are not available right now.")).toBeTruthy();
+    expect(screen.queryByText(/No rated games finished/)).toBeNull();
+  });
+
   it("maps a ws base to http", () => {
     process.env.VITE_SOCKET_SERVER = "wss://cc-api.example.dev/";
     expect(apiBase()).toBe("https://cc-api.example.dev");

@@ -119,6 +119,15 @@ export class Lobby extends DurableObject {
     return out;
   }
 
+  // The last 20 rated bot sides across the arena, newest first (one row per bot per game). Names and numbers only.
+  listFeed(): { name: string; gameId: string; result: string; ratingAfter: number; at: number }[] {
+    return this.ctx.storage.sql
+      .exec<{ name: string; game_id: string; result: string; rating_after: number; at: number }>(
+        "SELECT COALESCE(b.name, g.name_lc) AS name, g.game_id, g.result, g.rating_after, g.at FROM bot_games g LEFT JOIN bots b ON b.name_lc = g.name_lc ORDER BY g.id DESC LIMIT 20")
+      .toArray()
+      .map((r) => ({ name: r.name, gameId: r.game_id, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
+  }
+
   // One registered bot's rating in one game, for the README badge. Null when unregistered or no games. Number only.
   ratingOf(name: string, gameId: string): { name: string; rating: number } | null {
     const r = this.ctx.storage.sql

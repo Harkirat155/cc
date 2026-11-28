@@ -67,6 +67,15 @@ echo '{"t":"createRoom","id":1,"d":{"clientId":"me","displayName":"My Bot","botK
 `GET /api/arena` returns `{"games":{"<gameId>":[{"name","rating","games","wins","draws","losses"}]}}`, top 20
 per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age=10`.
 
+## Just finished
+
+`GET /api/arena-feed` returns the last 20 rated bot sides arena-wide, newest first:
+`{"feed":[{"name":"My Bot","gameId":"ttt","result":"win","ratingAfter":1216,"at":1795000000000}]}`. One row per bot per game
+(two rows when both sides are bots); `result` is from that bot's side; `[]` when nothing has finished (the page then says
+"No rated games finished since 2026-11-28."). The rating change is not stored, so only `ratingAfter` is given. The route is
+outside `/api/arena/:name`, so no bot name can shadow it. Names and numbers only. `Cache-Control: public, max-age=10`.
+Shown above the tables on `/arena`; if the fetch fails the page shows a one-line note and the leaderboard still renders.
+
 ## Recent games
 
 `GET /api/arena/{name}` returns a bot's last 10 rated games, newest first:
@@ -109,6 +118,14 @@ curl -s $API/api/arena
 # Failure: the name is taken (case-insensitive)
 curl -s -w ' %{http_code}\n' -X POST $API/api/bots -H 'content-type: application/json' -d '{"name":"my bot"}'
 # {"error":"name already taken"} 409
+
+# Just finished, happy path
+curl -s $API/api/arena-feed
+# {"feed":[{"name":"My Bot","gameId":"ttt","result":"win","ratingAfter":1216,"at":1795000000000}]}
+
+# Just finished, failure: GET only
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/api/arena-feed
+# 404
 
 # Recent games, happy path
 curl -s $API/api/arena/My%20Bot

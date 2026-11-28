@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
-import { liveUrl } from "./Live";
+import { ago, liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
 import OpenSeats from "./OpenSeats";
-import { BadgeCopy, RULE, apiBase, badgeBase, validName } from "./arenaShared";
+import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
 
@@ -14,36 +14,49 @@ export { apiBase };
 function Arena() {
   const [games, setGames] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
+  const [feed, setFeed] = useState(null); // null = loading, false = failed, else the last rated games
   const [rooms, setRooms] = useState(() => new Map()); // lowercased name -> roomId; optional, empty on any failure
   const [open, setOpen] = useState([]); // listed rooms waiting for an opponent; optional
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
   const base = badgeBase();
 
+  const gen = useRef(0); // a slower, older refresh must not overwrite a newer one
+
   const load = useCallback(async () => {
+    const mine = ++gen.current;
+    const ok = () => gen.current === mine;
     try {
       const res = await window.fetch(`${apiBase()}/api/arena`);
       if (!res.ok) throw new Error(String(res.status));
-      setGames((await res.json()).games ?? {});
-      setFailed(false);
+      const body = await res.json();
+      if (ok()) { setGames(body.games ?? {}); setFailed(false); }
     } catch {
-      setFailed(true);
+      if (ok()) setFailed(true);
+    }
+    try {
+      const res = await window.fetch(`${apiBase()}/api/arena-feed`);
+      if (!res.ok) throw new Error(String(res.status));
+      const body = await res.json();
+      if (!Array.isArray(body.feed)) throw new Error("no feed list");
+      if (ok()) setFeed(body.feed);
+    } catch {
+      if (ok()) setFeed(false);
     }
     try {
       const res = await window.fetch(liveUrl());
       if (!res.ok) throw new Error(String(res.status));
-      const live = await res.json();
-      setRooms(watchRooms(live.games));
-      setOpen(live.open ?? []);
+      const body = await res.json();
+      if (ok()) { setRooms(watchRooms(body.games)); setOpen(body.open ?? []); }
     } catch {
-      setRooms(new Map());
-      setOpen([]);
+      if (ok()) { setRooms(new Map()); setOpen([]); }
     }
   }, []);
 
   useEffect(() => {
     load();
     const t = window.setInterval(load, REFRESH_MS);
-    return () => window.clearInterval(t);
+    const g = gen;
+    return () => { g.current++; window.clearInterval(t); };
   }, [load]);
 
   const ids = Object.keys(games ?? {});
@@ -59,6 +72,28 @@ function Arena() {
             No one to play? Send <code>{'"vsHouse": "easy"'}</code> in <code>createRoom</code> and the House (easy, medium or hard) plays back, rated.
           </p>
         </header>
+
+        {feed === false && <p className="text-sm text-foreground/60">Recent games are not available right now.</p>}
+        {feed && (
+          <section aria-labelledby="just-finished">
+            <h2 id="just-finished" className="text-xl font-semibold">Just finished</h2>
+            {feed.length === 0
+              ? <p className="mt-2 text-sm text-foreground/60">No rated games finished since {SINCE}.</p>
+              : (
+                <>
+                  <p className="mt-1 text-sm text-foreground/60">The last {feed.length} rated {feed.length === 1 ? "result" : "results"} since {SINCE}, one line per bot, so a game between two bots shows twice.</p>
+                  <ul className="mt-2 text-sm">
+                    {feed.map((g, i) => (
+                      <li key={i} className="border-t border-foreground/10 py-1.5">
+                        {validName(g.name) ? <Link to={`/arena/${encodeURIComponent(g.name)}`} className="font-medium underline-offset-4 hover:underline">{g.name}</Link> : <span className="font-medium">{g.name}</span>}
+                        {` · ${names[g.gameId] || g.gameId} · ${VERB[g.result] ?? g.result} · rating ${g.ratingAfter} · ${ago(g.at)}`}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+          </section>
+        )}
 
         {failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the leaderboard. Retrying every {REFRESH_MS / 1000} seconds.</p>}
         {!failed && games === null && <p className="text-foreground/60">Loading…</p>}

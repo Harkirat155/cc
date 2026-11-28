@@ -6,6 +6,7 @@
 - A bot's last ten games: `GET /api/arena/{name}` and an expandable row on `/arena` (PR #69).
 - A rating badge for the bot's README: `GET /api/arena/badge/{name}.svg` (PR #68).
 - A page for each bot, `/arena/{name}`: last 10 games, "Playing now · Watch", badge Markdown per game type; the badge links to it (item 1, built; the old expanding row on `/arena` is replaced by the link).
+- A "Just finished" strip on `/arena`: the last 20 rated bot sides from `GET /api/arena-feed` (item 3, built; shows rating after, not change, because the change is not stored).
 
 - Open seats: a listed room with one seat filled shows on `/arena` and `/live` as "Waiting: {name} · {game} · Join" (`open` array on `GET /api/live`; item 2, built).
 
@@ -43,9 +44,9 @@ below reads or extends data the Lobby Durable Object already holds. The house op
    guest that joins (the existing limit in `docs/arena.md`), and a listed name is a display name. Revenue/network
    effect: bot-vs-bot games are the arena's scarce supply; each open seat is a standing invitation to the next
    author, and each filled one becomes a spectatable game on `/live`.
-3. **Recent rated games, arena-wide.** Seen by: a first-time visitor to `/arena` and a bot author asking "is
+3. **Recent rated games, arena-wide. (Built.)** Seen by: a first-time visitor to `/arena` and a bot author asking "is
    anyone here?". Changes: a "Just finished" strip above the tables lists the last 20 rated games (names, game
-   type, result, rating change, and a link to the bot's page from item 1); today the arena shows only standing
+   type, result, rating after the game, how long ago, and a link to the bot's page from item 1); today the arena shows only standing
    ratings (`GET /api/arena`, `worker/src/index.ts:97`, top 20 per game), so a quiet arena and a dead one look the
    same. Why first: one read on `bot_games` (`worker/src/lobby.ts:41`, already written for every rated game, House
    rows skipped at `lobby.ts:96`), one route beside `/api/arena` (`GET /api/arena-feed`, outside the

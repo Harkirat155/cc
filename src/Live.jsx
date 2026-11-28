@@ -14,7 +14,7 @@ export function liveUrl() {
 
 export function ago(ms, now = Date.now()) {
   const min = Math.max(0, Math.floor((now - ms) / 60_000));
-  return min < 1 ? "just now" : min < 60 ? `${min} min ago` : `${Math.floor(min / 60)} h ago`;
+  return min < 1 ? "just now" : min < 60 ? `${min} min ago` : min < 1440 ? `${Math.floor(min / 60)} h ago` : `${Math.floor(min / 1440)} d ago`;
 }
 
 function Live() {
