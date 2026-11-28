@@ -1,3 +1,6 @@
+/**
+ * @jest-environment-options {"url": "https://harkirat155.github.io/cc/"}
+ */
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
