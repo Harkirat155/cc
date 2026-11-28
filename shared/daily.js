@@ -117,6 +117,7 @@ export function solutionLine(puzzle) {
     line.push({ col, mark: MARKS[puzzle.turn] });
     if (makesFour(b, cell, MARKS[puzzle.turn])) break;
     const reply = defenderReply(b, puzzle.turn, left - 1);
+    if (reply < 0) break; // board full: no reply to show
     drop(b, reply, MARKS[1 - puzzle.turn]);
     line.push({ col: reply, mark: MARKS[1 - puzzle.turn] });
     left -= 1;
