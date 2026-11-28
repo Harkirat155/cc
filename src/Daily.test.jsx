@@ -210,6 +210,8 @@ describe("show the solution", () => {
     const total = solutionLine(p).length;
     const caption = () => screen.getAllByRole("status").map((e) => e.textContent).join("|");
     expect(screen.queryByText("That lets them off the hook")).toBeNull();
+    expect(caption()).toContain(`Solution · ${total} moves, press Next move`);
+    expect(caption()).not.toContain("move 0");
     fireEvent.click(screen.getByRole("button", { name: "Next move" }));
     expect(caption()).toContain(`Solution · move 1 of ${total}`);
     while (!screen.getByRole("button", { name: "Next move" }).disabled) fireEvent.click(screen.getByRole("button", { name: "Next move" }));
