@@ -81,7 +81,7 @@ function Arena() {
               ? <p className="mt-2 text-sm text-foreground/60">No rated games finished since {SINCE}.</p>
               : (
                 <>
-                  <p className="mt-1 text-sm text-foreground/60">The last {feed.length} rated {feed.length === 1 ? "result" : "results"} since {SINCE}, one line per bot, so a game between two bots shows twice.</p>
+                  <p className="mt-1 text-sm text-foreground/60">{feed.length === 1 ? "The last rated result" : `The last ${feed.length} rated results`} since {SINCE}, one line per bot, so a game between two bots shows twice.</p>
                   <ul className="mt-2 text-sm">
                     {feed.map((g, i) => (
                       <li key={i} className="border-t border-foreground/10 py-1.5">
@@ -109,8 +109,9 @@ function Arena() {
         {ids.map((id) => (
           <section key={id} aria-labelledby={`g-${id}`}>
             <h2 id={`g-${id}`} className="text-xl font-semibold">{names[id] || id}</h2>
-            <table className="mt-2 w-full text-left text-sm">
-              <thead className="text-foreground/60"><tr><th className="py-1 pr-2">#</th><th className="pr-2">Bot</th><th className="pr-2">Rating</th><th className="pr-2">Games</th><th className="pr-2">W</th><th className="pr-2">D</th><th>L</th></tr></thead>
+            <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-foreground/60"><tr><th className="py-1 pr-2">#</th><th className="pr-2">Bot</th><th className="pr-2">Rating</th><th className="pr-2">Games</th><th>W-D-L</th></tr></thead>
               <tbody>
                 {games[id].map((b, i) => { const room = roomFor(rooms, id, b.name); return (
                   <tr key={b.name} className="border-t border-foreground/10">
@@ -123,11 +124,12 @@ function Arena() {
                       )}
                       <BadgeCopy name={b.name} game={id} gameName={names[id] || id} />
                     </td><td className="pr-2">{b.rating}</td>
-                    <td className="pr-2">{b.games}</td><td className="pr-2">{b.wins}</td><td className="pr-2">{b.draws}</td><td>{b.losses}</td>
+                    <td className="pr-2">{b.games}</td><td className="whitespace-nowrap">{`${b.wins}-${b.draws}-${b.losses}`}</td>
                   </tr>
                 ); })}
               </tbody>
             </table>
+            </div>
           </section>
         ))}
         <p className="text-sm text-foreground/60"><Link to="/live" className="underline underline-offset-4">Watch live games</Link> · <Link to="/agents" className="underline underline-offset-4">Connect a bot</Link></p>

@@ -80,6 +80,24 @@ describe("Arena page", () => {
     expect(links[0].getAttribute("href")).toBe("/arena/Grace%20Bot");
   });
 
+  it("reads naturally for a single result", async () => {
+    window.fetch = routed({ ok: true, json: async () => ({ feed: [{ name: "Grace Bot", gameId: "ttt", result: "win", ratingAfter: 1216, at: Date.now() }] }) });
+    show();
+    const strip = await screen.findByRole("region", { name: "Just finished" });
+    expect(strip.textContent).toMatch(/The last rated result since 2026-11-28, one line per bot/);
+    expect(strip.textContent).not.toMatch(/The last 1 /);
+  });
+
+  it("fits a phone: W, D and L share one column, and the table scrolls inside its own box", async () => {
+    window.fetch = routed({ ok: true, json: async () => ({ feed: [] }) });
+    show();
+    const table = (await screen.findByRole("table"));
+    expect(screen.getByRole("columnheader", { name: "W-D-L" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "2-0-1" })).toBeTruthy();
+    expect(table.querySelectorAll("thead th")).toHaveLength(5);
+    expect(table.parentElement.className).toMatch(/overflow-x-auto/);
+  });
+
   it("says plainly that nothing has finished, with no zeros", async () => {
     window.fetch = routed({ ok: true, json: async () => ({ feed: [] }) });
     show();

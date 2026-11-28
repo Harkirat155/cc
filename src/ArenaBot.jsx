@@ -35,7 +35,7 @@ function ArenaBot() {
       if (gen.current !== mine) return;
       const key = asked.toLowerCase();
       const rated = Object.entries(lb.games ?? {}).flatMap(([id, rows]) => (rows ?? []).filter((r) => String(r.name).toLowerCase() === key).map((r) => ({ id, ...r })));
-      setState({ name: b.name || rated[0]?.name || asked, games: b.games ?? [], rated });
+      setState({ name: b.name || rated[0]?.name || asked, games: b.games ?? [], rated, unlisted: b.unlisted === true });
     } catch {
       if (gen.current === mine) setState("error");
     }
@@ -89,6 +89,7 @@ function ArenaBot() {
             {state === "missing" && <p className={note}>No bot named {asked} is registered. Games are recorded since {SINCE}. <Link to="/arena" className="underline underline-offset-4">Back to the Arena</Link></p>}
           </div>
         )}
+        {valid && loaded && state.unlisted && <p className="text-sm text-foreground/70">Unlisted: a test bot, not on the leaderboard</p>}
         {valid && room && (
           <p className="text-sm text-foreground/70">Playing now · <Link to={`/room/${encodeURIComponent(room)}`} className="underline underline-offset-4">A player named {name} is in a game · Watch</Link></p>
         )}
