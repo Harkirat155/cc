@@ -1,7 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.js";
 import useReducedMotion from "../hooks/useReducedMotion";
 import { getGamePalette } from "./games/palette";
+import { tally } from "../lib/tally";
+
+const DOOR =
+  "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-foreground/70 underline underline-offset-4 transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25";
 
 function resolveWinnerSlot(winner, winnerSlot, playerInfo) {
   if (Number.isInteger(winnerSlot)) return winnerSlot;
@@ -16,6 +21,7 @@ const WinnerCard = ({
   playerInfo,
   onReset,
   onRequestNewGame,
+  onFriend,
   isMultiplayer = false,
   disabled = false,
 }) => {
@@ -32,9 +38,10 @@ const WinnerCard = ({
   if (!isVisible) return null;
 
   return (
+    <>
     <output
       aria-live="polite"
-      className={`absolute -bottom-6 left-1/2 z-20 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-foreground/10 bg-background/80 p-1.5 pr-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl dark:shadow-[0_20px_40px_rgba(0,0,0,0.5)] sm:-bottom-8 sm:gap-4 sm:p-2 sm:pr-6 ${
+      className={`absolute bottom-14 left-1/2 z-20 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-foreground/10 bg-background/80 p-1.5 pr-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl dark:shadow-[0_20px_40px_rgba(0,0,0,0.5)] sm:bottom-14 sm:gap-4 sm:p-2 sm:pr-6 ${
         prefersReducedMotion ? "" : "animate-winner-card-in"
       }`}
     >
@@ -57,6 +64,18 @@ const WinnerCard = ({
         )}
       </span>
     </output>
+    {/* In flow under the board; the card above is anchored to this row so it still overlaps the board edge. */}
+    <div className="mt-12 flex h-8 items-center justify-center gap-x-2 sm:mt-14">
+      <Link to="/daily" className={DOOR} onClick={() => tally("cc", "end_daily")}>
+        Try today&apos;s puzzle
+      </Link>
+      {onFriend && !isMultiplayer && (
+        <button type="button" className={DOOR} onClick={() => { tally("cc", "end_friend"); onFriend(); }}>
+          Play a friend
+        </button>
+      )}
+    </div>
+    </>
   );
 };
 

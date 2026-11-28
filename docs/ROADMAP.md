@@ -85,7 +85,7 @@ Finding (2026-11-28, 7-day tally): 28 visitors and 15 home views, but `daily_pla
    tally `cc` events `door_daily`, `door_rush`, `door_computer`, `door_friend`, one per tap. Compare with `daily_play`,
    `rush_start`, `online_game` the week after launch; if the doors do not at least double `rush_start` plus `daily_play`, rework the copy.
 
-2. **A finished game leads somewhere (exploit).** Seen by: players at the result of a local, computer or online game
+2. **A finished game leads somewhere (built; exploit).** Seen by: players at the result of a local, computer or online game
    (`src/components/WinnerCard.jsx`, `src/components/ResultModal.jsx`). Changes: below the result, three quiet doors: rematch, "Try today's
    puzzle" and "Play a friend", so a finished game is not a dead end. Data: tally `cc` events `end_daily`, `end_friend`.
    Judge by `online_game` and `daily_play` per `finished_*` the week after.

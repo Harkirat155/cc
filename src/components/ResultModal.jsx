@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { tally } from "../lib/tally";
 import { Tooltip } from "./ui/Tooltip";
 import Button from "./ui/Button";
 
@@ -190,6 +192,13 @@ const ResultModal = ({
                 </Tooltip>
               )}
             </div>
+            <Link
+              to="/daily"
+              onClick={() => tally("cc", "end_daily")}
+              className="text-sm font-medium text-foreground/70 underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
+            >
+              Try today&apos;s puzzle
+            </Link>
           </div>
         </div>
       </div>
