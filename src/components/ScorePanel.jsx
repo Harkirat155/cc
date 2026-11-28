@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ScorePlayerCard from "./ScorePlayerCard";
 import { getGamePalette } from "./games/palette";
 
@@ -19,8 +19,16 @@ const ScorePanel = ({
   isMultiplayer,
   displayName,
   onUpdateDisplayName,
-  emote,
+  emote: incomingEmote,
 }) => {
+  // A reaction shows beside its sender's seat for 3 s.
+  const [emote, setEmote] = useState(null);
+  useEffect(() => {
+    setEmote(incomingEmote || null);
+    if (!incomingEmote) return undefined;
+    const t = setTimeout(() => setEmote(null), 3000);
+    return () => clearTimeout(t);
+  }, [incomingEmote]);
   const [editingSlot, setEditingSlot] = useState(null);
   const [editValue, setEditValue] = useState("");
 
@@ -119,10 +127,10 @@ const ScorePanel = ({
                   <span
                     key={emote.id}
                     role="status"
-                    aria-label={`${card.occupant || card.label} reacted ${emote.emote}`}
                     className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 rounded-full border border-foreground/10 bg-background px-2.5 py-0.5 text-lg shadow-md"
                   >
-                    {emote.emote}
+                    <span aria-hidden="true">{emote.emote}</span>
+                    <span className="sr-only">{`${card.occupant || card.label} reacted ${emote.emote}`}</span>
                   </span>
                 )}
               <ScorePlayerCard

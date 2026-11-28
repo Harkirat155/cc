@@ -118,7 +118,8 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null);
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
-  const [emote, setEmote] = useState(null); // the opponent's latest { slot, emote, id }; the UI hides it after ~2.5 s
+  const emoteSeq = useRef(0); // unique per reaction, so two in one millisecond still re-render and re-announce
+  const [emote, setEmote] = useState(null); // the latest reaction { slot, emote, id }, from either seat; the UI hides it after 3 s
   const [connectionState, setConnectionState] = useState(isConnected() ? "connected" : "disconnected");
 
   // Lobby state (inlined to avoid closure issues)
@@ -199,7 +200,7 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
       ...gameHandlers,
       ...lobbyHandlers,
       handleStartGame: () => setMessage("Game started"),
-      handleEmote: (d) => d && setEmote({ slot: d.slot, emote: d.emote, id: Date.now() }),
+      handleEmote: (d) => d && setEmote({ slot: d.slot, emote: d.emote, id: ++emoteSeq.current }),
       handleConnection: connectionHandler,
       onInitialConnect: () => socket.connected && setConnectionState("connected"),
     };
@@ -660,6 +661,7 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
       resetHistory("Left room", "system");
       setShowModal(false);
       setNewGameRequester(null);
+      setEmote(null);
       setSelection(null);
       resolve();
     });
@@ -712,9 +714,11 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
     newGameRequestedAt,
     emote,
     // Room actions: no-ops outside a connected room. The server ignores them from spectators.
+    // Returns true only when the event was actually emitted.
     sendRoomAction: (type, extra) => {
-      if (!isMultiplayer || !roomId || !socketRef.current?.connected) return;
+      if (!isMultiplayer || !roomId || !socketRef.current?.connected) return false;
       socketRef.current.emit(type, { roomId, ...extra });
+      return true;
     },
     createRoom,
     joinRoom,

@@ -81,9 +81,8 @@ interface Att {
   joined: boolean;
   // Rate limit state of server/rateLimiter.js, per socket: events in the current window, its start, ban end.
   rl?: { n: number; at: number; until: number };
-  em?: number; // ms epoch of this socket's last accepted emote
 }
-// The only emotes the room relays; no free text, so nothing to moderate. One per EMOTE_GAP_MS per socket.
+// The only reactions the room relays; no free text, so nothing to moderate. One per EMOTE_GAP_MS per seat.
 const EMOTES = ["👍", "👏", "😮", "😅", "🤔", "🔥"];
 const EMOTE_GAP_MS = 1000;
 // RATE_LIMIT_* of server/config.js:33-35, same names, defaults and clamps.
@@ -129,6 +128,7 @@ export class Room extends DurableObject {
   private armed = false; // an alarm is known to be set, so frames skip the getAlarm read
   private reported: string | null = null; // last listing state sent to the Lobby registry, so unchanged publishes send nothing
   private openedAt: number | null = null; // when this room began waiting with an open seat (in memory: resets if the room restarts)
+  private lastReact: [number, number] = [0, 0]; // ms epoch of each seat's last accepted reaction (in memory, never stored)
   private after: (() => void)[] = []; // broadcasts that follow the ack, as io emits after ack() in roomHandlers.js
 
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -636,16 +636,16 @@ export class Room extends DurableObject {
     }, ws);
   }
 
-  // Relay a fixed emote to the other players; nothing is stored. Bad values and bursts drop silently.
+  // Relay a fixed reaction to everyone in the room, sender and spectators included; nothing is stored.
+  // Spectators, bad values and bursts drop silently.
   private emote(ws: WebSocket, p: Msg) {
     const s = this.room(p.roomId);
     const slot = s ? this.slot(s, ws) : -1;
     if (slot < 0 || typeof p.emote !== "string" || !EMOTES.includes(p.emote)) return;
-    const att = this.att(ws);
     const now = Date.now();
-    if (att.em && now - att.em < EMOTE_GAP_MS) return;
-    ws.serializeAttachment({ ...att, em: now });
-    this.others(ws, { t: "emote", d: { slot, emote: p.emote } });
+    if (now - this.lastReact[slot] < EMOTE_GAP_MS) return;
+    this.lastReact[slot] = now;
+    this.broadcast({ t: "emote", d: { slot, emote: p.emote } });
   }
 
   // gameHandlers.js:150. Emits before the ack, as Express does.

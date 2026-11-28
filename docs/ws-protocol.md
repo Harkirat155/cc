@@ -108,7 +108,7 @@ Frame: `{"t":"declineDraw","d":{"roomId":string}}`. No ack. Only the seat that d
 Source: worker/src/room.ts
 
 ### `emote`
-Frame: `{"t":"emote","d":{"roomId":string,"emote":"👍"|"👏"|"😮"|"😅"|"🤔"|"🔥"}}`. No ack. Seated players only; any other value is dropped, and so is an emote less than 1 s after the same socket's last one. Relayed to the other sockets as `emote`. Worker only.
+Frame: `{"t":"emote","d":{"roomId":string,"emote":"👍"|"👏"|"😮"|"😅"|"🤔"|"🔥"}}`. No ack. Seated players only; any other value is dropped, and so is a reaction less than 1 s after the same seat's last one. Relayed to every joined socket (sender and spectators too) as `emote`. Worker only.
 Source: worker/src/room.ts
 
 ### `joinLobby`
@@ -157,7 +157,7 @@ Source: server/handlers/gameHandlers.js:135, :182
 Source: server/handlers/roomHandlers.js:155
 
 ### `emote`
-`{"t":"emote","d":{"slot":0|1,"emote":string}}` to every other joined socket when a seated player sends `emote`. Not stored; clients show it for about 2.5 s. Worker only.
+`{"t":"emote","d":{"slot":0|1,"emote":string}}` to every joined socket when a seated player sends `emote`. Not stored; clients show it beside that seat for 3 s. Worker only.
 Source: worker/src/room.ts
 
 ### `lobbyUpdate`

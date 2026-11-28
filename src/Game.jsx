@@ -7,6 +7,7 @@ import ResultModal from "./components/ResultModal";
 import WinnerCard from "./components/WinnerCard";
 import GameSelector from "./components/GameSelector";
 import useSocketGame from "./hooks/useSocketGame";
+import { reactionsSupported } from "./utils/socketManager";
 import Navbar from "./components/Navbar";
 import useVoiceChat from "./hooks/useVoiceChat";
 import AudioRenderer from "./components/AudioRenderer";
@@ -103,14 +104,6 @@ const Game = () => {
       enableMic(false);
     }
   };
-  // The opponent's emote bubble lasts 2.5 s.
-  const [visibleEmote, setVisibleEmote] = useState(null);
-  useEffect(() => {
-    if (!emote) return undefined;
-    setVisibleEmote(emote);
-    const t = setTimeout(() => setVisibleEmote(null), 2500);
-    return () => clearTimeout(t);
-  }, [emote]);
   const winningSquares = gameState.winningLine || [];
   // The cell filled by the move shown on the board: diff with the previous snapshot.
   const prevSquares = history?.[Math.min(viewIndex, history.length - 1) - 1]?.squares;
@@ -389,7 +382,7 @@ const Game = () => {
             isMultiplayer={isMultiplayer}
             displayName={displayName}
             onUpdateDisplayName={updateDisplayName}
-            emote={visibleEmote}
+            emote={emote}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
             <div className="relative w-full">
@@ -421,6 +414,7 @@ const Game = () => {
               socketId={socketId}
               roster={roster}
               onAction={sendRoomAction}
+              reactions={reactionsSupported()}
             />
           )}
         </div>
