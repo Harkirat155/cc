@@ -259,8 +259,11 @@ export class Room extends DurableObject {
   // names, game, move count and start time leave the room; never socket ids or client ids.
   private report(s: RoomState) {
     if (!s.listed) return;
-    const on = this.live(s) && s.moves > 0;
-    const row = { roomId: s.roomId, gameId: s.gameId, x: s.names.X, o: s.names.O, moves: s.moves, startedAt: s.startedAt ?? Date.now() };
+    // A row with moves = 0 is an open seat: exactly one seat filled and nothing played. Two seats and no move is unlisted.
+    const seated = (["X", "O"] as const).filter((k) => s.players[k]).length;
+    const on = (this.live(s) && s.moves > 0) || (s.state?.status === "active" && seated === 1 && s.moves === 0);
+    const nm = (k: "X" | "O") => (s.players[k] ? s.names[k] ?? "Anonymous" : null);
+    const row = { roomId: s.roomId, gameId: s.gameId, x: nm("X"), o: nm("O"), moves: s.moves, startedAt: s.startedAt ?? Date.now() };
     const key = on ? JSON.stringify(row) : "off";
     if (key === this.reported) return;
     this.reported = key;

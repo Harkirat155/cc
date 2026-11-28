@@ -22,6 +22,15 @@ list when the game ends, a player leaves, the board is reset or the game switche
 (`startedAt` is the ms epoch of the game's first move). No socket ids, client ids or seat tokens. Display
 names are whatever players chose. `Cache-Control: public, max-age=5`. Any method but GET is `404`.
 
+## Open seats
+
+The same response carries `"open":[{"roomId":string,"gameId":string,"name":string,"since":number}]`, additive:
+`games` is unchanged. A listed room (same rule as above) with exactly one seat filled and no move played is an
+open seat: `/arena` and `/live` show "Waiting: {name} · {game} · Join", and Join opens `/room/{roomId}`. It
+leaves `open` when the second seat fills (it then appears in `games` after its first move), the creator leaves,
+the game ends or the row goes 10 minutes without a refresh. Stored as a `live` row with `moves = 0`; no new
+table. A seat is first-come: whoever joins first plays, so a name is a display name, not proof of identity.
+
 To watch, open `/room/{roomId}` in the app, or send `joinRoom` on `/ws/room/{roomId}` without a token: a
 third socket is seated as `"spectator"` (`docs/ws-protocol.md`).
 
