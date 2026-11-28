@@ -56,6 +56,17 @@ function Replay() {
     try { return rebuild(res.gameId, res.first, res.moves); } catch { return false; }
   }, [loaded, res]);
 
+  useEffect(() => {
+    if (!built) return undefined;
+    const key = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.target?.closest?.("input, textarea, select")) return;
+      if (e.key === "ArrowLeft") setAt((a) => Math.max(a - 1, 0));
+      else if (e.key === "ArrowRight") setAt((a) => Math.min(a + 1, built.length - 1));
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [built]);
+
   const rules = loaded && built ? rulesFor(res.gameId) : null;
   const state = built ? built[at] : null;
   const last = built && at > 0 ? res.moves[at - 1] : null;

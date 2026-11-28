@@ -51,6 +51,7 @@ interface RoomState {
   // for that bot: its clientId rebinds, or its botKey rejoins, and either clears it; nobody else is seated at X.
   abandonAt: number | null;
 }
+const LOG_MAX = 500; // moves kept per game for its replay
 const HOUSE_GRACE_MS = 30_000;
 // The house (docs/arena.md): the Room plays seat O with shared/ai/bot.js. workerd freezes Date.now() during CPU
 // work, so bot.js's own 300 ms deadline never fires on hard; measured with a frozen clock, hard took 4.7 s a move on
@@ -306,7 +307,7 @@ export class Room extends DurableObject {
     if ((!x && !o) || (s.house && (!x || !o)) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
     const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
     try {
-      this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score, { first: (s.first ?? 0) as 0 | 1, moves: s.log ?? [] })
+      this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score, s.first !== undefined && s.log && s.log.length === s.moves ? { first: s.first as 0 | 1, moves: s.log } : undefined)
         .then((r) => { if (r === "limit") this.broadcast({ t: "unrated", d: { reason: "daily house limit", gameId: id } }); })
         .catch(() => {}));
     } catch { /* the leaderboard must never break the broadcast */ }
@@ -577,7 +578,7 @@ export class Room extends DurableObject {
     } catch {
       return false;
     }
-    if (!s.moves) { s.log = []; s.first = s.state.turn; }
+    if (!s.moves) { s.log = []; s.first = s.state.turn; } // a room saved before replays has moves > 0 and no log: it never gets one mid-game
     s.state = result.state;
     const m = move as any;
     s.lastMove = m.type === "transfer"
@@ -585,7 +586,7 @@ export class Room extends DurableObject {
       : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
-    (s.log ??= []).push(s.lastMove);
+    if (s.log) { if (s.log.length < LOG_MAX) s.log.push(s.lastMove); else s.log = undefined; } // past the cap the game has no replay
     if (!s.moves) {
       s.startedAt = Date.now();
       const { X, O } = s.players;

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
 import { open } from "./helpers";
@@ -92,5 +92,38 @@ describe("game id on rows", () => {
     expect(JSON.stringify(feed)).not.toMatch(/hidden/i);
     const own = ((await (await get("/api/arena/Hidden%20Bot")).json()) as any).games;
     expect(own[0].replayId).toBe("u1");
+  });
+});
+
+describe("a game whose log is incomplete stores no replay", () => {
+  // A bot plays X's first move, the stored room is edited, then O moves and X resigns: a rated game with 2 moves.
+  async function settled(name: string, edit: (room: any) => void) {
+    const key = await register(name);
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: `${name}-a`, displayName: name, botKey: key, gameId: "ttt" });
+    const b = await open(`/ws/room/${roomId}`);
+    await b.call("joinRoom", { roomId, clientId: `${name}-b`, displayName: "Human" });
+    a.send("makeMove", { roomId, index: 4 });
+    await a.update(1);
+    const stub = (env as any).ROOM.getByName(roomId);
+    await runInDurableObject(stub, async (_o, st) => { const room = await st.storage.get<any>("room"); edit(room); await st.storage.put("room", room); });
+    await evictDurableObject(stub, { webSockets: "hibernate" });
+    b.send("makeMove", { roomId, index: 0 });
+    b.send("resign", { roomId });
+    let games: any[] = [];
+    for (let i = 0; i < 100 && !games.length; i++) { games = ((await (await get(`/api/arena/${encodeURIComponent(name)}`)).json()) as any).games; if (!games.length) await new Promise((r) => setTimeout(r, 10)); }
+    expect(games).toHaveLength(1);
+    return games[0];
+  }
+
+  it("a room saved before replays (moves > 0, no log) settles with no replay", async () => {
+    const g = await settled("Legacy Bot", (room) => { delete room.log; delete room.first; });
+    expect(g.replayId).toBeUndefined();
+    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM replays").one().n)).toBe(0);
+  });
+
+  it("a log past the 500-move cap is dropped and settles with no replay", async () => {
+    const g = await settled("Capped Bot", (room) => { room.log = Array.from({ length: 500 }, () => ({ type: "place", cell: 0 })); room.moves = 500; });
+    expect(g.replayId).toBeUndefined();
   });
 });
