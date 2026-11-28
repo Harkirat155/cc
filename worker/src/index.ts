@@ -252,6 +252,39 @@ app.get("/j/:roomId", (c) => {
 </head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
 });
 
+// Link-preview card for a Rush challenge (docs/ROADMAP.md item 4): the link carries only the target number (1..999, the client's parseBeat rule), so
+// the card names it and says what Rush is, and no Durable Object is read. "Beat" means strictly more, as in the Rush verdict. The number is digits only; still escaped.
+app.get("/b/:n", (c) => {
+  const p = c.req.param("n");
+  if (!/^[1-9]\d{0,2}$/.test(p)) {
+    return c.html(`<!doctype html><meta charset="utf-8"><title>Challenge not found · CrissCross</title><p>This challenge link is not valid. <a href="${PAGES}/rush/">Play Puzzle Rush</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
+  }
+  const title = html(`Beat ${p} in today's Puzzle Rush · CrissCross`);
+  const desc = html(`Solve more than ${p} ${p === "1" ? "puzzle" : "puzzles"} to beat it. Solve as many puzzles as you can in 3 minutes, across Tic-Tac-Toe, Connect Four, Five in a Row and Checkers. Same run for everyone today.`);
+  const url = html(new URL(`/b/${p}`, c.req.url).href);
+  // ?via=b lets the Rush page count arrivals through challenge links (rush_beat_arrival); crawlers never follow the refresh. The trailing slash avoids a Pages 301.
+  const to = html(`${PAGES}/rush/?beat=${p}&via=b`);
+  const img = `${PAGES}/og-default.png`;
+  return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${url}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CrissCross">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${url}">
+<meta property="og:image" content="${img}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="CrissCross, two-player board games">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 // The cup is drawn lazily (Lobby.ensureCup): the account's 5 free cron triggers are taken. This handler runs only if a
