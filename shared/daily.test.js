@@ -1,7 +1,8 @@
 import connect4 from './games/connect4.js';
 import ttt from './games/ttt.js';
 import five from './games/five.js';
-import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine, gameForDate, tttPuzzleForDate, tttWinningCells, fivePuzzleForDate, fiveWinningCells, FIVE_WINDOW } from './daily.js';
+import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine, gameForDate, tttPuzzleForDate, tttWinningCells, fivePuzzleForDate, fiveWinningCells, FIVE_WINDOW, CHECKERS_FROM, checkersPuzzleForDate, checkersCanWin, checkersMoves, checkersPlay, checkersSolutionLine } from './daily.js';
+import checkers from './games/checkers.js';
 
 const play = (cols) => {
   let state = connect4.createInitialState();
@@ -199,5 +200,83 @@ describe('Five in a Row day', () => {
         expect(r >= 0 && r < FIVE_WINDOW.size && c >= 0 && c < FIVE_WINDOW.size).toBe(true);
       });
     }
+  });
+});
+
+describe('checkers days', () => {
+  const day = (i) => new Date(Date.parse(`${CHECKERS_FROM}T00:00:00Z`) + i * 86400000).toISOString().slice(0, 10);
+  const span = Array.from({ length: 60 }, (_, i) => day(i));
+  const checkersDays = Array.from({ length: 60 }, (_, i) => day(i * 4)); // day number % 4 === 2 from the start date
+
+  test('the rotation starts on CHECKERS_FROM and every day before keeps the game it always had', () => {
+    expect(gameForDate(CHECKERS_FROM)).toBe('checkers');
+    expect(gameForDate('2026-12-03')).toBe('connect4'); // day number % 4 === 2, but before the start
+    // The rule before the Checkers rotation (Tic-Tac-Toe, Five in a Row, Connect Four), written out by day number.
+    const before = (d) => { const n = Math.floor(Date.parse(`${d}T00:00:00Z`) / 86400000) % 4; return n === 3 ? 'ttt' : n === 1 && d >= '2026-11-29' ? 'five' : 'connect4'; };
+    for (let t = Date.parse('2026-11-27T00:00:00Z'); t < Date.parse(`${CHECKERS_FROM}T00:00:00Z`); t += 86400000) {
+      const d = new Date(t).toISOString().slice(0, 10);
+      expect(gameForDate(d)).toBe(before(d));
+    }
+    // From the start date only the days that were Connect Four on the old rule and are day % 4 === 2 changed.
+    for (const d of span) {
+      const n = Math.floor(Date.parse(`${d}T00:00:00Z`) / 86400000) % 4;
+      expect(gameForDate(d)).toBe(n === 2 ? 'checkers' : before(d));
+    }
+    expect(span.filter((d) => gameForDate(d) === 'checkers')).toHaveLength(15);
+  });
+
+  test('60 consecutive Checkers days each have a stable puzzle that is a forced win in exactly n, quickly', () => {
+    const ns = new Set();
+    for (const d of checkersDays) {
+      expect(gameForDate(d)).toBe('checkers');
+      const t0 = Date.now();
+      const p = checkersPuzzleForDate(d);
+      expect(Date.now() - t0).toBeLessThan(200);
+      expect(checkersPuzzleForDate(d)).toEqual(p);
+      ns.add(p.n);
+      expect([2, 3]).toContain(p.n);
+      expect(checkers.checkTerminal({ board: p.board, status: 'active' }).status).toBe('active');
+      expect(checkersCanWin(p.board, p.turn, p.n)).toBe(true);
+      expect(checkersCanWin(p.board, p.turn, p.n - 1)).toBe(false);
+    }
+    expect(ns).toEqual(new Set([2, 3]));
+  });
+
+  test('the solution line wins within n against its own best defence, through the checkers rules module', () => {
+    for (const d of checkersDays.slice(0, 20)) {
+      const p = checkersPuzzleForDate(d);
+      let state = { board: p.board, turn: p.turn, status: 'active', winner: null, winningCells: [], scores: [0, 0], moveCount: 0 };
+      let mine = 0;
+      for (const { move, turn } of checkersSolutionLine(p)) {
+        expect(state.turn).toBe(turn);
+        state = checkers.applyMove(state, move, turn).state;
+        if (turn === p.turn) mine++;
+      }
+      expect(state.status).toBe('win');
+      expect(state.winner).toBe(p.turn);
+      expect(mine).toBeLessThanOrEqual(p.n);
+    }
+  });
+
+  test('a position checked by hand: a lone Red man at row 5 col 2 chases a lone Amber man at row 2 col 1 (0-based)', () => {
+    // Red (slot 0, moves up) man on 33 = (4,1); Amber (slot 1, moves down) man on 8 = (1,0). Red to move.
+    // Amber's only move is (1,0)->(2,1). Red plays (4,1)->(3,2) or (3,0); either way Amber must step to (2,1),
+    // which Red then jumps (to (1,0) or (1,2)), taking the last piece: a win in 2, not in 1 (no piece is adjacent now).
+    const board = Array(64).fill('');
+    board[33] = { type: 'man', owner: 0 };
+    board[8] = { type: 'man', owner: 1 };
+    expect(checkersCanWin(board, 0, 1)).toBe(false);
+    expect(checkersCanWin(board, 0, 2)).toBe(true);
+    const moves = checkersMoves(board, 0);
+    expect(moves.map((m) => `${m.from}>${m.to}`).sort()).toEqual(['33>24', '33>26']);
+    expect(checkersMoves(board, 1).map((m) => `${m.from}>${m.to}`)).toEqual(['8>17']);
+    const first = checkersPlay(board, 0, moves.find((m) => m.to === 26), 2);
+    expect(first.kept).toBe(true);
+    const reply = checkersMoves(first.board, 1)[0];
+    expect(reply).toEqual({ type: 'transfer', from: 8, to: 17 });
+    const after = checkersPlay(first.board, 1, reply, 0).board;
+    const jump = checkersMoves(after, 0).find((m) => m.captures);
+    expect(jump).toEqual({ type: 'transfer', from: 26, to: 8, captures: [17] });
+    expect(checkersPlay(after, 0, jump, 1).won).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import five from './games/five.js';
+import checkers from './games/checkers.js';
 
 // Daily Connect Four puzzle: a small exact solver plus a date-seeded generator.
 // Pure functions over the connect4 board (42 cells, row-major, '' | 'R' | 'Y').
@@ -171,11 +172,13 @@ export function puzzleForDate(date) {
 // every fourth UTC day (day number % 4 === 3) is Tic-Tac-Toe; from FIVE_FROM on, day number % 4 === 1 is Five in a Row;
 // the rest are Connect Four. FIVE_FROM is the day after the one live when Five in a Row shipped, so no served puzzle changes.
 // The Worker's /d card uses the same rule.
-export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe', five: 'Five in a Row' };
+// CHECKERS_FROM starts the next rotation: from then on day number % 4 === 2 is Checkers, so no served puzzle changes.
+export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe', five: 'Five in a Row', checkers: 'Checkers' };
 const FIVE_FROM = '2026-11-29';
+export const CHECKERS_FROM = '2026-12-07';
 export const gameForDate = (date) => {
   const n = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000) % 4;
-  return n === 3 ? 'ttt' : n === 1 && date >= FIVE_FROM ? 'five' : 'connect4';
+  return n === 3 ? 'ttt' : n === 1 && date >= FIVE_FROM ? 'five' : n === 2 && date >= CHECKERS_FROM ? 'checkers' : 'connect4';
 };
 
 const TTT_LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
@@ -282,4 +285,112 @@ export function fivePuzzleForDate(date) {
     return { date, game: 'five', n: 1, board, turn, answers: [gapCell], window: FIVE_WINDOW };
   }
   throw new Error(`no five-in-a-row puzzle found for ${date}`);
+}
+
+// Checkers: positions are states of shared/games/checkers.js and every search below goes through that module's own
+// getLegalMoves and applyMove, so its rules (single jumps, captures not forced, no draws) are the rules of the puzzle.
+// "Win in N" means the side to move wins within N of its own moves against every defence: the opponent has no piece
+// or no legal move after one of them.
+const CK_ATTEMPTS = 4000;
+const ckState = (board, turn) => ({ board, turn, status: 'active', winner: null, winningCells: [], scores: [0, 0], moveCount: 0 });
+const ckMoves = (s) => getCkMoves(s).sort((a, b) => (b.captures?.length || 0) - (a.captures?.length || 0)); // jumps first prunes sooner
+const getCkMoves = (s) => checkers.getLegalMoves(s, s.turn);
+const ckApply = (s, m) => checkers.applyMove(s, m, s.turn).state;
+
+// `me` (to move in s) wins within n of its own moves.
+function ckAttack(s, n) {
+  const nexts = [];
+  for (const m of ckMoves(s)) {
+    const t = ckApply(s, m);
+    if (t.status === 'win') return true;
+    nexts.push(t);
+  }
+  return n >= 2 && nexts.some((t) => ckForced(t, s.turn, n - 1));
+}
+
+// The opponent of `me` is to move in s; every reply must still lose to `me` within n more moves.
+function ckForced(s, me, n) {
+  for (const m of ckMoves(s)) {
+    const t = ckApply(s, m);
+    if (t.status === 'win' || !ckAttack(t, n)) return false;
+  }
+  return true;
+}
+
+/** Side `turn` to move on `board` can force a win within n of its own moves. */
+export const checkersCanWin = (board, turn, n) => n >= 1 && ckAttack(ckState(board, turn), n);
+
+/** Legal moves of the side to move on `board`. */
+export const checkersMoves = (board, turn) => getCkMoves(ckState(board, turn));
+
+/** After `turn` plays `move`, is the win still forced within n moves (this one included)? Returns the new board and whether it won. */
+export function checkersPlay(board, turn, move, n) {
+  const t = ckApply(ckState(board, turn), move);
+  return { board: t.board, won: t.status === 'win', kept: t.status === 'win' || (n > 1 && ckForced(t, turn, n - 1)) };
+}
+
+/** The opponent's best reply after the attacker's move (`left` more attacker moves allowed): win, else escape, else resist longest. */
+export function checkersDefenderReply(board, attacker, left) {
+  const s = ckState(board, 1 - attacker);
+  let best = null;
+  let bestScore = -1;
+  for (const m of ckMoves(s)) {
+    const t = ckApply(s, m);
+    if (t.status === 'win') return m;
+    let score = left + 1; // escaped
+    for (let k = 1; k <= left; k++) if (ckAttack(t, k)) { score = k; break; }
+    if (score > bestScore) { best = m; bestScore = score; }
+  }
+  return best;
+}
+
+/** One winning line: [{move, turn}] of the attacker's moves and the defender's best replies. */
+export function checkersSolutionLine(puzzle) {
+  let board = puzzle.board;
+  const line = [];
+  for (let left = puzzle.n; left >= 1; left--) {
+    const pick = ckMoves(ckState(board, puzzle.turn)).map((m) => ({ m, r: checkersPlay(board, puzzle.turn, m, left) })).find((x) => x.r.kept);
+    if (!pick) break;
+    line.push({ move: pick.m, turn: puzzle.turn });
+    board = pick.r.board;
+    if (pick.r.won) break;
+    const reply = checkersDefenderReply(board, puzzle.turn, left - 1);
+    if (!reply) break;
+    line.push({ move: reply, turn: 1 - puzzle.turn });
+    board = ckApply(ckState(board, 1 - puzzle.turn), reply).board;
+  }
+  return line;
+}
+
+/**
+ * Checkers puzzle for a date: a sparse position (2 or 3 men or kings for the mover, 1 or 2 for the defender) where the side to move wins in exactly n moves
+ * (2 or 3) against any defence, found by random placement and kept only when the exhaustive search says so.
+ */
+export function checkersPuzzleForDate(date) {
+  const rng = mulberry32(seedFrom(`${date}:checkers`));
+  const n = rng() < 0.5 ? 2 : 3;
+  const pick = (k) => Math.floor(rng() * k);
+  for (let attempt = 0; attempt < CK_ATTEMPTS; attempt++) {
+    const board = Array(64).fill('');
+    const turn = pick(2);
+    let anchor = null; // the defender is placed first; the mover's pieces start within 3 squares of one, so the sides can meet
+    for (const owner of [1 - turn, turn]) {
+      const count = owner === turn ? 2 + pick(2) : 1 + pick(2);
+      for (let placed = 0; placed < count;) {
+        const r = pick(8);
+        const c = pick(8);
+        const cell = r * 8 + c;
+        if ((r + c) % 2 !== 1 || board[cell] !== '') continue;
+        if (owner === turn && Math.max(Math.abs(r - anchor[0]), Math.abs(c - anchor[1])) > 3) continue;
+        const king = rng() < 0.3;
+        if (!king && r === (owner === 0 ? 0 : 7)) continue; // a man on its promotion row would already be a king
+        board[cell] = { type: king ? 'king' : 'man', owner };
+        if (!anchor) anchor = [r, c];
+        placed++;
+      }
+    }
+    if (!checkersMoves(board, turn).length || !checkersMoves(board, 1 - turn).length) continue;
+    if (!checkersCanWin(board, turn, n - 1) && checkersCanWin(board, turn, n)) return { date, game: 'checkers', n, board, turn };
+  }
+  throw new Error(`no checkers puzzle found for ${date}`);
 }
