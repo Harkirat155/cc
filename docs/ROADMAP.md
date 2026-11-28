@@ -95,6 +95,24 @@ Finding (2026-11-28, 7-day tally): 28 visitors and 15 home views, but `daily_pla
    a shared run brings the sender's friends into the same day's puzzles. Built: "Challenge a friend" on the Rush end screen (a run with at least 1 solve) shares or copies `/rush?beat=N`; the start and end screens show the target (integer 1..999, else ignored; no sender identity). Data: tally `rush_beat_link` per press of the button (arrivals are not counted). Kill rule:
    fewer than 5 `rush_beat_link` in 4 weeks: remove the parameter.
 
+Next round (2026-11-28, after items 1–3 went live). The 8-day tally: 24 visitors and 5 `rush_start` on 2026-11-28, so Rush is
+the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTTP 404 on Pages, so chat apps showed no card.
+
+4. **The challenge card names the number (exploit; extends 3).** Seen by: whoever receives a "Challenge a friend" link. Changes:
+   `beatLink(n)` points at a Worker page `/b/:n` (`worker/src/index.ts`, beside `/j/:roomId` and `/r/:id`) whose card says
+   "Beat 7 in today's Puzzle Rush" and which sends the browser on to `/rush/?beat=N&via=b`; invalid N answers 404 like `/j/`. Data:
+   tally `cc` `rush_beat_arrival`, once per arrival through `via=b`. Judge with item 3's rule: arrivals per `rush_beat_link`.
+
+5. **Today's best Rush, checked by the server (explore).** Seen by: everyone on the Rush start and end screens. Changes: the
+   Worker issues a run token at start and replays the finished run's moves against `shared/rush.js` (the same puzzles for
+   everyone), so the day's best score is one no client can claim without solving; the page shows "Today's best: N" with
+   its rule in words. No names, no accounts, no per-player record. Data: tally `rush_verified`. Kill: fewer than 10 verified
+   runs by 2026-12-19: remove the endpoint and the line.
+
+6. **Remind me tomorrow (exploit).** Seen by: anyone who just solved the daily. Changes: a "Remind me tomorrow" link
+   downloads a calendar file (`.ics`, a daily event at the UTC reset, made on the device), so people come back without an
+   account or push permission. Data: tally `daily_remind`. Judge by `daily_play` from returning days.
+
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
 
