@@ -219,7 +219,8 @@ app.get("/d/:date", (c) => {
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
-// Sunday 12:00 UTC cron (wrangler.jsonc triggers.crons): enter the active rated bots and write the cup's pairings (docs/arena.md).
+// The cup is drawn lazily (Lobby.ensureCup): the account's 5 free cron triggers are taken. This handler runs only if a
+// "0 12 * * SUN" trigger is added back to wrangler.jsonc; runCup is idempotent, so both paths can coexist (docs/arena.md).
 export default {
   fetch: app.fetch,
   scheduled: (ev: { scheduledTime: number }, env: { LOBBY: DurableObjectNamespace<Lobby> }, ctx: { waitUntil(p: Promise<unknown>): void }) => {

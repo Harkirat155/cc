@@ -95,14 +95,15 @@ Each game row also carries `replayId` when a replay exists (older games omit it,
 
 ## Weekly cup
 
-Every Sunday 12:00 UTC (Worker cron `0 12 * * SUN`, `scheduled` in `worker/src/index.ts`, `runCup` in `lobby.ts`) a cup is set up per game
-type. Entrants: listed (not unlisted) registered bots with a rated game of that type in the last 7 days; the House and guests never enter. Three
-rounds, paired by rating at the cron (`pairRounds`, `worker/src/cup.ts`): nearest-rated first, nobody meets twice when a full round of new
-pairings exists, an odd count gives the lowest-rated bot without one its bye. Pairings are fixed at the cron from the rating snapshot, not from cup
-results. The cron cannot move a bot's socket, so it does not start games: a pairing is settled by the next rated game the two bots finish with
-each other in that game type within 7 days of the cron (the bots arrange it, e.g. by joining a room by code). Points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
-Ranked by points, then rating at the cron. A cup changes no rating: its games are ordinary rated games. Fewer than 2 entrants: the run is recorded, no pairings.
-Stored in the additive tables `cup_runs`, `cup_entries`, `cup_pairings` (inserts only, written by the cron only); scores are read off `bot_games`, never stored.
+Every Sunday 12:00 UTC a cup is set up per game type. There is no cron (the account's 5 free cron triggers are taken): the first rated game or
+`GET /api/arena/cup` at or after Sunday 12:00 UTC draws that Sunday's cup (`ensureCup` → `runCup` in `worker/src/lobby.ts`, counting only games
+before the draw time), exactly as a cron would; `scheduled` in `worker/src/index.ts` stays for a trigger added back later. Entrants: listed (not unlisted) registered bots with a rated game of that type in the last 7 days; the House and guests never enter. Three
+rounds, paired by rating at the draw (`pairRounds`, `worker/src/cup.ts`): nearest-rated first, nobody meets twice when a full round of new
+pairings exists, an odd count gives the lowest-rated bot without one its bye. Pairings are fixed at the draw from the rating snapshot, not from cup
+results. The draw cannot move a bot's socket, so it does not start games: a pairing is settled by the next rated game the two bots finish with
+each other in that game type within 7 days of the draw (the bots arrange it, e.g. by joining a room by code). Points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
+Ranked by points, then rating at the draw. A cup changes no rating: its games are ordinary rated games. Fewer than 2 entrants: the run is recorded, no pairings.
+Stored in the additive tables `cup_runs`, `cup_entries`, `cup_pairings` (inserts only, written by the draw only); scores are read off `bot_games`, never stored.
 The name `Cup` cannot be registered (409 `name reserved`), so `GET /api/arena/cup` never shadows a bot page.
 
 `GET /api/arena/cup` returns `{"current":{"week":"2026-12-06","games":{"ttt":{"entrants":3,"table":[{"name","points","games","results":["win","draw","bye"],"opponents":["Grace Bot","Linus Bot",null]}],"winner":{"name","points"}|null}}},"last":{...}}`;
@@ -111,7 +112,7 @@ The name `Cup` cannot be registered (409 `name reserved`), so `GET /api/arena/cu
 
 ```sh
 curl -s https://cc-api.harkirat-hira.workers.dev/api/arena/cup
-# {"current":null,"last":null}   before the first Sunday cron
+# {"current":null,"last":null}   before the first Sunday draw
 ```
 
 ## Replays

@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import app from "../src/index";
 import type { Lobby } from "../src/lobby";
-import { pairRounds } from "../src/cup";
+import { cupDrawTime, pairRounds } from "../src/cup";
 
 const lobby = () => (env as any).LOBBY.getByName("lobby");
 const sql = <T>(fn: (s: any) => T) => runInDurableObject(lobby(), async (_o: Lobby, st) => fn(st.storage.sql));
@@ -12,6 +12,9 @@ const cup = () => app.fetch(new Request("http://x/api/arena/cup"), env);
 const SUN = Date.UTC(2026, 11, 6, 12); // Sunday 2026-12-06 12:00 UTC
 const reg = (...names: string[]) => sql((s) => names.forEach((n, i) => s.exec("INSERT INTO bots (name_lc, name, key_hash, created_at) VALUES (?, ?, ?, 1)", n.toLowerCase(), n, `SECRETHASH${i}${n}`)));
 const runCup = (t = SUN) => runInDurableObject(lobby(), async (o: Lobby) => o.runCup(t));
+// Every test runs on a pinned clock before the first cup Sunday, so the lazy draw (GET, recordGame) never runs on the real date.
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(Date.UTC(2026, 10, 28, 12)); });
+afterEach(() => vi.useRealTimers());
 const scheduled = async (t = SUN) => {
   const ps: Promise<unknown>[] = [];
   (app as any).scheduled({ scheduledTime: t, cron: "0 12 * * SUN" }, env, { waitUntil: (p: Promise<unknown>) => ps.push(p) });
@@ -134,13 +137,13 @@ describe("GET /api/arena/cup", () => {
     const body = (await (await cup()).json()) as any;
     expect(body.current.games.ttt).toEqual({ entrants: 1, table: [], winner: null });
     expect(body.last.week).toBe("2026-11-29");
-    expect(body.last.games.ttt).toEqual({ entrants: 1, table: [], winner: null });
+    expect(body.last.games.ttt).toEqual({ entrants: 0, table: [], winner: null }); // Ada's game came after that draw
   });
 
   it("leaks no internal ids, hashes or socket ids", async () => {
     await reg("Ada Bot", "Grace Bot");
     await play("g1", "ttt", "Ada Bot", "Grace Bot", 1);
-    await runCup(Date.now() - 1000);
+    await runCup(Date.now() + 1000);
     const text = await (await cup()).text();
     expect(text).toContain("Ada Bot");
     for (const bad of ["SECRETHASH", "key_hash", "sid", "clientId", "socketId", "replay", "name_lc", "bot_game_id", "g1"]) expect(text).not.toContain(bad);
@@ -150,5 +153,43 @@ describe("GET /api/arena/cup", () => {
   it("does not let the name Cup shadow the route: registering it is refused", async () => {
     const r = await runInDurableObject(lobby(), async (o: Lobby) => o.registerBot("Cup", "1.2.3.4"));
     expect(r.status).toBe(409);
+  });
+});
+
+describe("cup drawn without a cron (the free plan's 5 cron triggers are taken)", () => {
+  const DAY = 86_400_000;
+  it("draws for the latest Sunday 12:00 UTC at or before now", () => {
+    expect(cupDrawTime(SUN)).toBe(SUN);
+    expect(cupDrawTime(SUN - 1)).toBe(SUN - 7 * DAY);
+    expect(cupDrawTime(SUN + 3 * DAY + 5)).toBe(SUN);
+  });
+
+  it("the first rated game after Sunday noon draws the cup before it is rated, from the week before only", async () => {
+    await reg("Ada Bot", "Grace Bot", "Linus Bot");
+    await sql((s) => {
+      for (const [n, r] of [["ada bot", 1250], ["grace bot", 1220]] as const) {
+        s.exec("INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, 'ttt', ?, 1, 1, 0, 0)", n, r);
+        s.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, 'ttt', 'guest', 'win', ?, ?)", n, r, SUN - DAY);
+      }
+    });
+    vi.setSystemTime(SUN + 1000);
+    await play("lazy1", "ttt", "Ada Bot", "Linus Bot", 1); // Linus first plays after the draw: not an entrant
+    expect(await sql((s) => s.exec("SELECT week, game_id, entrants FROM cup_runs").toArray())).toEqual([{ week: "2026-12-06", game_id: "ttt", entrants: 2 }]);
+    expect(await sql((s) => s.exec("SELECT name_lc, rating FROM cup_entries ORDER BY name_lc").toArray())).toEqual([{ name_lc: "ada bot", rating: 1250 }, { name_lc: "grace bot", rating: 1220 }]);
+    await play("lazy2", "ttt", "Ada Bot", "Grace Bot", 1);
+    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM cup_runs").one().n)).toBe(1);
+    const t = ((await (await cup()).json()) as any).current.games.ttt.table;
+    expect(t[0]).toEqual({ name: "Ada Bot", points: 1, games: 1, results: ["win", "pending", "pending"], opponents: ["Grace Bot", "Grace Bot", "Grace Bot"] });
+  });
+
+  it("a cup page visit after Sunday noon draws it too; nothing is drawn before the first cup Sunday", async () => {
+    await reg("Ada Bot");
+    await sql((s) => s.exec("INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES ('ada bot', 'ttt', 1200, 1, 1, 0, 0)"));
+    // the pinned clock: Saturday 2026-11-28, before the first cup (2026-11-29)
+    expect(await (await cup()).json()).toEqual({ current: null, last: null });
+    expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM cup_runs").one().n)).toBe(0);
+    vi.setSystemTime(SUN + 5);
+    const body = (await (await cup()).json()) as any;
+    expect(body.current.week).toBe("2026-12-06");
   });
 });
