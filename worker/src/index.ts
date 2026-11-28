@@ -177,6 +177,42 @@ app.get("/r/:id", async (c) => {
 </head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
 });
 
+// Link-preview card for a shared daily result (docs/ROADMAP.md item 4). Only the date is in the link: the result is worded in the share text on the
+// client, so no player-supplied number reaches this page. The date is still checked as a real calendar day in a sane range, and escaped.
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+app.get("/d/:date", (c) => {
+  const date = c.req.param("date");
+  const ms = DAY.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
+  // A day the puzzle has existed on (it launched 2026-11-27 UTC) and that has begun: a card never says "solved" about a future puzzle.
+  if (!(ms >= Date.parse("2026-11-27T00:00:00Z") && ms <= Math.floor(Date.now() / 86400000) * 86400000) || new Date(ms).toISOString().slice(0, 10) !== date) {
+    return c.html(`<!doctype html><meta charset="utf-8"><title>Daily puzzle not found · CrissCross</title><p>No daily puzzle with this link. <a href="${PAGES}/daily">Today's daily puzzle</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
+  }
+  const title = html(`CrissCross Daily ${date} · a friend solved it`);
+  const desc = html(`A friend solved the ${date} Connect Four puzzle. Play today’s: one puzzle a day, the same for everyone.`);
+  const url = html(new URL(`/d/${date}`, c.req.url).href);
+  // ?via=d lets the daily page count arrivals through shared links (the kill rule); crawlers never follow the refresh.
+  const to = html(`${PAGES}/daily?via=d`);
+  const img = `${PAGES}/og-daily.png`;
+  return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${url}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CrissCross">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${url}">
+<meta property="og:image" content="${img}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="CrissCross daily puzzle">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
+});
+
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
 export default app;

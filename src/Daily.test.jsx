@@ -1,7 +1,7 @@
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import Daily from "./Daily";
+import Daily, { shareText } from "./Daily";
 import { puzzleForDate, keepsWin, defenderReply } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
 
@@ -57,8 +57,8 @@ describe("daily page", () => {
     drop(slip(p));
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     solve(p);
-    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 2 tries · harkirat155.github.io/cc/daily")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    expect(screen.getByText("CrissCross Daily 2026-11-28 · solved in 2 tries https://cc-api.harkirat-hira.workers.dev/d/2026-11-28")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
   });
 
   it("a reload keeps today's solved state, and a new UTC day starts fresh", () => {
@@ -67,7 +67,7 @@ describe("daily page", () => {
     solve(p);
     first.unmount();
     const second = show();
-    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 1 try · harkirat155.github.io/cc/daily")).toBeTruthy();
+    expect(screen.getByText("CrissCross Daily 2026-11-28 · solved in 1 try https://cc-api.harkirat-hira.workers.dev/d/2026-11-28")).toBeTruthy();
     second.unmount();
     jest.setSystemTime(new Date("2026-11-29T00:00:01Z"));
     show();
@@ -81,7 +81,7 @@ describe("daily page", () => {
     first.unmount();
     show();
     solve(p);
-    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 2 tries · harkirat155.github.io/cc/daily")).toBeTruthy();
+    expect(screen.getByText("CrissCross Daily 2026-11-28 · solved in 2 tries https://cc-api.harkirat-hira.workers.dev/d/2026-11-28")).toBeTruthy();
   });
 
   it("switches to the new puzzle at 00:00 UTC without unmounting", () => {
@@ -96,7 +96,7 @@ describe("daily page", () => {
     expect(screen.queryByText(/solved in/)).toBeNull();
     const next = puzzleForDate("2026-11-29");
     solve(next);
-    expect(screen.getByText(/CrissCross daily 2026-11-29 · solved in 1 try/)).toBeTruthy();
+    expect(screen.getByText(/CrissCross Daily 2026-11-29 · solved in 1 try/)).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem("cc.daily")).date).toBe("2026-11-29");
   });
 
@@ -116,8 +116,53 @@ describe("daily page", () => {
     Object.assign(navigator, { clipboard: { writeText: jest.fn().mockRejectedValue(new Error("no")) } });
     show();
     solve(p);
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
-    expect((await screen.findByLabelText("Result line")).value).toMatch(/^CrissCross daily 2026-11-28/);
+    fireEvent.click(screen.getByRole("button", { name: "Share result" }));
+    expect((await screen.findByLabelText("Result line")).value).toMatch(/^CrissCross Daily 2026-11-28/);
+  });
+});
+
+describe("share result", () => {
+  const solved = () => { show(); solve(puzzleForDate(DATE)); };
+  afterEach(() => { delete navigator.share; });
+
+  it("shares text and a date-only link through navigator.share when there is one", async () => {
+    navigator.share = jest.fn().mockResolvedValue();
+    solved();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Share result" })); });
+    expect(navigator.share).toHaveBeenCalledWith({ text: "CrissCross Daily 2026-11-28 · solved in 1 try", url: "https://cc-api.harkirat-hira.workers.dev/d/2026-11-28" });
+  });
+
+  it("copies text plus link and says Copied when there is no navigator.share", async () => {
+    Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue() } });
+    solved();
+    fireEvent.click(screen.getByRole("button", { name: "Share result" }));
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("CrissCross Daily 2026-11-28 · solved in 1 try\nhttps://cc-api.harkirat-hira.workers.dev/d/2026-11-28");
+  });
+
+  it("words the streak and the plural in the share text", () => {
+    expect(shareText("2026-11-28", 5, 3)).toBe("CrissCross Daily 2026-11-28 · solved in 5 tries · 3 days in a row");
+  });
+});
+
+describe("daily_link tally", () => {
+  const beacon = jest.fn(() => true);
+  const visit = (url) => render(<MemoryRouter initialEntries={[url]}><Daily /></MemoryRouter>);
+  const hits = () => beacon.mock.calls.map(([u]) => u).filter((u) => u.includes("e=daily_link"));
+  beforeEach(() => { beacon.mockClear(); Object.assign(navigator, { sendBeacon: beacon }); });
+
+  it("counts one hit for an arrival with ?via=d and none without", () => {
+    visit("/daily");
+    expect(hits()).toHaveLength(0);
+    visit("/daily?via=d");
+    expect(hits()).toHaveLength(1);
+  });
+
+  it("drops ?via=d from the address once counted, so a reload or a bookmark does not count again", () => {
+    const Where = () => <output data-testid="where">{useLocation().search}</output>;
+    render(<MemoryRouter initialEntries={["/daily?via=d&x=1"]}><Daily /><Where /></MemoryRouter>);
+    expect(hits()).toHaveLength(1);
+    expect(screen.getByTestId("where").textContent).toBe("?x=1");
   });
 });
 
@@ -130,7 +175,7 @@ describe("daily streak", () => {
     show();
     solve(puzzleForDate(DATE));
     expect(screen.getByText("Day 2 in a row")).toBeTruthy();
-    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 1 try · day 2 in a row · harkirat155.github.io/cc/daily")).toBeTruthy();
+    expect(screen.getByText("CrissCross Daily 2026-11-28 · solved in 1 try · 2 days in a row https://cc-api.harkirat-hira.workers.dev/d/2026-11-28")).toBeTruthy();
   });
 
   it("resets after a gap and leaves the day-1 result line unchanged", () => {
@@ -138,7 +183,7 @@ describe("daily streak", () => {
     show();
     solve(puzzleForDate(DATE));
     expect(screen.getByText("Day 1 in a row")).toBeTruthy();
-    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 1 try · harkirat155.github.io/cc/daily")).toBeTruthy();
+    expect(screen.getByText("CrissCross Daily 2026-11-28 · solved in 1 try https://cc-api.harkirat-hira.workers.dev/d/2026-11-28")).toBeTruthy();
   });
 
   it("Try yesterday's loads yesterday's puzzle, keeps today's record, and a late solve extends the streak", () => {
@@ -180,7 +225,7 @@ describe("daily streak", () => {
     toYesterday();
     expect(screen.getByText("Already solved.")).toBeTruthy();
     expect(screen.queryByText(/solved in/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Share result" })).toBeNull();
     expect(read().days).toEqual([YDAY]);
   });
 
