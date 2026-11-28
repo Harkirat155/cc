@@ -59,11 +59,11 @@ describe("unlisted bots", () => {
     expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM unlisted_bots").one().n)).toBe(0);
   });
 
-  it("seeds the two operator smoke bots as unlisted in a fresh Lobby", async () => {
+  it("seeds the operator smoke bots as unlisted in a fresh Lobby", async () => {
     const stub = (env as any).LOBBY.getByName("fresh-seed");
     await runInDurableObject(stub, async (_o: Lobby, st) => {
       const names = st.storage.sql.exec("SELECT name_lc FROM unlisted_bots ORDER BY name_lc").toArray().map((r: any) => r.name_lc);
-      expect(names).toEqual(["smokehouse14206", "smokerecent42775"]);
+      expect(names).toEqual(["cc-launch-check", "smokehouse14206", "smokerecent42775"]);
     });
   });
 });

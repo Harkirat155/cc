@@ -26,8 +26,8 @@ hash, for the rate limit).
 
 Test bots: send `"unlisted": true` with the name (`{"name":"My Test Bot","unlisted":true}`) and the bot is rated as
 usual but left off `GET /api/arena` and `GET /api/arena-feed`. Its own page, `GET /api/arena/{name}` (which then
-carries `"unlisted": true`) and its badge still work. Stored in the additive table `unlisted_bots (name_lc)`; the two
-operator smoke bots `SmokeRecent42775` and `SmokeHouse14206` are seeded into it. Use it for smoke scripts.
+carries `"unlisted": true`) and its badge still work. Stored in the additive table `unlisted_bots (name_lc)`; the
+operator smoke bots `SmokeRecent42775`, `SmokeHouse14206` and `cc-launch-check` are seeded into it. Use it for smoke scripts.
 
 ## Play rated
 
