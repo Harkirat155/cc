@@ -7,7 +7,7 @@ import connect4 from "@shared/games/connect4.js";
 
 const DATE = "2026-11-28";
 const show = () => render(<MemoryRouter><Daily /></MemoryRouter>);
-const drop = (col) => fireEvent.click(screen.getByRole("button", { name: `Drop piece in column ${col + 1}` }));
+const drop = (col) => fireEvent.click(screen.getByRole("button", { name: new RegExp(`Drop piece in column ${col + 1}$`) }));
 const COLS = [0, 1, 2, 3, 4, 5, 6];
 const put = (board, col, mark) => {
   const row = [5, 4, 3, 2, 1, 0].find((r) => board[r * 7 + col] === "");
@@ -104,11 +104,11 @@ describe("daily page", () => {
     const p = puzzleForDate(DATE);
     show();
     drop(slip(p));
-    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: /Drop piece in column 4$/ }).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: /Drop piece in column 4$/ }).disabled).toBe(false);
     solve(p);
-    expect(screen.getByRole("button", { name: "Drop piece in column 4" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: /Drop piece in column 4$/ }).disabled).toBe(true);
   });
 
   it("falls back to a hand-copy field when the clipboard refuses", async () => {
