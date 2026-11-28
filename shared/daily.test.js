@@ -1,6 +1,7 @@
 import connect4 from './games/connect4.js';
 import ttt from './games/ttt.js';
-import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine, gameForDate, tttPuzzleForDate, tttWinningCells } from './daily.js';
+import five from './games/five.js';
+import { canWin, keepsWin, defenderReply, puzzleForDate, solutionLine, gameForDate, tttPuzzleForDate, tttWinningCells, fivePuzzleForDate, fiveWinningCells, FIVE_WINDOW } from './daily.js';
 
 const play = (cols) => {
   let state = connect4.createInitialState();
@@ -145,5 +146,58 @@ describe('daily game by date', () => {
       }
     }
     expect([...kinds].sort()).toEqual(['block', 'win']);
+  });
+});
+
+describe('Five in a Row day', () => {
+  const span = Array.from({ length: 400 }, (_, i) => new Date(Date.UTC(2026, 10, 27 + i)).toISOString().slice(0, 10));
+  const fiveDays = span.filter((d) => gameForDate(d) === 'five');
+
+  test('every fourth UTC day from 2026-12-02 is Five in a Row; every earlier day keeps its game', () => {
+    expect(gameForDate('2026-11-27')).toBe('connect4');
+    expect(gameForDate('2026-11-28')).toBe('connect4'); // day number % 4 === 1 but already live before the Five day shipped
+    expect(gameForDate('2026-11-30')).toBe('ttt');
+    expect(gameForDate('2026-12-01')).toBe('connect4');
+    expect(gameForDate('2026-12-02')).toBe('five');
+    expect(gameForDate('2026-12-03')).toBe('connect4');
+    expect(gameForDate('2026-12-04')).toBe('ttt');
+    expect(gameForDate('2026-12-06')).toBe('five');
+    expect(fiveDays.every((d) => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86400000) % 4 === 1)).toBe(true);
+    expect(fiveDays).toHaveLength(99);
+    // Tic-Tac-Toe days (n % 4 === 3) are untouched by the new rule.
+    expect(span.filter((d) => gameForDate(d) === 'ttt')).toHaveLength(100);
+  });
+
+  test('the puzzle is stable and has exactly one winning cell for the side to move', () => {
+    for (const d of fiveDays) {
+      const p = fivePuzzleForDate(d);
+      expect(fivePuzzleForDate(d)).toEqual(p);
+      const me = ['B', 'G'][p.turn];
+      const them = ['B', 'G'][1 - p.turn];
+      const b = p.board.filter((v) => v === 'B').length;
+      const g = p.board.filter((v) => v === 'G').length;
+      expect(b - g).toBe(p.turn === 0 ? 0 : 1);
+      expect(five.checkTerminal({ board: p.board }).status).toBe('active');
+      expect(fiveWinningCells(p.board, me)).toEqual(p.answers);
+      expect(p.answers).toHaveLength(1);
+      expect(fiveWinningCells(p.board, them)).toEqual([]);
+      // the same verdict through the shared rules
+      const next = p.board.slice();
+      next[p.answers[0]] = me;
+      expect(five.checkTerminal({ board: next }).winner).toBe(p.turn);
+      for (let i = 0; i < p.board.length; i++) {
+        if (p.board[i] !== '' || i === p.answers[0]) continue;
+        const alt = p.board.slice();
+        alt[i] = me;
+        expect(five.checkTerminal({ board: alt }).status).toBe('active');
+      }
+      // every stone and the answer sit inside the shown window, so the crop loses nothing
+      p.board.forEach((v, i) => {
+        if (!v && i !== p.answers[0]) return;
+        const r = Math.floor(i / 15) - FIVE_WINDOW.top;
+        const c = (i % 15) - FIVE_WINDOW.left;
+        expect(r >= 0 && r < FIVE_WINDOW.size && c >= 0 && c < FIVE_WINDOW.size).toBe(true);
+      });
+    }
   });
 });

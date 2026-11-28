@@ -6,7 +6,7 @@ import { dayState, monthWeeks, monthsBetween } from "./dailyGrid";
 import { tally } from "./lib/tally";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MARK = { connect4: "●●", ttt: "✕○" };
+const MARK = { connect4: "●●", ttt: "✕○", five: "◉◉" };
 const STATE_MARK = { solved: "✓", tried: "…", "not tried": "" };
 const STATE_CLASS = {
   solved: "border-emerald-600/40 bg-emerald-600/10",
@@ -46,7 +46,7 @@ function DailyArchive() {
         <header>
           <h1 className="text-3xl font-semibold tracking-tight">Past puzzles</h1>
           <p className="mt-2 text-foreground/70">Solved on this device: {solved} of {total} {total === 1 ? "day" : "days"}. Days in a row count solved days whenever you solved them, so solving a missed day later can extend your streak. This record stays on this device.</p>
-          <p className="mt-2 text-sm text-foreground/60">●● Connect Four, ✕○ Tic-Tac-Toe. ✓ solved, … tried.</p>
+          <p className="mt-2 text-sm text-foreground/60">●● Connect Four, ✕○ Tic-Tac-Toe, ◉◉ Five in a Row. ✓ solved, … tried.</p>
         </header>
         {months.map((ym) => (
           <section key={ym}>
