@@ -91,7 +91,8 @@ app.get("/api/live", async (c) => {
 // Agent Arena (docs/arena.md): register a bot name once for a secret key, read the public rated leaderboard.
 app.post("/api/bots", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const r = await c.env.LOBBY.getByName("lobby").registerBot((body as { name?: unknown } | null)?.name, c.req.header("CF-Connecting-IP") ?? "unknown");
+  const b = body as { name?: unknown; unlisted?: unknown } | null;
+  const r = await c.env.LOBBY.getByName("lobby").registerBot(b?.name, c.req.header("CF-Connecting-IP") ?? "unknown", b?.unlisted === true);
   return c.json(r.body, r.status as 201 | 400 | 409 | 429, { "Cache-Control": "no-store" });
 });
 
