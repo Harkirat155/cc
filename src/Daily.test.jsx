@@ -2,7 +2,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
-import { puzzleForDate, keepsWin, defenderReply, solutionLine } from "@shared/daily.js";
+import { puzzleForDate, keepsWin, defenderReply, solutionLine, tttPuzzleForDate } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
 
 const DATE = "2026-11-28";
@@ -485,5 +485,71 @@ describe("play someone now", () => {
     render(<MemoryRouter><Daily /></MemoryRouter>);
     expect(screen.getAllByText("Solved.").length).toBeGreaterThan(1);
     expect(events("daily_solve")).toHaveLength(1);
+  });
+});
+
+describe("a Tic-Tac-Toe day", () => {
+  const TTT_DATE = "2026-11-30"; // gameForDate: every fourth UTC day
+  const beacon = jest.fn(() => true);
+  const events = (e) => beacon.mock.calls.map(([u]) => u).filter((u) => new window.URL(u).searchParams.get("e") === e);
+  const cell = (i) => screen.getByRole("button", { name: new RegExp(`^Square row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1} `) });
+  const wrong = (p) => p.board.findIndex((v, i) => v === "" && !p.answers.includes(i));
+  const p = tttPuzzleForDate(TTT_DATE);
+  beforeEach(() => {
+    jest.setSystemTime(new Date(`${TTT_DATE}T10:00:00Z`));
+    beacon.mockClear();
+    Object.assign(navigator, { sendBeacon: beacon });
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [] }) });
+  });
+
+  it("names the game and the task, with every cell a labelled button", () => {
+    show();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Tic-Tac-Toe");
+    expect(screen.getByText(new RegExp(`^${["X", "O"][p.turn]} to move: ${p.kind === "win" ? "win now" : "block their win"}`))).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Square row \d, column \d /})).toHaveLength(9);
+    expect(screen.queryByRole("button", { name: /Drop piece/ })).toBeNull();
+  });
+
+  it("the right cell solves it: result line names the game, tallies daily_solve_ttt only", async () => {
+    show();
+    fireEvent.click(cell(p.answers[0]));
+    expect(screen.getByText("Solved.")).toBeTruthy();
+    expect(screen.getByText(`CrissCross Daily ${TTT_DATE} · Tic-Tac-Toe · solved in 1 try https://cc-api.harkirat-hira.workers.dev/d/${TTT_DATE}`)).toBeTruthy();
+    expect(events("daily_solve_ttt")).toHaveLength(1);
+    expect(events("daily_solve")).toHaveLength(0);
+  });
+
+  it("a wrong cell is a counted try; Try again resets the board", () => {
+    show();
+    fireEvent.click(cell(wrong(p)));
+    expect(screen.getByText("That lets them off the hook")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(cell(p.answers[0]));
+    expect(screen.getByText(new RegExp(`solved in 2 tries`))).toBeTruthy();
+  });
+
+  it("shows the solution as one move, then the winner when it wins", () => {
+    show();
+    fireEvent.click(cell(wrong(p)));
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(screen.getByText(/^Solution ·/).textContent).toMatch(p.kind === "win" ? /wins$/ : /move 1 of 1$/);
+  });
+
+  it("Play someone now joins an open Tic-Tac-Toe seat, not a Connect Four one", async () => {
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [{ roomId: "CF111", gameId: "connect4", name: "Cy" }, { roomId: "TT222", gameId: "ttt", name: "Ada" }] }) });
+    show();
+    fireEvent.click(cell(p.answers[0]));
+    await act(async () => {});
+    expect(screen.getByRole("link", { name: "Play someone now" }).getAttribute("href")).toBe("/room/TT222");
+    fireEvent.click(screen.getByRole("link", { name: "Play someone now" }));
+    expect(events("daily_play_ttt")).toHaveLength(1);
+    expect(events("daily_play")).toHaveLength(0);
+  });
+
+  it("counts a shared-link arrival as daily_link_ttt", () => {
+    render(<MemoryRouter initialEntries={[`/daily/${TTT_DATE}?via=d`]}><Routes><Route path="/daily/:date" element={<Daily />} /></Routes></MemoryRouter>);
+    expect(events("daily_link_ttt")).toHaveLength(1);
+    expect(events("daily_link")).toHaveLength(0);
   });
 });

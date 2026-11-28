@@ -164,3 +164,42 @@ export function puzzleForDate(date) {
   }
   throw new Error(`no puzzle found for ${date}`);
 }
+
+// Which game a date's puzzle is, from the UTC date alone so everyone agrees and a past day never changes:
+// every fourth UTC day (day number % 4 === 3) is Tic-Tac-Toe, the rest Connect Four. The Worker's /d card uses the same rule.
+export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe' };
+export const gameForDate = (date) => (Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000) % 4 === 3 ? 'ttt' : 'connect4');
+
+const TTT_LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+const TTT_MARKS = ['X', 'O'];
+
+/** Empty cells where `mark` completes a line. */
+export const tttWinningCells = (board, mark) =>
+  board.flatMap((v, i) => (v === '' && TTT_LINES.some((l) => l.includes(i) && l.every((c) => c === i || board[c] === mark)) ? [i] : []));
+
+/**
+ * Tic-Tac-Toe puzzle for a date: a live position where the side to move either wins now (kind 'win') or must block the
+ * opponent's only threat (kind 'block'). `answers` are the cells that solve it; `n` is 1 (one move).
+ */
+export function tttPuzzleForDate(date) {
+  const rng = mulberry32(seedFrom(`${date}:ttt`));
+  const kind = rng() < 0.5 ? 'win' : 'block';
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const board = Array(9).fill('');
+    const plies = 3 + Math.floor(rng() * 4);
+    let turn = 0;
+    let dead = false;
+    for (let i = 0; i < plies && !dead; i++) {
+      const open = board.flatMap((v, c) => (v === '' ? [c] : []));
+      board[open[Math.floor(rng() * open.length)]] = TTT_MARKS[turn];
+      dead = TTT_LINES.some((l) => l.every((c) => board[c] === TTT_MARKS[turn]));
+      turn = 1 - turn;
+    }
+    if (dead) continue;
+    const mine = tttWinningCells(board, TTT_MARKS[turn]);
+    const theirs = tttWinningCells(board, TTT_MARKS[1 - turn]);
+    if (kind === 'win' && mine.length) return { date, game: 'ttt', kind, n: 1, board, turn, answers: mine };
+    if (kind === 'block' && !mine.length && theirs.length === 1) return { date, game: 'ttt', kind, n: 1, board, turn, answers: theirs };
+  }
+  throw new Error(`no tic-tac-toe puzzle found for ${date}`);
+}

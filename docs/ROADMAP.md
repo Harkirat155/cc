@@ -28,6 +28,14 @@
 - See the winning line: a solved or given-up day offers "Show the solution", stepping one winning line a move per
   press on the same board, derived from `shared/daily.js` (`solutionLine`), nothing stored (item 1, built).
 
+- A different game on some days (item 3, built, not yet live): every fourth UTC day (day number % 4 === 3, first on
+  2026-11-30) the daily is a Tic-Tac-Toe position, win now or block their only threat, one move, from
+  `gameForDate` / `tttPuzzleForDate` in `shared/daily.js`; the Worker's `/d/{date}` card names the same game. Same
+  solve, tries, share text (it adds "Tic-Tac-Toe") and "Play someone now" (an open Tic-Tac-Toe seat, else `/lobby`).
+  Connect Four events are unchanged; Tic-Tac-Toe days tally `daily_solve_ttt`, `daily_link_ttt` (arrivals through
+  `/d/`) and `daily_play_ttt`. Kill rule: over 4 weeks of live Tic-Tac-Toe days, `daily_link_ttt` or
+  `daily_solve_ttt` per Tic-Tac-Toe day below `daily_link` or `daily_solve` per Connect Four day. Checkers not built.
+
 Finding (2026-11-28): the daily puzzle is the only reason to come back each day, but a solve leaves nothing that
 carries over to tomorrow, and a shared replay link unfurls as the generic card. Next, keep daily players, make the
 board readable to everyone, and let a replay travel. All three reuse what exists: the daily engine and its
@@ -45,13 +53,6 @@ localStorage record, the shared GameBoard, and the stored replays.
    static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4
    weeks of launch. Data: the stored replay row; read-only.
 - "Play someone now" after the daily is done (not in the solution view): joins an open Connect Four seat from `GET /api/live`, else `/lobby` (item 2, built). Data: tally `cc` events `daily_play` (clicks) and `daily_solve` (first solves); kill rule: `daily_play` under 5% of `daily_solve` within 4 weeks of launch.
-
-## Next
-
-3. **A different game on alternate days (explore).** Seen by: a daily player who has seen every Connect Four puzzle
-   shape. Changes: some days the puzzle is a Checkers or Tic-Tac-Toe position, with the same share card. Data: the
-   game rules already in `shared/games/`. Kill rule: `daily_link` hits or return solves on those days fall below the
-   Connect Four days over 4 weeks.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
