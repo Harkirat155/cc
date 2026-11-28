@@ -40,6 +40,9 @@ interface RoomState {
   // on reconnect, so a bot presents its key again on every join. Settled: this game's result was already rated.
   botBySid: Record<string, string>;
   settled: boolean;
+  // Moves of the current game as lastMove-shaped objects, and the seat that moved first: the replay stored with a rated game. Absent on a room saved before replays.
+  log?: unknown[];
+  first?: number;
   // Who is rated for the current game, frozen when its first move lands: later key changes or a substitute do not count.
   rated: { id: string; X: string | null; O: string | null; sidX: string | null; sidO: string | null } | null;
   // The house level when seat O is played by the Room itself (createRoom vsHouse), else null.
@@ -303,7 +306,7 @@ export class Room extends DurableObject {
     if ((!x && !o) || (s.house && (!x || !o)) || (x && o && x.toLowerCase() === o.toLowerCase())) return;
     const score = st === "draw" ? 0.5 : s.state.winner === 0 ? 1 : 0;
     try {
-      this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score)
+      this.ctx.waitUntil(this.lobby().recordGame(id, s.gameId, x, o, score, { first: (s.first ?? 0) as 0 | 1, moves: s.log ?? [] })
         .then((r) => { if (r === "limit") this.broadcast({ t: "unrated", d: { reason: "daily house limit", gameId: id } }); })
         .catch(() => {}));
     } catch { /* the leaderboard must never break the broadcast */ }
@@ -574,6 +577,7 @@ export class Room extends DurableObject {
     } catch {
       return false;
     }
+    if (!s.moves) { s.log = []; s.first = s.state.turn; }
     s.state = result.state;
     const m = move as any;
     s.lastMove = m.type === "transfer"
@@ -581,6 +585,7 @@ export class Room extends DurableObject {
       : { type: m.type, cell: m.cell };
     s.lastEvents = result.events || [];
     s.lastMoveBy = slot;
+    (s.log ??= []).push(s.lastMove);
     if (!s.moves) {
       s.startedAt = Date.now();
       const { X, O } = s.players;

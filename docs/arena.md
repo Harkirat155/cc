@@ -75,7 +75,7 @@ per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age
 ## Just finished
 
 `GET /api/arena-feed` returns the last 20 rated bot sides arena-wide, newest first:
-`{"feed":[{"name":"My Bot","gameId":"ttt","result":"win","ratingAfter":1216,"at":1795000000000}]}`. One row per bot per game
+`{"feed":[{"name":"My Bot","gameId":"ttt","result":"win","ratingAfter":1216,"at":1795000000000,"replayId":"<uuid>"}]}`. `replayId` is present only when the game has a stored replay (and never when either side is an unlisted bot); the page then shows a "Replay" link. One row per bot per game
 (two rows when both sides are bots); `result` is from that bot's side; `[]` when nothing has finished (the page then says
 "No rated games finished since 2026-11-28."). The rating change is not stored, so only `ratingAfter` is given. The route is
 outside `/api/arena/:name`, so no bot name can shadow it. Names and numbers only. `Cache-Control: public, max-age=10`.
@@ -90,6 +90,19 @@ Shown above the tables on `/arena`; if the fetch fails the page shows a one-line
 (`name_lc`, ignoring case). A name that fails the name rule, or is not registered, is 404 `{"error":"bot not found"}`
 (the House has no page); a registered bot with no games is 200 with `games: []`. Names and numbers only: no keys, hashes, game ids or room ids.
 `Cache-Control: public, max-age=10`. Each registered name on `/arena` links to the bot's page, `/arena/{name}`, which shows the same list, a "Playing now · Watch" link when a listed game has that name, and the badge Markdown per game type. The House has no page.
+
+Each game row also carries `replayId` when a replay exists (older games omit it, and the page shows no link).
+
+## Replays
+
+`GET /api/replay/{replayId}` returns one rated game: `{"id","gameId":"ttt","players":["My Bot","House (easy)"],"first":0,"result":"X","moves":[{"type":"place","cell":4},...],"at":1795000000000}`.
+`players` are the X and O sides (`"guest"` for a human or unregistered bot); `first` is the seat that moved first (0 = X); `result` is `X`, `O` or `draw`;
+`moves` are in play order (checkers: `{"type":"transfer","from","to","captures":[...]}`). An unknown id, or a game rated before replays shipped, is
+404 `{"error":"replay not found"}`. `Cache-Control: public, max-age=3600`. The client page `/replay/{replayId}` rebuilds each position with the
+rules modules in `shared/games/` and steps through them with Previous and Next. Linked from "Just finished" and from each bot-page game row.
+
+Stored in `replays` (plus `replay_links`, which ties a `bot_games` row to it), written in `recordGame` in the same transaction as the rating, from the move list the
+Room holds at settlement. Additive: inserts only, never altered or pruned; only games rated after this shipped have one. The id is the unguessable settlement id.
 
 Stored in `bot_games`, one row per bot per rated game, written in the same step as the rating (`recordGame`). The table is
 new as of 2026-11-28: games rated before then have no rows and do not appear. One row per bot per rated game, kept (never pruned or edited); the House side gets no row.
@@ -143,6 +156,14 @@ curl -s $API/api/arena/My%20Bot
 # Recent games, failure: unknown bot
 curl -s -w ' %{http_code}\n' $API/api/arena/No%20Such%20Bot
 # {"error":"bot not found"} 404
+
+# Replay, happy path (id from a row's replayId)
+curl -s $API/api/replay/REPLAY_ID
+# {"id":"...","gameId":"ttt","players":["My Bot","House (easy)"],"first":0,"result":"X","moves":[{"type":"place","cell":4}],"at":1795000000000}
+
+# Replay, failure: unknown id
+curl -s -w ' %{http_code}\n' $API/api/replay/no-such-game
+# {"error":"replay not found"} 404
 
 # Badge, happy path
 curl -s -i "$API/api/arena/badge/My%20Bot.svg?game=ttt"
