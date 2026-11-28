@@ -1,7 +1,7 @@
 /* global process */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import Arena, { apiBase } from "./Arena";
 
 const show = () => render(<MemoryRouter><Arena /></MemoryRouter>);
@@ -38,7 +38,7 @@ describe("Arena page", () => {
     show();
     const link = await screen.findByRole("link", { name: "A player named Ada Bot is in a game · Watch" });
     expect(link.getAttribute("href")).toBe("/room/r9%20%2F%3F");
-    expect(screen.queryByRole("link", { name: /Grace Bot/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Grace Bot is in a game/ })).toBeNull();
   });
 
   it("still renders the leaderboard, with no links and no error, when /api/live fails", async () => {
@@ -61,76 +61,16 @@ describe("Arena page", () => {
     show();
     fireEvent.click(await screen.findByRole("button", { name: "Badge" }));
     const field = await screen.findByRole("textbox", { name: "Badge Markdown for Ada Bot" });
-    expect(field.value).toBe("[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/Ada%20Bot.svg?game=connect4)](https://harkirat155.github.io/cc/arena)");
+    expect(field.value).toBe("[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/Ada%20Bot.svg?game=connect4)](https://harkirat155.github.io/cc/arena/Ada%20Bot)");
     expect(screen.getByRole("button", { name: "Copy failed: select the text below" })).toBeTruthy();
   });
 
-  describe("recent games", () => {
-    const row = { games: { connect4: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }] } };
-    const stub = (recent) => { window.fetch = jest.fn(async (url) => (String(url).endsWith("/api/live") ? { ok: true, json: async () => ({ games: [] }) } : String(url).includes("/api/arena/Ada%20Bot") ? recent : { ok: true, json: async () => row })); };
-
-    it("expands a bot's last games on demand, one compact line each", async () => {
-      stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [{ gameId: "ttt", opponent: "House (easy)", result: "win", ratingAfter: 1216, at: 1 }, { gameId: "ttt", opponent: "guest", result: "loss", ratingAfter: 1200, at: 0 }] }) });
-      show();
-      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
-      expect(window.fetch.mock.calls.some(([u]) => String(u).includes("/api/arena/Ada"))).toBe(false);
-      fireEvent.click(btn);
-      expect(await screen.findByText("Won vs House (easy) · Tic-Tac-Toe · 1216")).toBeTruthy();
-      expect(screen.getByText("Lost vs guest · Tic-Tac-Toe · 1200")).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Badge" })).toBeTruthy();
-    });
-
-    it("keeps the newest answer when an older request for the same bot lands last, and keeps loaded data on re-expand", async () => {
-      const pending = [];
-      window.fetch = jest.fn((url) => (String(url).endsWith("/api/live") ? Promise.resolve({ ok: true, json: async () => ({ games: [] }) })
-        : String(url).includes("/api/arena/Ada%20Bot") ? new Promise((res) => pending.push(res)) : Promise.resolve({ ok: true, json: async () => row })));
-      const reply = (g) => ({ ok: true, json: async () => ({ name: "Ada Bot", games: [{ gameId: "ttt", opponent: g, result: "win", ratingAfter: 1216, at: 1 }] }) });
-      show();
-      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
-      fireEvent.click(btn); fireEvent.click(btn); fireEvent.click(btn); // open, close, open again: two requests
-      await waitFor(() => expect(pending).toHaveLength(2));
-      await act(async () => { pending[1](reply("Newer")); });
-      await act(async () => { pending[0](reply("Older")); });
-      expect(await screen.findByText("Won vs Newer · Tic-Tac-Toe · 1216")).toBeTruthy();
-      expect(screen.queryByText(/Older/)).toBeNull();
-      fireEvent.click(btn); fireEvent.click(btn); // collapse, expand: loaded data stays visible while it refetches
-      expect(screen.getByText("Won vs Newer · Tic-Tac-Toe · 1216")).toBeTruthy();
-      expect(screen.queryByText(/Loading/)).toBeNull();
-    });
-
-    it("labels the button, points aria-controls at the region, and announces loading politely", async () => {
-      window.fetch = jest.fn((url) => (String(url).endsWith("/api/live") ? Promise.resolve({ ok: true, json: async () => ({ games: [] }) })
-        : String(url).includes("/api/arena/Ada%20Bot") ? new Promise(() => {}) : Promise.resolve({ ok: true, json: async () => row })));
-      show();
-      const btn = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
-      fireEvent.click(btn);
-      const region = document.getElementById(btn.getAttribute("aria-controls"));
-      expect(region).toBeTruthy();
-      expect(region.getAttribute("aria-live")).toBe("polite");
-      expect(region.textContent).toMatch(/Loading/);
-    });
-
-    it("gives two bots whose names differ only by space and underscore different regions", async () => {
-      const two = { games: { ttt: [{ name: "Ada Bot", rating: 1216, games: 1, wins: 1, draws: 0, losses: 0 }, { name: "Ada_Bot", rating: 1184, games: 1, wins: 0, draws: 0, losses: 1 }] } };
-      window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [] } : two) }));
-      show();
-      const a = await screen.findByRole("button", { name: "Ada Bot: last 10 games" });
-      const b = screen.getByRole("button", { name: "Ada_Bot: last 10 games" });
-      expect(a.getAttribute("aria-controls")).not.toBe(b.getAttribute("aria-controls"));
-    });
-
-    it("says so when the games cannot be loaded", async () => {
-      stub({ ok: false, status: 500 });
-      show();
-      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot: last 10 games" }));
-      expect(await screen.findByText("Could not load this bot's games")).toBeTruthy();
-    });
-
-    it("says since when games are recorded when there are none", async () => {
-      stub({ ok: true, json: async () => ({ name: "Ada Bot", games: [] }) });
-      show();
-      fireEvent.click(await screen.findByRole("button", { name: "Ada Bot: last 10 games" }));
-      expect(await screen.findByText("No rated games recorded since 2026-11-28")).toBeTruthy();
-    });
+  it("links each registered name to its page, and leaves a House name as plain text", async () => {
+    const two = { games: { ttt: [{ name: "Ada Bot", rating: 1216, games: 3, wins: 2, draws: 0, losses: 1 }, { name: "House (easy)", rating: 1250, games: 9, wins: 5, draws: 0, losses: 4 }] } };
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [] } : two) }));
+    show();
+    expect((await screen.findByRole("link", { name: "Ada Bot" })).getAttribute("href")).toBe("/arena/Ada%20Bot");
+    expect(screen.getByText("House (easy)")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "House (easy)" })).toBeNull();
   });
 });

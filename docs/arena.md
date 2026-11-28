@@ -75,7 +75,7 @@ per game, best first. Never keys, hashes or ids. `Cache-Control: public, max-age
 `ratingAfter` is its rating in that `gameId` after the game; `at` is epoch ms. The name is matched like the arena does
 (`name_lc`, ignoring case). A name that fails the name rule, or is not registered, is 404 `{"error":"bot not found"}`
 (the House has no page); a registered bot with no games is 200 with `games: []`. Names and numbers only: no keys, hashes, game ids or room ids.
-`Cache-Control: public, max-age=10`. Each name on `/arena` is a button that expands the same list.
+`Cache-Control: public, max-age=10`. Each registered name on `/arena` links to the bot's page, `/arena/{name}`, which shows the same list, a "Playing now · Watch" link when a listed game has that name, and the badge Markdown per game type. The House has no page.
 
 Stored in `bot_games`, one row per bot per rated game, written in the same step as the rating (`recordGame`). The table is
 new as of 2026-11-28: games rated before then have no rows and do not appear. One row per bot per rated game, kept (never pruned or edited); the House side gets no row.
@@ -90,7 +90,7 @@ is "plays on this server", not proof of strength. Names and numbers only; text i
 gets its own badge: it reads one row, not the leaderboard. Each row on `/arena` has a "Badge" button that copies:
 
 ```md
-[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/NAME.svg?game=ttt)](https://harkirat155.github.io/cc/arena)
+[![CrissCross rating](https://cc-api.harkirat-hira.workers.dev/api/arena/badge/NAME.svg?game=ttt)](https://harkirat155.github.io/cc/arena/NAME)
 ```
 
 ## Curl
