@@ -18,6 +18,8 @@ import PeoplePanel from "./components/PeoplePanel";
 import FeedbackDialog from "./components/FeedbackDialog";
 import OpponentControl from "./components/OpponentControl";
 import RoomActions from "./components/RoomActions";
+import useGameSounds from "./hooks/useGameSounds";
+import { viewerSlotFor } from "./utils/sound";
 import useOpponent from "./hooks/useOpponent";
 import { getGamePalette } from "./components/games/palette";
 import { tally } from "./lib/tally";
@@ -83,6 +85,7 @@ const Game = () => {
     tally("cc", finishedMode);
     tally("cc", `finished_${finishedGameId}`);
   }, [finishedGameId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useGameSounds(gameState, viewerSlotFor({ player, isMultiplayer, botSlot }), `${roomId}|${connectionState}`);
   // Voice chat hook
   const { micEnabled, muted, remoteAudioStreams, enableMic, disableMic } =
     useVoiceChat({
