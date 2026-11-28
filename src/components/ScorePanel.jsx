@@ -119,10 +119,10 @@ const ScorePanel = ({
                   <span
                     key={emote.id}
                     role="status"
-                    aria-label={`${card.occupant || card.label} reacted ${emote.emote}`}
                     className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 rounded-full border border-foreground/10 bg-background px-2.5 py-0.5 text-lg shadow-md"
                   >
-                    {emote.emote}
+                    <span aria-hidden="true">{emote.emote}</span>
+                    <span className="sr-only">{`${card.occupant || card.label} reacted ${emote.emote}`}</span>
                   </span>
                 )}
               <ScorePlayerCard

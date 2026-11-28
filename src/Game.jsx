@@ -7,6 +7,7 @@ import ResultModal from "./components/ResultModal";
 import WinnerCard from "./components/WinnerCard";
 import GameSelector from "./components/GameSelector";
 import useSocketGame from "./hooks/useSocketGame";
+import { reactionsSupported } from "./utils/socketManager";
 import Navbar from "./components/Navbar";
 import useVoiceChat from "./hooks/useVoiceChat";
 import AudioRenderer from "./components/AudioRenderer";
@@ -103,12 +104,12 @@ const Game = () => {
       enableMic(false);
     }
   };
-  // The opponent's emote bubble lasts 2.5 s.
+  // A reaction shows beside its sender's seat for 3 s, on both screens.
   const [visibleEmote, setVisibleEmote] = useState(null);
   useEffect(() => {
     if (!emote) return undefined;
     setVisibleEmote(emote);
-    const t = setTimeout(() => setVisibleEmote(null), 2500);
+    const t = setTimeout(() => setVisibleEmote(null), 3000);
     return () => clearTimeout(t);
   }, [emote]);
   const winningSquares = gameState.winningLine || [];
@@ -421,6 +422,7 @@ const Game = () => {
               socketId={socketId}
               roster={roster}
               onAction={sendRoomAction}
+              reactions={reactionsSupported()}
             />
           )}
         </div>

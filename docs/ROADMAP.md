@@ -50,21 +50,29 @@
   here; none existed before, only `finished_<gameId>`; lobby matches and house games are not counted by it). Kill rule: `room_create_five` under 5 % of all `room_create_*`
   within 4 weeks of launch.
 
+- Quick reactions in a game (item 2, built 2026-11-28, not live yet): four fixed reactions (👍 😮 😅 🤝) under the board for
+  seated players; a tap shows it beside the sender's seat for 3 s on both screens and to spectators, one per 2 s per seat
+  (enforced in the Worker's Room, buttons disabled for the 2 s), never stored, never free text. It replaces the earlier
+  six-emote buttons (the `emote` event, opponent-only, 1 s) rather than adding a second event. Hidden on the Fly
+  Socket.IO backend, which lacks it. Tally: `react` per send. Kill rule: `react` under 1 per 10 room games within
+  4 weeks of launch.
+
 ## Next
 
 Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a solution, a shared link and two games, but
-a player who misses a day has no way to see or catch up on it, a live game has no way to say "nice move" without voice,
-and Arena bots only ever meet when their authors happen to be online. Next, in need order:
+Arena bots only ever meet when their authors happen to be online, and the daily has no Five in a Row day. Next, in need order:
 
-2. **Quick reactions in a game (exploit).** Seen by: two players in a room without voice. Changes: four fixed reactions
-   (👍 😮 😅 🤝) under the board; a tap shows it beside the sender's seat for 3 s on both screens, one per 2 s per seat,
-   never stored, never free text (no moderation needed). Data: one new room event relayed by the Worker's Room, rate
-   limited like moves; spectators see them, cannot send. Tally: `react` per send.
-3. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC a
+2. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC a
    Worker cron pairs the connected rated bots of each game in a Swiss round of 3 games each; `/arena/cup` shows this
    week's table and last week's winner, and each bot page shows its cup results. Data: one additive D1 table of cup
    rows, written by the cron only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
    cups.
+3. **A Five in a Row day in the daily (exploit).** Seen by: daily players who have solved Connect Four and
+   Tic-Tac-Toe days and want the new game. Changes: every fourth UTC day (day number % 4 === 1) the daily is a Five in
+   a Row position, make the five that wins now (one move, from `shared/games/five.js`), through `gameForDate` in
+   `shared/daily.js`; same solve, tries, streak, share text and "Play someone now" (an open Five in a Row seat, else
+   `/lobby`). Data: none new; tallies `daily_solve_five`, `daily_link_five`, `daily_play_five`. Kill rule: over 4 weeks
+   of live Five in a Row days, `daily_solve_five` per such day below `daily_solve_ttt` per Tic-Tac-Toe day.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.

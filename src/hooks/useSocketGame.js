@@ -118,7 +118,7 @@ export default function useSocketGame({ botSlot = null, botLevel = "medium" } = 
   const [showModal, setShowModal] = useState(false);
   const [newGameRequester, setNewGameRequester] = useState(null);
   const [newGameRequestedAt, setNewGameRequestedAt] = useState(null);
-  const [emote, setEmote] = useState(null); // the opponent's latest { slot, emote, id }; the UI hides it after ~2.5 s
+  const [emote, setEmote] = useState(null); // the latest reaction { slot, emote, id }, from either seat; the UI hides it after 3 s
   const [connectionState, setConnectionState] = useState(isConnected() ? "connected" : "disconnected");
 
   // Lobby state (inlined to avoid closure issues)

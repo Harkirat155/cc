@@ -21,6 +21,9 @@ function getSocketUrl() {
   );
 }
 
+/** Only the Worker backend (ws:// or wss://) relays reactions; the Fly Socket.IO server does not. */
+export const reactionsSupported = () => isWsUrl(getSocketUrl());
+
 /**
  * Get or create the singleton socket instance.
  * Returns the socket immediately (may not be connected yet).

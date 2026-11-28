@@ -395,22 +395,37 @@ describe("game: resign, draw offers, emotes", () => {
     expect(d.drawOfferer).toBeNull();
   });
 
-  it("relays an emote to the opponent only, with the sender's slot", async () => {
+  it("relays a reaction to both players and a spectator, with the sender's slot", async () => {
     const { a, b, roomId } = await pair();
-    b.send("emote", { roomId, emote: "🔥" });
-    const f = await a.wait((x) => x.t === "emote");
-    expect(f.d).toEqual({ slot: 1, emote: "🔥" });
-    await flush(a, roomId, b);
-    expect(b.frames.some((x) => x.t === "emote")).toBe(false);
+    const c = await open(`/ws/room/${roomId}`);
+    expect(await c.call("joinRoom", { roomId })).toEqual({ player: "spectator" });
+    b.send("emote", { roomId, emote: "🤝" });
+    for (const w of [a, b, c]) expect((await w.wait((x) => x.t === "emote")).d).toEqual({ slot: 1, emote: "🤝" });
   });
 
-  it("drops a bad emote and rate-limits to 1 per second per player", async () => {
+  it("rejects a spectator's reaction and anything outside the four fixed ones", async () => {
     const { a, b, roomId } = await pair();
-    for (const bad of ["hi", "👍👍", 5, null]) b.send("emote", { roomId, emote: bad });
-    b.send("emote", { roomId, emote: "👍" });
-    b.send("emote", { roomId, emote: "👏" }); // within 1 s: dropped
+    const c = await open(`/ws/room/${roomId}`);
+    await c.call("joinRoom", { roomId });
+    c.send("emote", { roomId, emote: "👍" });
+    for (const bad of ["hi", "👍👍", "🔥", "👏", 5, null]) b.send("emote", { roomId, emote: bad });
     await flush(b, roomId, a);
-    expect(a.frames.filter((x) => x.t === "emote").map((x) => x.d.emote)).toEqual(["👍"]);
+    expect(a.frames.some((x) => x.t === "emote")).toBe(false);
+    expect(c.frames.some((x) => x.t === "emote")).toBe(false);
+  });
+
+  it("allows one reaction per 2 s per seat, and the other seat has its own budget", async () => {
+    const { a, b, roomId } = await pair();
+    b.send("emote", { roomId, emote: "👍" });
+    b.send("emote", { roomId, emote: "😮" }); // within 2 s: dropped
+    a.send("emote", { roomId, emote: "😅" }); // other seat: allowed
+    await flush(b, roomId, a);
+    await a.wait((x) => x.t === "emote" && x.d.slot === 0);
+    expect(a.frames.filter((x) => x.t === "emote").map((x) => x.d.emote).sort()).toEqual(["👍", "😅"]);
+    await sleep(1050);
+    b.send("emote", { roomId, emote: "😮" }); // 1 s later: still inside the 2 s gap
+    await flush(b, roomId, a);
+    expect(a.frames.filter((x) => x.t === "emote" && x.d.emote === "😮")).toHaveLength(0);
     await sleep(1050);
     b.send("emote", { roomId, emote: "😮" });
     await a.wait((x) => x.t === "emote" && x.d.emote === "😮");
