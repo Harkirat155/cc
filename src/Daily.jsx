@@ -10,6 +10,7 @@ import { paletteForValue } from "./components/games/boardPresentationUtils";
 import { getGamePalette } from "./components/games/palette";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
+import { downloadRemind } from "./lib/remindIcs";
 import { liveUrl } from "./Live";
 
 const KEY = "cc.daily";
@@ -358,6 +359,10 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
               <p className="mt-1 text-sm">Day {streak} in a row</p>
               <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak, game)}</p>
               <div className="mt-2"><ShareResult text={shareText(date, saved.tries, streak, game)} url={shareLink(date)} /></div>
+              <div className="mt-2">
+                <button type="button" onClick={() => { tally("cc", "daily_remind"); downloadRemind(); }} className="text-sm text-foreground/60 underline underline-offset-4 hover:text-foreground">Remind me tomorrow</button>
+                <p className="mt-1 text-xs text-foreground/60">Adds a daily reminder at the new puzzle to your calendar. Nothing is sent to us.</p>
+              </div>
             </>
           ) : slipped ? (
             <>

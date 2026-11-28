@@ -691,3 +691,29 @@ describe("a Checkers day", () => {
     expect(events("daily_link")).toHaveLength(0);
   });
 });
+
+describe("remind me tomorrow", () => {
+  const beacon = jest.fn(() => true);
+  const remind = () => screen.queryByRole("button", { name: "Remind me tomorrow" });
+  beforeEach(() => {
+    beacon.mockClear();
+    Object.assign(navigator, { sendBeacon: beacon });
+    URL.createObjectURL = jest.fn(() => "blob:ics");
+    URL.revokeObjectURL = jest.fn();
+    jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it("shows only once the day is solved, and each press counts one daily_remind and builds the file", () => {
+    show();
+    expect(remind()).toBeNull();
+    solve(puzzleForDate(DATE));
+    expect(screen.getByText(/Nothing is sent to us/)).toBeTruthy();
+    fireEvent.click(remind());
+    const hits = () => beacon.mock.calls.map(([u]) => u).filter((u) => u.includes("e=daily_remind"));
+    expect(hits()).toHaveLength(1);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    fireEvent.click(remind());
+    expect(hits()).toHaveLength(2);
+  });
+});
