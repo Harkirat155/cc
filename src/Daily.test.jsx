@@ -1,5 +1,5 @@
 import React from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
 import { puzzleForDate, keepsWin, defenderReply } from "@shared/daily.js";
@@ -257,5 +257,59 @@ describe("daily streak", () => {
     expect(days).not.toContain("2026-12-01");
     expect(days).not.toContain("junk");
     expect(days).not.toContain(old[0]);
+  });
+});
+
+describe("dated daily link /daily/:date", () => {
+  const seed = (rec) => window.localStorage.setItem("cc.daily", JSON.stringify(rec));
+  const read = () => JSON.parse(window.localStorage.getItem("cc.daily"));
+  const at = (url) => render(
+    <MemoryRouter initialEntries={[url]}>
+      <Routes><Route path="/daily" element={<Daily />} /><Route path="/daily/:date" element={<Daily />} /></Routes>
+    </MemoryRouter>,
+  );
+  const PAST = "2026-11-27";
+
+  it("opens that date's puzzle", () => {
+    at(`/daily/${PAST}`);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/Daily puzzle · 2026-11-27/);
+    expect(screen.queryByText(/isn't available/)).toBeNull();
+  });
+
+  it("shows today's puzzle with a note for a date that is out of range or not a date", () => {
+    for (const d of ["2026-11-26", "2026-11-29", "2026-02-30", "nope"]) {
+      const v = at(`/daily/${d}`);
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/Daily puzzle · 2026-11-28/);
+      expect(screen.getByText("That puzzle isn't available, here is today's.")).toBeTruthy();
+      v.unmount();
+    }
+  });
+
+  it("keeps tries on a past date when switching days: slip, go to today, come back, solve counts both", () => {
+    at(`/daily/${PAST}`);
+    drop(slip(puzzleForDate(PAST)));
+    fireEvent.click(screen.getByRole("button", { name: "Back to today's" }));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/2026-11-28/);
+    solve(puzzleForDate(DATE));
+    fireEvent.click(screen.getByRole("button", { name: "Try yesterday's" }));
+    solve(puzzleForDate(PAST));
+    expect(screen.getByText(/CrissCross Daily 2026-11-27 · solved in 2 tries/)).toBeTruthy();
+  });
+
+  it("solving a past date leaves today's record and streak untouched", () => {
+    seed({ date: DATE, tries: 3, solved: true, days: [DATE] });
+    at(`/daily/${PAST}`);
+    solve(puzzleForDate(PAST));
+    expect(read()).toMatchObject({ date: DATE, tries: 3, solved: true });
+    expect(read().days).toEqual([PAST, DATE]);
+  });
+
+  it("still counts and strips ?via=d", () => {
+    const beacon = jest.fn(() => true);
+    Object.assign(navigator, { sendBeacon: beacon });
+    const Where = () => <output data-testid="where">{useLocation().pathname + useLocation().search}</output>;
+    render(<MemoryRouter initialEntries={[`/daily/${PAST}?via=d`]}><Daily /><Where /></MemoryRouter>);
+    expect(beacon.mock.calls.filter(([u]) => u.includes("e=daily_link"))).toHaveLength(1);
+    expect(screen.getByTestId("where").textContent).toBe(`/daily/${PAST}`);
   });
 });

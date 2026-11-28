@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
@@ -9,12 +9,14 @@ import { tally } from "./lib/tally";
 const KEY = "cc.daily";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DAYS = 400;
+const FIRST_DAY = "2026-11-27"; // the day the puzzle launched; /daily/:date opens a date from here to today
 const MARKS = ["R", "Y"];
 const COLOR = ["Red", "Yellow"];
 
 // The record is {date, tries, solved} for the latest day played (the original shape) plus `days`, the UTC dates
 // solved on that day's own puzzle. Records written before streaks have no `days`; their `date` counts if solved.
-// A streak is consecutive UTC days solved, whenever each was solved: solving yesterday's puzzle late counts.
+// `pastTries` maps a past date to the tries spent on it so far, so leaving and coming back keeps the count; it never touches
+// the latest-day fields. A streak is consecutive UTC days solved, whenever each was solved: solving yesterday's puzzle late counts.
 const readStore = () => {
   try {
     const s = JSON.parse(window.localStorage.getItem(KEY));
@@ -22,16 +24,25 @@ const readStore = () => {
       const today = todayUtc();
       const listed = [...(Array.isArray(s.days) ? s.days : []), ...(s.solved ? [s.date] : [])];
       const days = [...new Set(listed.filter((d) => typeof d === "string" && DAY.test(d) && d <= today))].sort().slice(-MAX_DAYS);
-      return { ...s, days };
+      const raw = s.pastTries && typeof s.pastTries === "object" && !Array.isArray(s.pastTries) ? s.pastTries : {};
+      const pastTries = Object.fromEntries(Object.entries(raw).filter(([d, n]) => DAY.test(d) && Number.isInteger(n) && n >= 1).sort().slice(-MAX_DAYS));
+      return { ...s, days, pastTries };
     }
   } catch { /* storage unavailable or corrupt: start fresh */ }
-  return { days: [] };
+  return { days: [], pastTries: {} };
 };
 
 const load = (date) => {
   const s = readStore();
   return s.date === date ? { tries: s.tries || 1, solved: Boolean(s.solved) } : { tries: 1, solved: false };
 };
+
+const loadPast = (date) => {
+  const s = readStore();
+  return { tries: s.pastTries[date] || (s.date === date ? s.tries || 1 : 1), solved: false };
+};
+
+const isDay = (d, today) => typeof d === "string" && DAY.test(d) && d >= FIRST_DAY && d <= today && todayUtc(new Date(`${d}T00:00:00Z`)) === d;
 
 const dayBefore = (date) => todayUtc(new Date(Date.parse(`${date}T00:00:00Z`) - 86400000));
 
@@ -102,15 +113,20 @@ function Daily() {
     const t = window.setTimeout(() => { setToday(todayUtc()); setPast(false); }, Math.max(next - Date.now(), 0) + 50);
     return () => window.clearTimeout(t);
   }, [today]);
-  const date = past ? dayBefore(today) : today;
-  return <DailyPuzzle key={date} date={date} past={past} onSwitch={() => setPast(!past)} />;
+  // /daily/:date opens that day's puzzle; a date outside launch..today shows today's with a note.
+  const { date: asked } = useParams();
+  const dated = isDay(asked, today) && asked !== today;
+  const date = dated ? asked : past ? dayBefore(today) : today;
+  const onSwitch = () => (dated ? navigate("/daily") : setPast(!past));
+  return <DailyPuzzle key={date} date={date} today={today} unavailable={asked !== undefined && !isDay(asked, today)} onSwitch={onSwitch} />;
 }
 
-function DailyPuzzle({ date, past, onSwitch }) {
+function DailyPuzzle({ date, today, unavailable, onSwitch }) {
+  const past = date !== today;
   const puzzle = useMemo(() => puzzleForDate(date), [date]);
-  const [saved, setSaved] = useState(() => (past ? { tries: 1, solved: false } : load(date)));
+  const [saved, setSaved] = useState(() => (past ? loadPast(date) : load(date)));
   const [days, setDays] = useState(() => readStore().days);
-  const [already] = useState(() => past && days.includes(date)); // tries for past days are session-only: no new result line
+  const [already] = useState(() => past && days.includes(date)); // a past day solved earlier shows no new result line
   const [board, setBoard] = useState(puzzle.board);
   const [left, setLeft] = useState(puzzle.n);
   const [slipped, setSlipped] = useState(false);
@@ -123,7 +139,9 @@ function DailyPuzzle({ date, past, onSwitch }) {
     setSaved(next);
     const keep = next.solved ? [...new Set([...readStore().days, date])].sort().slice(-MAX_DAYS) : readStore().days;
     if (next.solved) setDays(keep);
-    const rec = past ? { ...readStore(), days: keep } : { date, ...next, days: keep };
+    const store = readStore();
+    const pastTries = past && !next.solved ? { ...store.pastTries, [date]: next.tries } : store.pastTries;
+    const rec = past ? { ...store, days: keep, pastTries } : { date, ...next, days: keep, pastTries };
     try { window.localStorage.setItem(KEY, JSON.stringify(rec)); } catch { /* ignore */ }
   };
   const done = saved.solved || slipped || already;
@@ -162,7 +180,8 @@ function DailyPuzzle({ date, past, onSwitch }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
         <Link to="/" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← CrissCross</Link>
         <header className="self-start">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{past ? " · yesterday's" : ""}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
+          {unavailable && <p className="mt-2 font-medium">{"That puzzle isn't available, here is today's."}</p>}
           <p className="mt-2 text-foreground/70">One puzzle a day, the same for everyone. New puzzle at 00:00 UTC.</p>
           <p className="mt-2 font-medium">{COLOR[me]} to move: win in {puzzle.n} of your moves.</p>
         </header>

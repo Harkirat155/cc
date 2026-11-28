@@ -21,6 +21,10 @@
   to `/daily?via=d`; arrivals count as `daily_link` (item 4, built). Only the date is in the link, so no result number
   is read from a URL. Kill rule: No daily_link tally hits within 4 weeks (by 2026-12-26).
 
+- A shared daily link opens the shared puzzle: `/d/{date}` now sends the browser to `/daily/{date}?via=d`, which plays
+  that date's puzzle (launch day to today UTC; anything else shows today's with a note). Tries on past dates are kept
+  per date in the `cc.daily` record (`pastTries`), and a past solve never changes today's record.
+
 Finding (2026-11-28): the daily puzzle is the only reason to come back each day, but a solve leaves nothing that
 carries over to tomorrow, and a shared replay link unfurls as the generic card. Next, keep daily players, make the
 board readable to everyone, and let a replay travel. All three reuse what exists: the daily engine and its
@@ -38,16 +42,18 @@ localStorage record, the shared GameBoard, and the stored replays.
    static card image, and sends the browser on to `/replay/{id}`. Kill rule: no visits to `/r/` in tally within 4
    weeks of launch. Data: the stored replay row; read-only.
 
-Next (user-visible, one line each):
+## Next
 
-5. **See the winning line.** Seen by: a friend who opened a shared daily link and got stuck. Changes: a solved or
+1. **See the winning line.** Seen by: a friend who opened a shared daily link and got stuck. Changes: a solved or
    given-up day offers "Show the solution", stepping the winning moves on the same board. Data: the generator in
    `shared/daily.js`; nothing stored.
-6. **From the daily to a live game.** Seen by: someone who just solved `/daily`. Changes: the result area offers
-   "Play someone now" to `/lobby` or the open seats on `/live`. Data: the existing `GET /api/live`.
-7. **A different game on alternate days.** Seen by: a daily player who has seen every Connect Four puzzle shape.
-   Changes: some days the puzzle is a Checkers or Tic-Tac-Toe position, with the same share card. Data: the game
-   rules already in `shared/games/`.
+2. **From the daily to a live game (explore).** Seen by: someone who just solved `/daily`. Changes: the result area
+   offers "Play someone now" to `/lobby` or the open seats on `/live`. Data: the existing `GET /api/live`. Kill rule:
+   under 5% of solves click it within 4 weeks of launch, measured by a new tally event.
+3. **A different game on alternate days (explore).** Seen by: a daily player who has seen every Connect Four puzzle
+   shape. Changes: some days the puzzle is a Checkers or Tic-Tac-Toe position, with the same share card. Data: the
+   game rules already in `shared/games/`. Kill rule: `daily_link` hits or return solves on those days fall below the
+   Connect Four days over 4 weeks.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
