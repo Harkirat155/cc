@@ -18,6 +18,7 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 const HOUSE_NAMES: Record<string, string> = { "house (easy)": "House (easy)", "house (medium)": "House (medium)", "house (hard)": "House (hard)" };
 const RESERVED = /^house(easy|medlum|hard)$/; // compared after 0->o, 1/i->l and stripping everything else
 const HOUSE_DAILY = 20; // rated house games per bot per UTC day; later ones are played but unrated
+type Replay = { first: 0 | 1; moves: unknown[] };
 type QRow = { sid: string; name: string; game_id: string; joined_at: number };
 
 // Bound by the v1 SQLite migration. Holds the matchmaking queue (server/lobbyManager.js) and the
@@ -42,6 +43,9 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE INDEX IF NOT EXISTS bot_games_by_bot ON bot_games (name_lc, id)");
     // Operator test bots stay rated but off the leaderboard and the feed (registration with "unlisted": true). Additive: rows are only ever inserted.
     sql.exec("CREATE TABLE IF NOT EXISTS unlisted_bots (name_lc TEXT PRIMARY KEY)");
+    // Replays of rated games (GET /api/replay/:id). Additive: rows are only ever inserted, one per settled game, for games rated after this shipped. replay_links ties a bot_games row to its replay.
+    sql.exec("CREATE TABLE IF NOT EXISTS replays (id TEXT PRIMARY KEY, game_id TEXT NOT NULL, x_name TEXT NOT NULL, o_name TEXT NOT NULL, x_lc TEXT, o_lc TEXT, first INTEGER NOT NULL, result TEXT NOT NULL, moves TEXT NOT NULL, at INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS replay_links (bot_game_id INTEGER PRIMARY KEY, replay_id TEXT NOT NULL)");
     sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206'), ('cc-launch-check')");
   }
 
@@ -75,12 +79,13 @@ export class Lobby extends DurableObject {
 
   // One finished game. `a` and `b` are registered bot names or null (guest, fixed at ELO_START and never stored);
   // `score` is a's result: 1 win, 0.5 draw, 0 loss. Both sides use the ratings from before the game.
-  recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): "rated" | "skipped" | "limit" {
+  // `replay` is the move list the Room held at settlement (first = the seat that moved first); without it the game has no replay.
+  recordGame(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1, replay?: Replay): "rated" | "skipped" | "limit" {
     // One transaction: the settled mark, the house counter, both rating upserts and the history rows land together or not at all.
-    return this.ctx.storage.transactionSync(() => this.settle(id, gameId, a, b, score));
+    return this.ctx.storage.transactionSync(() => this.settle(id, gameId, a, b, score, replay));
   }
 
-  private settle(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1): "rated" | "skipped" | "limit" {
+  private settle(id: string, gameId: string, a: string | null, b: string | null, score: 0 | 0.5 | 1, replay?: Replay): "rated" | "skipped" | "limit" {
     const sql = this.ctx.storage.sql;
     if (sql.exec("INSERT OR IGNORE INTO settled_games (id) VALUES (?)", id).rowsWritten === 0) return "skipped"; // already rated
     const house = [a, b].some((n) => n && HOUSE_NAMES[n.toLowerCase()]);
@@ -91,6 +96,10 @@ export class Lobby extends DurableObject {
       if (used >= HOUSE_DAILY) return "limit";
       sql.exec("INSERT INTO house_games (name_lc, day, n) VALUES (?, ?, 1) ON CONFLICT (name_lc, day) DO UPDATE SET n = n + 1", bot.toLowerCase(), day);
     }
+    const shown = (n: string | null) => (n ? HOUSE_NAMES[n.toLowerCase()] ?? n : "guest");
+    const hasReplay = !!replay?.moves?.length;
+    if (hasReplay) sql.exec("INSERT OR IGNORE INTO replays (id, game_id, x_name, o_name, x_lc, o_lc, first, result, moves, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      id, gameId, shown(a), shown(b), a?.toLowerCase() ?? null, b?.toLowerCase() ?? null, replay!.first, score === 1 ? "X" : score === 0 ? "O" : "draw", JSON.stringify(replay!.moves), Date.now());
     const get = (n: string | null) => (n ? sql.exec<{ rating: number }>("SELECT rating FROM ratings WHERE name_lc = ? AND game_id = ?", n.toLowerCase(), gameId).toArray()[0]?.rating ?? ELO_START : ELO_START);
     const [ra, rb] = [get(a), get(b)];
     const exp = 1 / (1 + 10 ** ((rb - ra) / 400));
@@ -99,6 +108,7 @@ export class Lobby extends DurableObject {
       if (!n) return;
       if (!HOUSE_NAMES[n.toLowerCase()]) sql.exec("INSERT INTO bot_games (name_lc, game_id, opponent, result, rating_after, at) VALUES (?, ?, ?, ?, ?, ?)",
         n.toLowerCase(), gameId, opp ? HOUSE_NAMES[opp.toLowerCase()] ?? opp : "guest", s === 1 ? "win" : s === 0 ? "loss" : "draw", r + ELO_K * (s - e), now);
+      if (hasReplay && !HOUSE_NAMES[n.toLowerCase()]) sql.exec("INSERT INTO replay_links (bot_game_id, replay_id) SELECT last_insert_rowid(), ?", id);
       sql.exec(
         `INSERT INTO ratings (name_lc, game_id, rating, games, wins, draws, losses) VALUES (?, ?, ?, 1, ?, ?, ?)
          ON CONFLICT (name_lc, game_id) DO UPDATE SET rating = excluded.rating, games = games + 1, wins = wins + excluded.wins, draws = draws + excluded.draws, losses = losses + excluded.losses`,
@@ -125,12 +135,16 @@ export class Lobby extends DurableObject {
   }
 
   // The last 20 rated bot sides across the arena, newest first (one row per bot per game). Names and numbers only.
-  listFeed(): { name: string; gameId: string; result: string; ratingAfter: number; at: number }[] {
+  // replayId is left out when the game has no replay or when either side is an unlisted bot (its name is in the replay).
+  listFeed(): { name: string; gameId: string; result: string; ratingAfter: number; at: number; replayId?: string }[] {
     return this.ctx.storage.sql
-      .exec<{ name: string; game_id: string; result: string; rating_after: number; at: number }>(
-        "SELECT COALESCE(b.name, g.name_lc) AS name, g.game_id, g.result, g.rating_after, g.at FROM bot_games g LEFT JOIN bots b ON b.name_lc = g.name_lc WHERE g.name_lc NOT IN (SELECT name_lc FROM unlisted_bots) ORDER BY g.id DESC LIMIT 20")
+      .exec<{ name: string; game_id: string; result: string; rating_after: number; at: number; replay_id: string | null }>(
+        `SELECT COALESCE(b.name, g.name_lc) AS name, g.game_id, g.result, g.rating_after, g.at,
+           CASE WHEN p.x_lc IN (SELECT name_lc FROM unlisted_bots) OR p.o_lc IN (SELECT name_lc FROM unlisted_bots) THEN NULL ELSE l.replay_id END AS replay_id
+         FROM bot_games g LEFT JOIN bots b ON b.name_lc = g.name_lc LEFT JOIN replay_links l ON l.bot_game_id = g.id LEFT JOIN replays p ON p.id = l.replay_id
+         WHERE g.name_lc NOT IN (SELECT name_lc FROM unlisted_bots) ORDER BY g.id DESC LIMIT 20`)
       .toArray()
-      .map((r) => ({ name: r.name, gameId: r.game_id, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
+      .map((r) => ({ name: r.name, gameId: r.game_id, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at, ...(r.replay_id ? { replayId: r.replay_id } : {}) }));
   }
 
   // One registered bot's rating in one game, for the README badge. Null when unregistered or no games. Number only.
@@ -142,17 +156,25 @@ export class Lobby extends DurableObject {
   }
 
   // A registered bot's last 10 rated games, newest first. Null when the name is not registered. Names and numbers only.
-  recentGames(name: string): { name: string; unlisted?: true; games: { gameId: string; opponent: string; result: string; ratingAfter: number; at: number }[] } | null {
+  recentGames(name: string): { name: string; unlisted?: true; games: { gameId: string; opponent: string; result: string; ratingAfter: number; at: number; replayId?: string }[] } | null {
     const sql = this.ctx.storage.sql;
     const lc = name.toLowerCase();
     const bot = sql.exec<{ name: string }>("SELECT name FROM bots WHERE name_lc = ?", lc).toArray()[0];
     if (!bot) return null;
     const games = sql
-      .exec<{ game_id: string; opponent: string; result: string; rating_after: number; at: number }>("SELECT game_id, opponent, result, rating_after, at FROM bot_games WHERE name_lc = ? ORDER BY id DESC LIMIT 10", lc)
+      .exec<{ game_id: string; opponent: string; result: string; rating_after: number; at: number; replay_id: string | null }>("SELECT g.game_id, g.opponent, g.result, g.rating_after, g.at, l.replay_id FROM bot_games g LEFT JOIN replay_links l ON l.bot_game_id = g.id WHERE g.name_lc = ? ORDER BY g.id DESC LIMIT 10", lc)
       .toArray()
-      .map((r) => ({ gameId: r.game_id, opponent: r.opponent, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at }));
+      .map((r) => ({ gameId: r.game_id, opponent: r.opponent, result: r.result, ratingAfter: Math.round(r.rating_after), at: r.at, ...(r.replay_id ? { replayId: r.replay_id } : {}) }));
     const unlisted = sql.exec("SELECT 1 FROM unlisted_bots WHERE name_lc = ?", lc).toArray().length > 0;
     return unlisted ? { name: bot.name, unlisted: true, games } : { name: bot.name, games };
+  }
+
+  // One settled game's replay, or null. The id is the unguessable settlement id, only linked from public rows (see listFeed).
+  getReplay(id: string): { id: string; gameId: string; players: [string, string]; first: number; result: string; moves: unknown[]; at: number } | null {
+    const r = this.ctx.storage.sql
+      .exec<{ id: string; game_id: string; x_name: string; o_name: string; first: number; result: string; moves: string; at: number }>("SELECT id, game_id, x_name, o_name, first, result, moves, at FROM replays WHERE id = ?", id)
+      .toArray()[0];
+    return r ? { id: r.id, gameId: r.game_id, players: [r.x_name, r.o_name], first: r.first, result: r.result, moves: JSON.parse(r.moves), at: r.at } : null;
   }
 
   reportLive(r: { roomId: string; gameId: string; x: string | null; o: string | null; moves: number; startedAt: number }): void {

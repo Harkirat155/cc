@@ -37,3 +37,6 @@ export function BadgeCopy({ name, game, label = "Badge", gameName = game }) {
     </>
   );
 }
+
+// Path of a game's replay page; link it only from a row that has a replayId (older games have no stored moves).
+export const replayPath = (id) => `/replay/${encodeURIComponent(id)}`;

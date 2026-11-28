@@ -32,6 +32,15 @@ describe("Arena page", () => {
     expect(screen.getByRole("link", { name: "Join" }).getAttribute("href")).toBe("/room/AB234");
   });
 
+  it("links a Just finished row that has a replay, and not one without", async () => {
+    const feed = [{ name: "Ada Bot", gameId: "ttt", result: "win", ratingAfter: 1216, at: 1, replayId: "r-9" }, { name: "Ada Bot", gameId: "ttt", result: "loss", ratingAfter: 1190, at: 0 }];
+    window.fetch = jest.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith("/api/live") ? { games: [] } : String(url).endsWith("/api/arena-feed") ? { feed } : { games: {} }) }));
+    show();
+    const link = await screen.findByRole("link", { name: "Replay" });
+    expect(link.getAttribute("href")).toBe("/replay/r-9");
+    expect(screen.getAllByRole("link", { name: "Replay" })).toHaveLength(1);
+  });
+
   it("shows an error, not the empty state, when the request fails", async () => {
     window.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 });
     show();

@@ -133,7 +133,7 @@ const GameBoard = ({
                   setPendingCell(null);
                   handleSquareClick(index);
                 }}
-                disabled={Boolean(value) || winningSquareIndexes.size > 0}
+                disabled={disabled || Boolean(value) || winningSquareIndexes.size > 0}
                 aria-label={value ? `${label}, ${info?.label || value}${isWinning ? " (winning)" : ""}` : `${label}, empty${isPending ? ", tap again to place" : ""}`}
                 className="relative flex aspect-square items-center justify-center border border-foreground/10 hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:cursor-default"
               >
@@ -179,6 +179,7 @@ const GameBoard = ({
                 gameId={gameId}
                 palette={palette}
                 isDarkSquare={darkSquare}
+              disabled={disabled}
                 hasSelectionFlow={hasSelectionFlow}
                 isSelected={selection === index}
                 isLegalTarget={legalTargetIndexes.has(index)}
@@ -211,6 +212,7 @@ const GameBoard = ({
               gameId={gameId}
               palette={palette}
               isDarkSquare={darkSquare}
+              disabled={disabled}
               hasSelectionFlow={hasSelectionFlow}
               isSelected={selection === index}
               isLegalTarget={legalTargetIndexes.has(index)}

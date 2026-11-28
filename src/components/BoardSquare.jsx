@@ -38,6 +38,7 @@ function areBoardSquarePropsEqual(prev, next) {
     prev.isSelected === next.isSelected &&
     prev.isLegalTarget === next.isLegalTarget &&
     prev.isDarkSquare === next.isDarkSquare &&
+    prev.disabled === next.disabled &&
     prev.hasSelectionFlow === next.hasSelectionFlow &&
     prev.isColumnHighlighted === next.isColumnHighlighted &&
     prev.onColumnEnter === next.onColumnEnter &&
@@ -58,6 +59,7 @@ const BoardSquare = memo(function BoardSquare({
   isSelected = false,
   isLegalTarget = false,
   isDarkSquare = false,
+  disabled = false,
   hasSelectionFlow = false,
   isColumnHighlighted = false,
   onColumnEnter,
@@ -125,7 +127,7 @@ const BoardSquare = memo(function BoardSquare({
       onBlur={onColumnLeave}
       aria-label={tooltipMessage}
       title={tooltipMessage}
-      disabled={!hasSelectionFlow && Boolean(hasValue)}
+      disabled={disabled || (!hasSelectionFlow && Boolean(hasValue))}
     >
       {isLegalTarget && !hasValue && (
         <LegalTargetDot />

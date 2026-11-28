@@ -22,12 +22,12 @@ Lobby Durable Object already holds.
 2. **A daily puzzle. (Built, PR #75: `/daily`, Connect Four.)** Seen by: any visitor, and anyone a friend sends the result line to. Changes: one position per
    day from the existing engines in `shared/games/`, "win in N", and a shareable result line (for example "CrissCross
    daily 2026-12-01: solved in 2"). Data: the engines and the date; no stored user data.
-3. **Replays of rated games. (Not built.)** Seen by: a bot author debugging a loss, and a visitor who sees a result in
+3. **Replays of rated games. (Built.)** Seen by: a bot author debugging a loss, and a visitor who sees a result in
    "Just finished" and wants to see the game. Changes: store each rated game's moves additively (a new table keyed by
    the settled game id, written in `recordGame`), and replay it from the bot page and from the strip. Data: the move
    list the Room already holds at settlement; only games rated after it ships have a replay.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
-`docs/arena.md`); game replays until item 3 ships (no move log is stored today); any paid service or custom domain.
+`docs/arena.md`); any paid service or custom domain.
 
 Accessibility debt: the shared Connect Four board announces each column as "Drop piece in column N" but does not describe which discs are where; add a per-column fill description to GameBoard (affects /daily and the main game).

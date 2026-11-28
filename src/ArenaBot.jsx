@@ -4,7 +4,7 @@ import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 import { liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
-import { BadgeCopy, RULE, SINCE, apiBase, gameLine, validName } from "./arenaShared";
+import { BadgeCopy, RULE, SINCE, apiBase, gameLine, replayPath, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
 const note = "rounded-2xl border border-foreground/10 p-4 text-foreground/70";
@@ -106,7 +106,7 @@ function ArenaBot() {
             <section aria-labelledby="recent">
               <h2 id="recent" className="text-xl font-semibold">Last 10 rated games since {SINCE}</h2>
               {games.length === 0 ? <p className="mt-2 text-foreground/70">No rated games recorded since {SINCE}</p>
-                : <ul className="mt-2 text-sm">{games.map((g, i) => <li key={i} className="border-t border-foreground/10 py-2">{gameLine(g, names)}</li>)}</ul>}
+                : <ul className="mt-2 text-sm">{games.map((g, i) => <li key={i} className="border-t border-foreground/10 py-2">{gameLine(g, names)}{g.replayId && <> · <Link to={replayPath(g.replayId)} className="underline underline-offset-4">Replay</Link></>}</li>)}</ul>}
             </section>
           </>
         )}

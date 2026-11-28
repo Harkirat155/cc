@@ -5,7 +5,7 @@ import { listAll } from "@shared/games/registry.js";
 import { ago, liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
 import OpenSeats from "./OpenSeats";
-import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, validName } from "./arenaShared";
+import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, replayPath, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
 
@@ -87,6 +87,7 @@ function Arena() {
                       <li key={i} className="border-t border-foreground/10 py-1.5">
                         {validName(g.name) ? <Link to={`/arena/${encodeURIComponent(g.name)}`} className="font-medium underline-offset-4 hover:underline">{g.name}</Link> : <span className="font-medium">{g.name}</span>}
                         {` · ${names[g.gameId] || g.gameId} · ${VERB[g.result] ?? g.result} · rating ${g.ratingAfter} · ${ago(g.at)}`}
+                        {g.replayId && <> · <Link to={replayPath(g.replayId)} className="underline underline-offset-4">Replay</Link></>}
                       </li>
                     ))}
                   </ul>

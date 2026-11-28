@@ -26,6 +26,15 @@ describe("bot page", () => {
     expect(window.fetch.mock.calls.some(([u]) => String(u).endsWith("/api/arena/Ada%20Bot"))).toBe(true);
   });
 
+  it("links a game that has a stored replay and leaves older games without a link", async () => {
+    stub({ bot: ok({ name: "Ada Bot", games: [{ ...games[0], replayId: "abc-1" }, games[1]] }) });
+    show();
+    await screen.findByText(/Won vs House \(easy\)/);
+    const links = screen.getAllByRole("link", { name: "Replay" });
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/replay/abc-1");
+  });
+
   it("says so, with a retry, when the games cannot be loaded, and recovers", async () => {
     stub({ bot: { ok: false, status: 500 } });
     show();

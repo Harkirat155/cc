@@ -9,6 +9,7 @@ const Agents = lazy(() => import('./Agents'));
 const Live = lazy(() => import('./Live'));
 const Arena = lazy(() => import('./Arena'));
 const ArenaBot = lazy(() => import('./ArenaBot'));
+const Replay = lazy(() => import('./Replay'));
 const Daily = lazy(() => import('./Daily'));
 
 function LoadingScreen() {
@@ -64,6 +65,7 @@ function App() {
           <Route path="/live" element={<Live />} />
           <Route path="/arena" element={<Arena />} />
           <Route path="/arena/:name" element={<ArenaBot />} />
+          <Route path="/replay/:id" element={<Replay />} />
           <Route path="/daily" element={<Daily />} />
         </Routes>
       </Suspense>

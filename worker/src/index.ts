@@ -108,6 +108,13 @@ app.get("/api/arena/:name", async (c) => {
   return r ? c.json(r, 200, { "Cache-Control": "public, max-age=10" }) : c.json({ error: "bot not found" }, 404);
 });
 
+// One rated game's moves (docs/arena.md). The id is the settlement id from a row's replayId; unknown or pre-replay games are 404.
+app.get("/api/replay/:id", async (c) => {
+  const id = c.req.param("id");
+  const r = id.length <= 64 ? await c.env.LOBBY.getByName("lobby").getReplay(id) : null;
+  return r ? c.json(r, 200, { "Cache-Control": "public, max-age=3600" }) : c.json({ error: "replay not found" }, 404);
+});
+
 // Rating badge for a bot's README (docs/arena.md): a flat SVG, no storage. Unknown bot or no games: grey "unrated", still 200.
 const BADGE_GAMES: Record<string, string> = { ttt: "Tic-Tac-Toe", connect4: "Connect Four", checkers: "Checkers", five: "Five in a Row" };
 const XML: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" };
