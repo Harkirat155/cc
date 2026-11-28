@@ -183,11 +183,12 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 app.get("/d/:date", (c) => {
   const date = c.req.param("date");
   const ms = DAY.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
-  if (!(ms >= Date.parse("2026-01-01T00:00:00Z") && ms <= Date.now() + 2 * 86400000) || new Date(ms).toISOString().slice(0, 10) !== date) {
+  // A day the puzzle has existed on (it launched 2026-11-27 UTC) and that has begun: a card never says "solved" about a future puzzle.
+  if (!(ms >= Date.parse("2026-11-27T00:00:00Z") && ms <= Math.floor(Date.now() / 86400000) * 86400000) || new Date(ms).toISOString().slice(0, 10) !== date) {
     return c.html(`<!doctype html><meta charset="utf-8"><title>Daily puzzle not found · CrissCross</title><p>No daily puzzle with this link. <a href="${PAGES}/daily">Today's daily puzzle</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
   }
   const title = html(`CrissCross Daily ${date} · a friend solved it`);
-  const desc = html(`A friend solved the ${date} Connect Four puzzle. Can you? One puzzle a day, the same for everyone.`);
+  const desc = html(`A friend solved the ${date} Connect Four puzzle. Play today’s: one puzzle a day, the same for everyone.`);
   const url = html(new URL(`/d/${date}`, c.req.url).href);
   // ?via=d lets the daily page count arrivals through shared links (the kill rule); crawlers never follow the refresh.
   const to = html(`${PAGES}/daily?via=d`);

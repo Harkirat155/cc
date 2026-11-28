@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
@@ -72,7 +72,10 @@ function ShareResult({ date, tries, streak }) {
         {state === "ok" ? "Copied" : "Share result"}
       </button>
       {state === "failed" && (
-        <input readOnly aria-label="Result line" value={`${text} ${url}`} onFocus={(e) => e.target.select()} className="mt-2 block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm" />
+        <>
+        <p className="mt-2 text-sm">Sharing is blocked here. Copy this by hand:</p>
+        <input readOnly aria-label="Result line" value={`${text} ${url}`} onFocus={(e) => e.target.select()} className="mt-1 block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm" />
+        </>
       )}
     </>
   );
@@ -82,9 +85,18 @@ function ShareResult({ date, tries, streak }) {
 function Daily() {
   const [today, setToday] = useState(() => todayUtc());
   const [past, setPast] = useState(false);
-  // Arrivals through a shared /d/ link (the Worker adds ?via=d): the share bet's kill-rule signal, counted once per page load.
-  const { search } = useLocation();
-  useEffect(() => { if (new window.URLSearchParams(search).get("via") === "d") tally("cc", "daily_link"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Arrivals through a shared /d/ link (the Worker adds ?via=d): the share bet's kill-rule signal. Counted once, then the marker is
+  // dropped from the address (replace, no new history entry) so a reload or a bookmark of this page never counts again.
+  const { pathname, search, hash } = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const q = new window.URLSearchParams(search);
+    if (q.get("via") !== "d") return;
+    tally("cc", "daily_link");
+    q.delete("via");
+    const rest = q.toString();
+    navigate(`${pathname}${rest ? `?${rest}` : ""}${hash}`, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const next = Date.parse(`${today}T00:00:00Z`) + 86400000;
     const t = window.setTimeout(() => { setToday(todayUtc()); setPast(false); }, Math.max(next - Date.now(), 0) + 50);

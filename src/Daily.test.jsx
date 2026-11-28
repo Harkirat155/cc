@@ -1,5 +1,5 @@
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
 import { puzzleForDate, keepsWin, defenderReply } from "@shared/daily.js";
@@ -156,6 +156,13 @@ describe("daily_link tally", () => {
     expect(hits()).toHaveLength(0);
     visit("/daily?via=d");
     expect(hits()).toHaveLength(1);
+  });
+
+  it("drops ?via=d from the address once counted, so a reload or a bookmark does not count again", () => {
+    const Where = () => <output data-testid="where">{useLocation().search}</output>;
+    render(<MemoryRouter initialEntries={["/daily?via=d&x=1"]}><Daily /><Where /></MemoryRouter>);
+    expect(hits()).toHaveLength(1);
+    expect(screen.getByTestId("where").textContent).toBe("?x=1");
   });
 });
 
