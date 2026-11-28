@@ -109,7 +109,7 @@ the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTT
    its rule in words. No names, no accounts, no per-player record. Data: tally `rush_verified`. Kill: fewer than 10 verified
    runs by 2026-12-19: remove the endpoint and the line.
 
-6. **Remind me tomorrow (exploit).** Seen by: anyone who just solved the daily. Changes: a "Remind me tomorrow" link
+6. **Remind me tomorrow (built; exploit).** Seen by: anyone who just solved the daily. Changes: a "Remind me tomorrow" link
    downloads a calendar file (`.ics`, a daily event at the UTC reset, made on the device), so people come back without an
    account or push permission. Data: tally `daily_remind`. Judge by `daily_play` from returning days.
 
