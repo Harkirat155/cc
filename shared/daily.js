@@ -253,7 +253,7 @@ export function fivePuzzleForDate(date) {
   const pick = (n) => Math.floor(rng() * n);
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const turn = pick(2);
-    const each = 4 + pick(5); // White's stones, 4..8; Black has the same, or one more when White is to move
+    const each = 4 + pick(5); // Green's stones, 4..8; Blue (first player) has the same, or one more when Green is to move
     const target = { B: each + turn, G: each };
     const board = Array(FIVE_SIZE * FIVE_SIZE).fill('');
     const [dr, dc] = DIRS[pick(DIRS.length)];

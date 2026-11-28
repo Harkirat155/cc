@@ -169,8 +169,7 @@ describe('Five in a Row day', () => {
   });
 
   test('the puzzle is stable and has exactly one winning cell for the side to move', () => {
-    expect(fiveDays.length).toBeGreaterThan(60);
-    for (const d of fiveDays.slice(0, 60)) {
+    for (const d of fiveDays) {
       const p = fivePuzzleForDate(d);
       expect(fivePuzzleForDate(d)).toEqual(p);
       const me = ['B', 'G'][p.turn];
@@ -192,9 +191,9 @@ describe('Five in a Row day', () => {
         alt[i] = me;
         expect(five.checkTerminal({ board: alt }).status).toBe('active');
       }
-      // every stone sits inside the shown window, so the crop loses nothing
+      // every stone and the answer sit inside the shown window, so the crop loses nothing
       p.board.forEach((v, i) => {
-        if (!v) return;
+        if (!v && i !== p.answers[0]) return;
         const r = Math.floor(i / 15) - FIVE_WINDOW.top;
         const c = (i % 15) - FIVE_WINDOW.left;
         expect(r >= 0 && r < FIVE_WINDOW.size && c >= 0 && c < FIVE_WINDOW.size).toBe(true);
