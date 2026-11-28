@@ -44,3 +44,13 @@ export async function shellFor(cacheStorage, current, pathname, base) {
   }
   return undefined;
 }
+
+// Kill switch activation: drop our caches, take over open pages (navigate only works on controlled ones), unregister,
+// then reload those pages from the network.
+export async function killActivate({ caches, clients, registration }) {
+  await activateCleanup(caches, null);
+  await clients.claim();
+  const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+  await registration.unregister();
+  await Promise.all(wins.map((c) => c.navigate(c.url).catch(() => {})));
+}

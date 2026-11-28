@@ -127,9 +127,9 @@ the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTT
    rechecks it on each visit and the new worker precaches into a new cache (all or nothing). It does not skip waiting or claim
    pages: it stays waiting until every tab on the old version is closed, then activates and deletes older `cc-shell-*`
    caches, so an open old tab keeps its own chunks. If a lazy chunk of an old bundle is gone anyway (`src/lib/lazyReload.js`),
-   the tab reloads once to get the new bundle. Offline, "Play the computer" from a room link starts the computer game and the
+   the tab reloads (at most once per 10 minutes) to get the new bundle. Offline, "Play the computer" from a room link starts the computer game and the
    home "Play a friend" door is disabled. Kill switch: `CC_SW_KILL=1 npm run build` emits `src/sw/kill.js` as `sw.js`;
-   deploy it and every phone that picks it up deletes all `cc-shell-*` caches, unregisters the worker and reloads its pages
+   deploy it and every phone that picks it up deletes all `cc-shell-*` caches, takes over its open pages, unregisters the worker and reloads those pages
    (recovery from a stale-deploy report; later normal builds register the offline worker again only if `registerSw` is
    left in `src/index.jsx`, so remove that call in the same change to retire the feature). Kill rule: remove the worker (ship a `sw.js` that unregisters itself) on any stale-deploy bug report, or if the Pages deploy
    check sees an old bundle served after an update.

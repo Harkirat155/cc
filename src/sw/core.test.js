@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { cacheName, staleCaches, routeFor, fallbackKeys, buildAssetList, activateCleanup, shellFor } from './core.js';
+import { cacheName, staleCaches, routeFor, fallbackKeys, buildAssetList, activateCleanup, shellFor, killActivate } from './core.js';
 
 const ctx = { origin: 'https://harkirat155.github.io', base: '/cc/', precache: new Set(['/cc/index.html', '/cc/assets/a-1.js', '/cc/icons/icon-192x192.svg']) };
 const req = (path, extra = {}) => ({ method: 'GET', mode: 'no-cors', url: `https://harkirat155.github.io${path}`, ...extra });
@@ -74,5 +74,25 @@ describe('shellFor', () => {
     expect(await shellFor(c, 'cc-shell-new', '/cc/daily', '/cc/')).toBe('DAILY');
     expect(await shellFor(c, 'cc-shell-new', '/cc/room/X', '/cc/')).toBe('NEW');
     expect(await shellFor(fakeCaches({ 'cc-shell-old': { '/cc/index.html': 'OLD' }, 'cc-shell-new': {} }), 'cc-shell-new', '/cc/', '/cc/')).toBeUndefined();
+  });
+});
+
+describe('killActivate', () => {
+  test('clears our caches, claims, navigates open uncontrolled tabs, unregisters', async () => {
+    const data = { 'cc-shell-a': {}, 'cc-shell-b': {}, 'other-app': {} };
+    const order = [];
+    const tab = { url: 'https://x/cc/', navigate: jest.fn(async () => { order.push('navigate'); }) };
+    const bad = { url: 'https://x/cc/daily', navigate: jest.fn(async () => { throw new Error('gone'); }) };
+    const clients = {
+      claim: async () => { order.push('claim'); },
+      matchAll: jest.fn(async () => { order.push('matchAll'); return [tab, bad]; }),
+    };
+    const registration = { unregister: async () => { order.push('unregister'); } };
+    await killActivate({ caches: fakeCaches(data), clients, registration });
+    expect(Object.keys(data)).toEqual(['other-app']);
+    expect(clients.matchAll).toHaveBeenCalledWith({ type: 'window', includeUncontrolled: true });
+    expect(tab.navigate).toHaveBeenCalledWith('https://x/cc/');
+    expect(bad.navigate).toHaveBeenCalled();
+    expect(order).toEqual(['claim', 'matchAll', 'unregister', 'navigate']);
   });
 });
