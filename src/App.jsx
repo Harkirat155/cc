@@ -13,6 +13,7 @@ const ArenaCup = lazy(() => import('./ArenaCup'));
 const Replay = lazy(() => import('./Replay'));
 const Daily = lazy(() => import('./Daily'));
 const DailyArchive = lazy(() => import('./DailyArchive'));
+const Rush = lazy(() => import('./Rush'));
 
 function LoadingScreen() {
   return (
@@ -72,6 +73,7 @@ function App() {
           <Route path="/daily" element={<Daily />} />
           <Route path="/daily/archive" element={<DailyArchive />} />
           <Route path="/daily/:date" element={<Daily />} />
+          <Route path="/rush" element={<Rush />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>
