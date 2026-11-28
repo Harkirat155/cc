@@ -2,8 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import ttt from "@shared/games/ttt.js";
-import { GAME_NAMES, defenderReply, gameForDate, keepsWin, puzzleForDate, solutionLine, todayUtc, tttPuzzleForDate } from "@shared/daily.js";
+import five from "@shared/games/five.js";
+import { FIVE_WINDOW, GAME_NAMES, defenderReply, fivePuzzleForDate, gameForDate, keepsWin, puzzleForDate, solutionLine, todayUtc, tttPuzzleForDate } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
+import { paletteForValue } from "./components/games/boardPresentationUtils";
+import { getGamePalette } from "./components/games/palette";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
 import { liveUrl } from "./Live";
@@ -94,6 +97,43 @@ function ShareResult({ date, tries, streak, game }) {
   );
 }
 
+// Five in a Row shows a 7x7 window of its 15x15 board (every stone is inside it) so each cell is a 44px target at 390px wide.
+// Cells are full-board indices; labels count rows and columns from the window's corner.
+const fiveRc = (cell) => ({ row: Math.floor(cell / 15) - FIVE_WINDOW.top + 1, col: (cell % 15) - FIVE_WINDOW.left + 1 });
+const FIVE_PALETTE = getGamePalette("five");
+
+function FiveWindow({ squares, onCell, winning, disabled }) {
+  const { top, left, size } = FIVE_WINDOW;
+  return (
+    <div className="mx-auto w-full max-w-sm rounded-xl border border-foreground/10 bg-foreground/[0.02] p-1 shadow-2xl" data-tour="board">
+      <div className="grid grid-cols-7">
+        {Array.from({ length: size * size }, (_, k) => {
+          const cell = (top + Math.floor(k / size)) * 15 + left + (k % size);
+          const value = squares[cell];
+          const info = paletteForValue(value, five.playerInfo, FIVE_PALETTE);
+          const { row, col } = fiveRc(cell);
+          const win = winning.includes(cell);
+          return (
+            <button
+              key={cell}
+              type="button"
+              onClick={() => onCell(cell)}
+              disabled={disabled || Boolean(value)}
+              aria-label={`Row ${row}, column ${col}, ${value ? `${info?.label?.replace(/^Player /, "") || value}${win ? " (winning)" : ""}` : "empty"}`}
+              className="flex aspect-square min-h-11 items-center justify-center border border-foreground/10 hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:cursor-default"
+            >
+              {value && <span className={`h-[72%] w-[72%] rounded-full border ${info?.piece || "bg-stone-500"} ${win ? "scale-110 ring-2 ring-foreground/60" : ""}`} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Per-game tally name: Connect Four keeps the original bare names.
+const evt = (base, game) => (game === "connect4" ? base : `${base}_${game}`);
+
 // "Play someone now": one fetch of GET /api/live when the day is done. A seat of the day's own game waiting for a player is joined directly;
 // on no seat, a failure or a slow answer the link already points at the lobby, so it is never a spinner or a dead button.
 function PlayNow({ game }) {
@@ -112,7 +152,7 @@ function PlayNow({ game }) {
     return () => { live = false; };
   }, [game]);
   return (
-    <Link to={seat ? `/room/${encodeURIComponent(seat)}` : "/lobby"} onClick={() => tally("cc", game === "connect4" ? "daily_play" : `daily_play_${game}`)} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+    <Link to={seat ? `/room/${encodeURIComponent(seat)}` : "/lobby"} onClick={() => tally("cc", evt("daily_play", game))} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
       Play someone now
     </Link>
   );
@@ -132,7 +172,7 @@ function Daily() {
     if (q.get("via") !== "d") return;
     // /daily/:date?via=d is the date the link shared; the event is per game so the kill rule reads Tic-Tac-Toe days apart (Connect Four keeps `daily_link`).
     const shared = isDay(asked, today) ? asked : today;
-    tally("cc", gameForDate(shared) === "connect4" ? "daily_link" : `daily_link_${gameForDate(shared)}`);
+    tally("cc", evt("daily_link", gameForDate(shared)));
     q.delete("via");
     const rest = q.toString();
     navigate(`${pathname}${rest ? `?${rest}` : ""}${hash}`, { replace: true });
@@ -153,9 +193,13 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const past = date !== today;
   const game = gameForDate(date);
   const isTtt = game === "ttt";
-  const marks = isTtt ? ["X", "O"] : MARKS;
-  const names = isTtt ? ["X", "O"] : COLOR;
-  const puzzle = useMemo(() => (isTtt ? tttPuzzleForDate(date) : puzzleForDate(date)), [date, isTtt]);
+  const isFive = game === "five";
+  const oneMove = isTtt || isFive; // a one-move position with `answers`, not a Connect Four forced win
+  const rules = isFive ? five : isTtt ? ttt : connect4;
+  const marks = isFive ? ["B", "G"] : isTtt ? ["X", "O"] : MARKS;
+  const names = isFive ? ["Blue", "Green"] : isTtt ? ["X", "O"] : COLOR;
+  const puzzle = useMemo(() => (isFive ? fivePuzzleForDate(date) : isTtt ? tttPuzzleForDate(date) : puzzleForDate(date)), [date, isTtt, isFive]);
+  const rcOf = (cell) => (isFive ? fiveRc(cell) : { row: Math.floor(cell / 3) + 1, col: (cell % 3) + 1 });
   const [saved, setSaved] = useState(() => (past ? loadPast(date) : load(date)));
   const [days, setDays] = useState(() => readStore().days);
   const [already] = useState(() => past && days.includes(date)); // a past day solved earlier shows no new result line
@@ -164,7 +208,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const [slipped, setSlipped] = useState(false);
   const [note, setNote] = useState("");
   const [shown, setShown] = useState(null); // null = my board; else how many moves of the winning line are on the board
-  const line = useMemo(() => (isTtt ? [{ cell: puzzle.answers[0], mark: marks[puzzle.turn] }] : solutionLine(puzzle)), [puzzle, isTtt]); // eslint-disable-line react-hooks/exhaustive-deps
+  const line = useMemo(() => (oneMove ? [{ cell: puzzle.answers[0], mark: marks[puzzle.turn] }] : solutionLine(puzzle)), [puzzle, oneMove]); // eslint-disable-line react-hooks/exhaustive-deps
   const status = useRef(null);
   const me = puzzle.turn;
 
@@ -183,12 +227,13 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
 
   const play = (col) => {
     if (done || board[col] !== "") return;
-    if (isTtt) {
+    if (oneMove) {
       const solves = puzzle.answers.includes(col);
+      const { row, col: c } = rcOf(col);
       setBoard(board.map((v, i) => (i === col ? marks[me] : v)));
-      setNote(`You played row ${Math.floor(col / 3) + 1}, column ${(col % 3) + 1}${solves ? (puzzle.kind === "win" ? " and won." : " and blocked.") : "."}`);
+      setNote(`You played row ${row}, column ${c}${solves ? (isFive || puzzle.kind === "win" ? " and won." : " and blocked.") : "."}`);
       if (solves) {
-        tally("cc", "daily_solve_ttt"); // once per day solved: `done` blocks any further move on this day
+        tally("cc", evt("daily_solve", game)); // once per day solved: `done` blocks any further move on this day
         save({ ...saved, solved: true });
       } else {
         setSlipped(true);
@@ -225,13 +270,14 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   };
 
   // The solution view is derived: the puzzle's start position plus the first `shown` moves of the line. Nothing is saved.
-  const place = (b, m) => (isTtt ? b.map((v, i) => (i === m.cell ? m.mark : v)) : drop(b, m.col, m.mark));
+  const place = (b, m) => (oneMove ? b.map((v, i) => (i === m.cell ? m.mark : v)) : drop(b, m.col, m.mark));
   const viewBoard = shown === null ? board : line.slice(0, shown).reduce(place, puzzle.board);
-  const end = shown === null ? null : (isTtt ? ttt : connect4).checkTerminal({ board: viewBoard });
+  const end = shown === null ? null : rules.checkTerminal({ board: viewBoard });
   const solutionWin = end?.status === "win" ? end : null;
   // Tic-Tac-Toe boards have no move announcer of their own (GameBoard speaks Connect Four drops only), so the caption says where the mark went.
-  const last = isTtt && shown > 0 ? line[shown - 1] : null;
-  const step = last ? `${last.mark} at row ${Math.floor(last.cell / 3) + 1}, column ${(last.cell % 3) + 1} · ` : "";
+  // Five in a Row says it with the shown window's own row and column numbers, and the mark by its colour name.
+  const last = oneMove && shown > 0 ? line[shown - 1] : null;
+  const step = last ? `${names[marks.indexOf(last.mark)]} at row ${rcOf(last.cell).row}, column ${rcOf(last.cell).col} · ` : "";
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
@@ -239,21 +285,25 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
         <Link to="/" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← CrissCross</Link>
         <header className="self-start">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{isTtt ? " · Tic-Tac-Toe" : ""}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{oneMove ? ` · ${GAME_NAMES[game]}` : ""}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
           {unavailable && <p className="mt-2 font-medium">{"That puzzle isn't available, here is today's."}</p>}
           <p className="mt-2 text-foreground/70">One puzzle a day, the same for everyone. New puzzle at 00:00 UTC.</p>
-          <p className="mt-2 font-medium">{isTtt ? `${names[me]} to move: ${puzzle.kind === "win" ? "win now" : "block their win"}.` : `${names[me]} to move: win in ${puzzle.n} of your moves.`}</p>
+          <p className="mt-2 font-medium">{isFive ? `${names[me]} to move: make the five that wins now.` : isTtt ? `${names[me]} to move: ${puzzle.kind === "win" ? "win now" : "block their win"}.` : `${names[me]} to move: win in ${puzzle.n} of your moves.`}</p>
         </header>
-        <GameBoard
-          squares={viewBoard}
-          onSquareClick={play}
-          winningSquares={solutionWin?.line ?? []}
-          rows={isTtt ? 3 : 6}
-          cols={isTtt ? 3 : 7}
-          playerInfo={(isTtt ? ttt : connect4).playerInfo}
-          boardSpec={(isTtt ? ttt : connect4).boardSpec}
-          disabled={done || shown !== null}
-        />
+        {isFive ? (
+          <FiveWindow squares={viewBoard} onCell={play} winning={solutionWin?.line ?? []} disabled={done || shown !== null} />
+        ) : (
+          <GameBoard
+            squares={viewBoard}
+            onSquareClick={play}
+            winningSquares={solutionWin?.line ?? []}
+            rows={isTtt ? 3 : 6}
+            cols={isTtt ? 3 : 7}
+            playerInfo={rules.playerInfo}
+            boardSpec={rules.boardSpec}
+            disabled={done || shown !== null}
+          />
+        )}
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
           {shown !== null ? (
             // The board's own sr-only status announces "<Side> dropped in column N"; this caption adds only what it does not say (progress, the winner).
@@ -276,7 +326,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
               <button type="button" onClick={retry} className="mt-2 rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">Try again</button>
             </>
           ) : (
-            <p className="text-sm text-foreground/70">{note || (isTtt ? `Try ${saved.tries}.` : `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`)}</p>
+            <p className="text-sm text-foreground/70">{note || (oneMove ? `Try ${saved.tries}.` : `Try ${saved.tries}. ${left} ${left === 1 ? "move" : "moves"} left to win.`)}</p>
           )}
         </div>
         {done && shown === null && (
