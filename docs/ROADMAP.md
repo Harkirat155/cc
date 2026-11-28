@@ -41,7 +41,7 @@
   `/d/`) and `daily_play_ttt`. Kill rule: over 4 weeks of live Tic-Tac-Toe days, `daily_link_ttt` or
   `daily_solve_ttt` per Tic-Tac-Toe day below `daily_link` or `daily_solve` per Connect Four day. Checkers not built.
 
-- A Five in a Row day in the daily (item 3, built, not live yet): every fourth UTC day (day number % 4 === 1, first on
+- A Five in a Row day in the daily (item 3, live 2026-11-28, Pages 1877e1d, cc-api 3c3050a0): every fourth UTC day (day number % 4 === 1, first on
   2026-12-02; 2026-11-28 stays Connect Four because it was already served) the daily is "make the five that wins now", one
   move with exactly one winning cell and no immediate five for the opponent, from `gameForDate` / `fivePuzzleForDate` in
   `shared/daily.js` (rules of `shared/games/five.js`). The page shows the 7x7 window of the 15x15 board that holds every
