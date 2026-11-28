@@ -118,9 +118,9 @@ describe("GET /api/arena/cup", () => {
     const t = body.current.games.ttt;
     expect(t.entrants).toBe(3);
     expect(t.table).toEqual([
-      { name: "Ada Bot", points: 2.5, games: 2, results: ["win", "draw", "bye"] },
-      { name: "Linus Bot", points: 1.5, games: 1, results: ["bye", "draw", "pending"] },
-      { name: "Grace Bot", points: 1, games: 1, results: ["loss", "bye", "pending"] },
+      { name: "Ada Bot", points: 2.5, games: 2, results: ["win", "draw", "bye"], opponents: ["Grace Bot", "Linus Bot", null] },
+      { name: "Linus Bot", points: 1.5, games: 1, results: ["bye", "draw", "pending"], opponents: [null, "Ada Bot", "Grace Bot"] },
+      { name: "Grace Bot", points: 1, games: 1, results: ["loss", "bye", "pending"], opponents: ["Ada Bot", null, "Linus Bot"] },
     ]);
     expect(t.winner).toEqual({ name: "Ada Bot", points: 2.5 });
   });
@@ -144,7 +144,7 @@ describe("GET /api/arena/cup", () => {
     const text = await (await cup()).text();
     expect(text).toContain("Ada Bot");
     for (const bad of ["SECRETHASH", "key_hash", "sid", "clientId", "socketId", "replay", "name_lc", "bot_game_id", "g1"]) expect(text).not.toContain(bad);
-    expect(Object.keys(JSON.parse(text).current.games.ttt.table[0]).sort()).toEqual(["games", "name", "points", "results"]);
+    expect(Object.keys(JSON.parse(text).current.games.ttt.table[0]).sort()).toEqual(["games", "name", "opponents", "points", "results"]);
   });
 
   it("does not let the name Cup shadow the route: registering it is refused", async () => {

@@ -6,8 +6,8 @@ import ArenaBot from "./ArenaBot";
 
 const ok = (b) => ({ ok: true, json: async () => b });
 const week = (w, extra = {}) => ({ week: w, games: { ttt: { entrants: 3, table: [
-  { name: "Ada Bot", points: 2.5, games: 2, results: ["win", "draw", "bye"] },
-  { name: "Grace Bot", points: 1, games: 1, results: ["loss", "bye", "pending"] },
+  { name: "Ada Bot", points: 2.5, games: 2, results: ["win", "draw", "bye"], opponents: ["Grace Bot", "Linus Bot", null] },
+  { name: "Grace Bot", points: 1, games: 1, results: ["loss", "bye", "pending"], opponents: ["Ada Bot", null, "Linus Bot"] },
 ], winner: { name: "Ada Bot", points: 2.5 } }, ...extra } });
 const showCup = () => render(<MemoryRouter initialEntries={["/arena/cup"]}><Routes><Route path="/arena/cup" element={<ArenaCup />} /></Routes></MemoryRouter>);
 afterEach(() => { delete window.fetch; });
@@ -34,9 +34,9 @@ describe("cup page", () => {
     expect(table.getAttribute("aria-describedby")).toBe("cup-rule");
     expect(document.getElementById("cup-rule").textContent).toMatch(/win 1, draw ½, loss 0\. A bye .* is 1 point/);
     const rows = within(table).getAllByRole("row");
-    expect(rows[1].textContent).toContain("Round 1 won · Round 2 drew · Round 3 bye");
+    expect(rows[1].textContent).toContain("Round 1 vs Grace Bot: won · Round 2 vs Linus Bot: drew · Round 3: bye");
     expect(rows[1].textContent).toContain("2½");
-    expect(rows[2].textContent).toContain("Round 3 not played yet");
+    expect(rows[2].textContent).toContain("Round 3 vs Linus Bot: not played yet");
     const winners = screen.getByRole("heading", { name: "Last week's winners" }).parentElement;
     expect(winners.textContent).toContain("Tic-Tac-Toe · Ada Bot · 2½ points");
     expect(screen.getAllByRole("link", { name: "Ada Bot" })[0].getAttribute("href")).toBe("/arena/Ada%20Bot");
@@ -61,8 +61,8 @@ describe("bot page cup results", () => {
     stub(ok({ current: week("2026-12-06"), last: null }));
     show();
     const table = await screen.findByRole("table", { name: "Tic-Tac-Toe cup result for Grace Bot" });
-    expect(table.textContent).toContain("Round 1 lost");
-    expect(table.textContent).not.toContain("Ada Bot");
+    expect(table.textContent).toContain("Round 1 vs Ada Bot: lost");
+    expect(within(table).getAllByRole("row")).toHaveLength(2); // the header and this bot's row only
   });
 
   it("shows no cup section when the bot has no cup row, or the cup cannot load", async () => {

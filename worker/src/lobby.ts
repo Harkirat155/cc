@@ -161,14 +161,14 @@ export class Lobby extends DurableObject {
     }
   }
 
-  // This week's table and last week's (the two newest cups). Names and numbers only. A pairing's result is the next rated game
+  // This week's table and last week's (the two newest cups). Names and numbers only; opponents[i] is round i+1's paired bot (null: bye). A pairing's result is the next rated game
   // between the two bots, in that game type, inside the cup's 7 days; points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
   listCup() {
     const sql = this.ctx.storage.sql;
     const weeks = sql.exec<{ week: string; at: number }>("SELECT week, MIN(at) AS at FROM cup_runs GROUP BY week ORDER BY week DESC LIMIT 2").toArray();
     const names = new Map(sql.exec<{ name_lc: string; name: string }>("SELECT name_lc, name FROM bots").toArray().map((b) => [b.name_lc, b.name]));
     const view = (w: { week: string; at: number }) => {
-      const games: Record<string, { entrants: number; table: { name: string; points: number; games: number; results: string[] }[]; winner: { name: string; points: number } | null }> = {};
+      const games: Record<string, { entrants: number; table: { name: string; points: number; games: number; results: string[]; opponents: (string | null)[] }[]; winner: { name: string; points: number } | null }> = {};
       for (const run of sql.exec<{ game_id: string; entrants: number }>("SELECT game_id, entrants FROM cup_runs WHERE week = ? ORDER BY game_id", w.week).toArray()) {
         const rating = new Map(sql.exec<{ name_lc: string; rating: number }>("SELECT name_lc, rating FROM cup_entries WHERE week = ? AND game_id = ?", w.week, run.game_id).toArray().map((e) => [e.name_lc, e.rating]));
         const played = new Map<string, string[]>(); // "a|b" -> a's results against b, oldest first
@@ -176,13 +176,14 @@ export class Lobby extends DurableObject {
           const opp = g.opponent.toLowerCase();
           if (rating.has(g.name_lc) && rating.has(opp)) played.set(`${g.name_lc}|${opp}`, [...(played.get(`${g.name_lc}|${opp}`) ?? []), g.result]);
         }
-        const side = new Map([...rating.keys()].map((lc) => [lc, { points: 0, games: 0, results: [] as string[] }]));
+        const side = new Map([...rating.keys()].map((lc) => [lc, { points: 0, games: 0, results: [] as string[], opponents: [] as (string | null)[] }]));
         const flip = { win: "loss", loss: "win", draw: "draw" } as Record<string, string>;
         const pts = { win: 1, draw: 0.5, loss: 0 } as Record<string, number>;
         for (const p of sql.exec<{ a_lc: string; b_lc: string | null }>("SELECT a_lc, b_lc FROM cup_pairings WHERE week = ? AND game_id = ? ORDER BY round, rowid", w.week, run.game_id).toArray()) {
           const a = side.get(p.a_lc)!;
-          if (!p.b_lc) { a.results.push("bye"); a.points += 1; continue; }
+          if (!p.b_lc) { a.results.push("bye"); a.opponents.push(null); a.points += 1; continue; }
           const b = side.get(p.b_lc)!;
+          a.opponents.push(names.get(p.b_lc) ?? p.b_lc); b.opponents.push(names.get(p.a_lc) ?? p.a_lc);
           const res = played.get(`${p.a_lc}|${p.b_lc}`)?.shift();
           if (!res) { a.results.push("pending"); b.results.push("pending"); continue; }
           played.get(`${p.b_lc}|${p.a_lc}`)?.shift(); // the same game, from the other side
@@ -191,7 +192,7 @@ export class Lobby extends DurableObject {
         }
         const table = [...side].map(([lc, s]) => ({ lc, name: names.get(lc) ?? lc, ...s }))
           .sort((x, y) => y.points - x.points || rating.get(y.lc)! - rating.get(x.lc)! || (x.lc < y.lc ? -1 : 1))
-          .map(({ name, points, games: n, results }) => ({ name, points, games: n, results }));
+          .map(({ name, points, games: n, results, opponents }) => ({ name, points, games: n, results, opponents }));
         games[run.game_id] = { entrants: run.entrants, table, winner: table[0]?.points > 0 ? { name: table[0].name, points: table[0].points } : null };
       }
       return { week: w.week, games };

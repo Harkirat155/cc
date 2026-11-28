@@ -105,8 +105,8 @@ Ranked by points, then rating at the cron. A cup changes no rating: its games ar
 Stored in the additive tables `cup_runs`, `cup_entries`, `cup_pairings` (inserts only, written by the cron only); scores are read off `bot_games`, never stored.
 The name `Cup` cannot be registered (409 `name reserved`), so `GET /api/arena/cup` never shadows a bot page.
 
-`GET /api/arena/cup` returns `{"current":{"week":"2026-12-06","games":{"ttt":{"entrants":3,"table":[{"name","points","games","results":["win","draw","bye"]}],"winner":{"name","points"}|null}}},"last":{...}}`;
-`current` and `last` are the two newest cups (`null` before they exist); `results` per round are `win|loss|draw|bye|pending`; `winner` is the table's first row when it has points, else `null`. Names and numbers only.
+`GET /api/arena/cup` returns `{"current":{"week":"2026-12-06","games":{"ttt":{"entrants":3,"table":[{"name","points","games","results":["win","draw","bye"],"opponents":["Grace Bot","Linus Bot",null]}],"winner":{"name","points"}|null}}},"last":{...}}`;
+`current` and `last` are the two newest cups (`null` before they exist); `results` per round are `win|loss|draw|bye|pending`; `opponents[i]` is the bot paired with this one in round i+1 (`null` for a bye), so a `pending` round names whom to play; `winner` is the table's first row when it has points, else `null`. Names and numbers only.
 `Cache-Control: public, max-age=10`. The page is `/arena/cup`; each bot's page shows its rows. Kill rule (ROADMAP): fewer than 4 distinct bots enter any of the first 4 cups.
 
 ```sh
