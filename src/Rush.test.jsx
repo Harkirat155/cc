@@ -5,10 +5,10 @@ import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Rush from "./Rush";
-import { rushPuzzle } from "@shared/rush.js";
+import { rushPuzzle, rushSolve } from "@shared/rush.js";
 
 const DAY = "2026-11-28";
-const show = () => render(<MemoryRouter><Rush /></MemoryRouter>);
+const show = (search = "") => render(<MemoryRouter initialEntries={[`/rush${search}`]}><Rush /></MemoryRouter>);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -52,5 +52,72 @@ describe("rush page", () => {
     expect(screen.getByText("Solved 0")).toBeTruthy();
     expect(screen.getByText("Missed, next puzzle")).toBeTruthy();
     expect(screen.getByText(/^Connect Four\./)).toBeTruthy();
+  });
+
+  describe("beat challenge", () => {
+    const finish = () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      solveFirst();
+      act(() => { jest.advanceTimersByTime(181000); });
+    };
+
+    it("copies a ?beat=N link with the score and tallies it, when sharing is unavailable", async () => {
+      show();
+      finish();
+      const writeText = jest.fn(() => Promise.resolve());
+      Object.assign(window.navigator, { share: undefined, clipboard: { writeText } });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Challenge a friend" })); });
+      expect(writeText).toHaveBeenCalledWith("https://harkirat155.github.io/cc/rush?beat=1");
+      expect(screen.getByText("Link copied")).toBeTruthy();
+      expect(beacons()).toContain("rush_beat_link");
+    });
+
+    it("uses the share sheet when there is one", async () => {
+      show();
+      finish();
+      const share = jest.fn(() => Promise.resolve());
+      Object.assign(window.navigator, { share });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Challenge a friend" })); });
+      expect(share.mock.calls[0][0].url).toBe("https://harkirat155.github.io/cc/rush?beat=1");
+      expect(beacons()).toContain("rush_beat_link");
+    });
+
+    it("offers no challenge after a run that solved nothing", () => {
+      show();
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      act(() => { jest.advanceTimersByTime(181000); });
+      expect(screen.queryByRole("button", { name: "Challenge a friend" })).toBeNull();
+    });
+
+    it("shows the target, then whether it was beaten, tied or missed", () => {
+      show("?beat=1");
+      expect(screen.getByText("Beat 1")).toBeTruthy();
+      finish();
+      expect(screen.getByText("You tied 1, one more beats it")).toBeTruthy();
+    });
+
+    it("says the target was missed when nothing was solved", () => {
+      show("?beat=1");
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      act(() => { jest.advanceTimersByTime(181000); });
+      expect(screen.getByText("Not beaten: 0 against 1")).toBeTruthy();
+    });
+
+    it.each(["abc", "0", "1000", "-3", "2.5", "1e2", ""])("ignores beat=%s", (v) => {
+      show(`?beat=${v}`);
+      expect(screen.queryByText(/^Beat \d/)).toBeNull();
+    });
+
+    it("says the target was beaten when the score is higher", () => {
+      show("?beat=1");
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      solveFirst();
+      rushSolve(rushPuzzle(DAY, 1)).forEach((col) => {
+        fireEvent.click(screen.getByRole("button", { name: new RegExp(`^Column ${col + 1}: `) }));
+      });
+      expect(screen.getByText("Solved 2")).toBeTruthy();
+      act(() => { jest.advanceTimersByTime(181000); });
+      expect(screen.getByText("You beat 1 with 2")).toBeTruthy();
+    });
   });
 });
