@@ -45,7 +45,7 @@ function DailyArchive() {
         <Link to="/daily" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← Daily puzzle</Link>
         <header>
           <h1 className="text-3xl font-semibold tracking-tight">Past puzzles</h1>
-          <p className="mt-2 text-foreground/70">Solved on this phone: {solved} of {total} {total === 1 ? "day" : "days"}. Days in a row count solved days whenever you solved them, so a missed day solved late can extend a streak. Nothing leaves this phone.</p>
+          <p className="mt-2 text-foreground/70">Solved on this device: {solved} of {total} {total === 1 ? "day" : "days"}. Days in a row count solved days whenever you solved them, so solving a missed day later can extend your streak. This record stays on this device.</p>
           <p className="mt-2 text-sm text-foreground/60">●● Connect Four, ✕○ Tic-Tac-Toe. ✓ solved, … tried.</p>
         </header>
         {months.map((ym) => (

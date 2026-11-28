@@ -32,7 +32,7 @@ describe("daily archive", () => {
     expect(screen.getByRole("link", { name: "28 November, Connect Four, tried" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "29 November, Connect Four, not tried" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "30 November, Tic-Tac-Toe, not tried" })).toBeTruthy();
-    expect(screen.getByText(/Solved on this phone: 1 of 4 days/)).toBeTruthy();
+    expect(screen.getByText(/Solved on this device: 1 of 4 days/)).toBeTruthy();
     expect(tally).toHaveBeenCalledTimes(1);
     expect(tally).toHaveBeenCalledWith("cc", "daily_archive");
   });
