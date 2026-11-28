@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ScorePlayerCard from "./ScorePlayerCard";
 import { getGamePalette } from "./games/palette";
 
@@ -19,8 +19,16 @@ const ScorePanel = ({
   isMultiplayer,
   displayName,
   onUpdateDisplayName,
-  emote,
+  emote: incomingEmote,
 }) => {
+  // A reaction shows beside its sender's seat for 3 s.
+  const [emote, setEmote] = useState(null);
+  useEffect(() => {
+    setEmote(incomingEmote || null);
+    if (!incomingEmote) return undefined;
+    const t = setTimeout(() => setEmote(null), 3000);
+    return () => clearTimeout(t);
+  }, [incomingEmote]);
   const [editingSlot, setEditingSlot] = useState(null);
   const [editValue, setEditValue] = useState("");
 

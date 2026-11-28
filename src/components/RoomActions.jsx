@@ -36,8 +36,7 @@ const RoomActions = ({ gameState, socketId, roster, onAction, reactions = true }
 
   const sendEmote = (e) => {
     setCooling(true);
-    onAction("emote", { emote: e });
-    tally("cc", "react");
+    if (onAction("emote", { emote: e }) === true) tally("cc", "react");
   };
 
   if (!socketId || (roster?.X !== socketId && roster?.O !== socketId)) return null; // spectators get no controls

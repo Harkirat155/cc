@@ -104,14 +104,6 @@ const Game = () => {
       enableMic(false);
     }
   };
-  // A reaction shows beside its sender's seat for 3 s, on both screens.
-  const [visibleEmote, setVisibleEmote] = useState(null);
-  useEffect(() => {
-    if (!emote) return undefined;
-    setVisibleEmote(emote);
-    const t = setTimeout(() => setVisibleEmote(null), 3000);
-    return () => clearTimeout(t);
-  }, [emote]);
   const winningSquares = gameState.winningLine || [];
   // The cell filled by the move shown on the board: diff with the previous snapshot.
   const prevSquares = history?.[Math.min(viewIndex, history.length - 1) - 1]?.squares;
@@ -390,7 +382,7 @@ const Game = () => {
             isMultiplayer={isMultiplayer}
             displayName={displayName}
             onUpdateDisplayName={updateDisplayName}
-            emote={visibleEmote}
+            emote={emote}
           />
           <div className="relative flex w-full flex-col items-center gap-8">
             <div className="relative w-full">

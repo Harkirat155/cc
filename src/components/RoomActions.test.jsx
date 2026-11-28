@@ -29,7 +29,7 @@ test("an incoming draw offer shows Accept and Decline", () => {
 });
 
 test("six labelled reactions send the chosen value and tally once per send; resign hides when the game ended", () => {
-  const onAction = setup({ status: "win" });
+  const onAction = setup({ status: "win" }, jest.fn(() => true));
   expect(screen.queryByText("Resign")).toBeNull();
   expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
     "Send thumbs up", "Send clap", "Send surprised", "Send relieved", "Send thinking", "Send fire",
@@ -38,6 +38,12 @@ test("six labelled reactions send the chosen value and tally once per send; resi
   expect(onAction).toHaveBeenCalledWith("emote", { emote: "🔥" });
   expect(tally).toHaveBeenCalledWith("cc", "react");
   expect(tally).toHaveBeenCalledTimes(1);
+});
+
+test("nothing is tallied when the send did not go out", () => {
+  setup({ status: "win" }, jest.fn(() => false));
+  fireEvent.click(screen.getByLabelText("Send thumbs up"));
+  expect(tally).not.toHaveBeenCalled();
 });
 
 test("the buttons are disabled for 1 s after a send", () => {

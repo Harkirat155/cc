@@ -399,19 +399,38 @@ describe("game: resign, draw offers, emotes", () => {
     const { a, b, roomId } = await pair();
     const c = await open(`/ws/room/${roomId}`);
     expect(await c.call("joinRoom", { roomId })).toEqual({ player: "spectator" });
-    b.send("emote", { roomId, emote: "🔥" });
-    for (const w of [a, b, c]) expect((await w.wait((x) => x.t === "emote")).d).toEqual({ slot: 1, emote: "🔥" });
+    b.send("emote", { roomId, emote: "😮" });
+    for (const w of [a, b, c]) expect((await w.wait((x) => x.t === "emote")).d).toEqual({ slot: 1, emote: "😮" });
   });
 
-  it("rejects a spectator's reaction and anything outside the four fixed ones", async () => {
+  it("drops a spectator's reaction", async () => {
     const { a, b, roomId } = await pair();
     const c = await open(`/ws/room/${roomId}`);
     await c.call("joinRoom", { roomId });
     c.send("emote", { roomId, emote: "👍" });
+    await flush(b, roomId, a);
+    for (const w of [a, b, c]) expect(w.frames.some((x) => x.t === "emote")).toBe(false);
+  });
+
+  it("drops a send from a socket that has not joined the room", async () => {
+    const { a, b, roomId } = await pair();
+    const c = await open(`/ws/room/${roomId}`);
+    c.send("emote", { roomId, emote: "👍" });
+    await flush(b, roomId, a);
+    expect(a.frames.some((x) => x.t === "emote")).toBe(false);
+  });
+
+  it("drops values outside the fixed set", async () => {
+    const { a, b, roomId } = await pair();
     for (const bad of ["hi", "👍👍", "🤝", 5, null]) b.send("emote", { roomId, emote: bad });
     await flush(b, roomId, a);
     expect(a.frames.some((x) => x.t === "emote")).toBe(false);
-    expect(c.frames.some((x) => x.t === "emote")).toBe(false);
+  });
+
+  it("takes the slot from the seat, never from the frame", async () => {
+    const { a, b, roomId } = await pair();
+    b.send("emote", { roomId, emote: "👍", slot: 0 });
+    expect((await a.wait((x) => x.t === "emote")).d).toEqual({ slot: 1, emote: "👍" });
   });
 
   it("allows one reaction per second per seat, and the other seat has its own budget", async () => {
