@@ -67,6 +67,7 @@ function App() {
           <Route path="/arena/:name" element={<ArenaBot />} />
           <Route path="/replay/:id" element={<Replay />} />
           <Route path="/daily" element={<Daily />} />
+          <Route path="/daily/:date" element={<Daily />} />
         </Routes>
       </Suspense>
     </AppTooltipProvider>

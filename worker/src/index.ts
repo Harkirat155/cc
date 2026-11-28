@@ -188,10 +188,10 @@ app.get("/d/:date", (c) => {
     return c.html(`<!doctype html><meta charset="utf-8"><title>Daily puzzle not found · CrissCross</title><p>No daily puzzle with this link. <a href="${PAGES}/daily">Today's daily puzzle</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
   }
   const title = html(`CrissCross Daily ${date} · a friend solved it`);
-  const desc = html(`A friend solved the ${date} Connect Four puzzle. Play today’s: one puzzle a day, the same for everyone.`);
+  const desc = html(`A friend solved the ${date} Connect Four puzzle. Can you?`);
   const url = html(new URL(`/d/${date}`, c.req.url).href);
   // ?via=d lets the daily page count arrivals through shared links (the kill rule); crawlers never follow the refresh.
-  const to = html(`${PAGES}/daily?via=d`);
+  const to = html(`${PAGES}/daily/${date}?via=d`);
   const img = `${PAGES}/og-daily.png`;
   return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <meta name="description" content="${desc}">
