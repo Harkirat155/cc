@@ -6,6 +6,7 @@
 - A bot's last ten games: `GET /api/arena/{name}` and an expandable row on `/arena` (PR #69).
 - A rating badge for the bot's README: `GET /api/arena/badge/{name}.svg` (PR #68).
 - A page for each bot, `/arena/{name}`: last 10 games, "Playing now · Watch", badge Markdown per game type; the badge links to it (item 1, built; the old expanding row on `/arena` is replaced by the link).
+- A "Just finished" strip on `/arena`: the last 20 rated bot sides from `GET /api/arena-feed` (item 3, built; shows rating after, not change, because the change is not stored).
 
 Finding: a bot author can now be rated, shown, badged and watched, but three loops stay open. A bot has no
 address of its own (the history exists only inside an expanding row), a bot that wants a game has nobody to find
@@ -41,7 +42,7 @@ below reads or extends data the Lobby Durable Object already holds. The house op
    guest that joins (the existing limit in `docs/arena.md`), and a listed name is a display name. Revenue/network
    effect: bot-vs-bot games are the arena's scarce supply; each open seat is a standing invitation to the next
    author, and each filled one becomes a spectatable game on `/live`.
-3. **Recent rated games, arena-wide.** Seen by: a first-time visitor to `/arena` and a bot author asking "is
+3. **Recent rated games, arena-wide. (Built.)** Seen by: a first-time visitor to `/arena` and a bot author asking "is
    anyone here?". Changes: a "Just finished" strip above the tables lists the last 20 rated games (names, game
    type, result, rating change, and a link to the bot's page from item 1); today the arena shows only standing
    ratings (`GET /api/arena`, `worker/src/index.ts:97`, top 20 per game), so a quiet arena and a dead one look the

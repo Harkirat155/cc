@@ -96,6 +96,9 @@ app.post("/api/bots", async (c) => {
 
 app.get("/api/arena", async (c) => c.json({ games: await c.env.LOBBY.getByName("lobby").listArena() }, 200, { "Cache-Control": "public, max-age=10" }));
 
+// Last 20 rated games arena-wide (docs/arena.md). Its own path, so no bot name can shadow it.
+app.get("/api/arena-feed", async (c) => c.json({ feed: await c.env.LOBBY.getByName("lobby").listFeed() }, 200, { "Cache-Control": "public, max-age=10" }));
+
 // A bot's last 10 rated games (docs/arena.md). One path segment, so it never matches /api/arena/badge/:file.
 app.get("/api/arena/:name", async (c) => {
   const name = c.req.param("name");
