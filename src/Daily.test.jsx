@@ -426,3 +426,64 @@ describe("dated daily link /daily/:date", () => {
     expect(screen.getByTestId("where").textContent).toBe(`/daily/${PAST}`);
   });
 });
+
+describe("play someone now", () => {
+  const beacon = jest.fn(() => true);
+  const link = () => screen.queryByRole("link", { name: "Play someone now" });
+  const events = (e) => beacon.mock.calls.map(([u]) => u).filter((u) => u.includes(`e=${e}`));
+  const live = (open) => { window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open }) }); };
+  const solvedDay = async () => { show(); solve(puzzleForDate(DATE)); await act(async () => {}); };
+  beforeEach(() => { beacon.mockClear(); Object.assign(navigator, { sendBeacon: beacon }); live([]); });
+
+  it("appears once the day is done, not before, and hides in the solution view", async () => {
+    show();
+    expect(link()).toBeNull();
+    solve(puzzleForDate(DATE));
+    await act(async () => {});
+    expect(link()).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    expect(link()).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Back to my board" }));
+    expect(link()).toBeTruthy();
+  });
+
+  it("appears after a slip too", async () => {
+    show();
+    drop(slip(puzzleForDate(DATE)));
+    await act(async () => {});
+    expect(link()).toBeTruthy();
+  });
+
+  it("points at an open Connect Four seat", async () => {
+    live([{ roomId: "TT111", gameId: "tictactoe", name: "Cy" }, { roomId: "AB234", gameId: "connect4", name: "Ada" }]);
+    await solvedDay();
+    expect(link().getAttribute("href")).toBe("/room/AB234");
+  });
+
+  it("points at the lobby with no open seat", async () => {
+    live([{ roomId: "TT111", gameId: "tictactoe", name: "Cy" }]);
+    await solvedDay();
+    expect(link().getAttribute("href")).toBe("/lobby");
+  });
+
+  it("points at the lobby when the fetch fails", async () => {
+    window.fetch = jest.fn().mockRejectedValue(new Error("offline"));
+    await solvedDay();
+    expect(link().getAttribute("href")).toBe("/lobby");
+  });
+
+  it("sends daily_play on click", async () => {
+    await solvedDay();
+    expect(events("daily_play")).toHaveLength(0);
+    fireEvent.click(link());
+    expect(events("daily_play")).toHaveLength(1);
+  });
+
+  it("sends daily_solve once on first solve and not when a solved day is shown again", async () => {
+    await solvedDay();
+    expect(events("daily_solve")).toHaveLength(1);
+    render(<MemoryRouter><Daily /></MemoryRouter>);
+    expect(screen.getAllByText("Solved.").length).toBeGreaterThan(1);
+    expect(events("daily_solve")).toHaveLength(1);
+  });
+});
