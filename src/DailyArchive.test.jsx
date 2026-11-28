@@ -3,9 +3,9 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import Daily from "./Daily";
 import DailyArchive from "./DailyArchive";
+import { tally } from "./lib/tally"; // jest.mock above is hoisted, so this is the mock
 
 jest.mock("./lib/tally", () => ({ tally: jest.fn() }));
-const { tally } = require("./lib/tally");
 
 const show = (path = "/daily/archive") => render(
   <MemoryRouter initialEntries={[path]}>
