@@ -42,7 +42,7 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE INDEX IF NOT EXISTS bot_games_by_bot ON bot_games (name_lc, id)");
     // Operator test bots stay rated but off the leaderboard and the feed (registration with "unlisted": true). Additive: rows are only ever inserted.
     sql.exec("CREATE TABLE IF NOT EXISTS unlisted_bots (name_lc TEXT PRIMARY KEY)");
-    sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206')");
+    sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206'), ('cc-launch-check')");
   }
 
   async registerBot(name: unknown, ip: string, unlisted = false): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
