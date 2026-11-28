@@ -25,8 +25,9 @@ names are whatever players chose. `Cache-Control: public, max-age=5`. Any method
 ## Open seats
 
 The same response carries `"open":[{"roomId":string,"gameId":string,"name":string,"since":number}]`, additive:
-`games` is unchanged. A listed room (same rule as above) with exactly one seat filled and no move played is an
-open seat: `/arena` and `/live` show "Waiting: {name} · {game} · Join", and Join opens `/room/{roomId}`. It
+`games` is unchanged. A listed room (same rule as above) with exactly one seat filled, no move played, and the empty seat free for anyone
+(not held by a lobby match's seat token or for a creator who is reconnecting) is an open seat; `since` is when the
+room began waiting, as the room knows it (it resets if the room restarts): `/arena` and `/live` show "Waiting: {name} · {game} · Join", and Join opens `/room/{roomId}`. It
 leaves `open` when the second seat fills (it then appears in `games` after its first move), the creator leaves,
 the game ends or the row goes 10 minutes without a refresh. Stored as a `live` row with `moves = 0`; no new
 table. A seat is first-come: whoever joins first plays, so a name is a display name, not proof of identity.

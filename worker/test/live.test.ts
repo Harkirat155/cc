@@ -130,6 +130,33 @@ describe("GET /api/live", () => {
     expect(games[0]).toMatchObject({ roomId: ma.roomId, gameId: "connect4", players: ["Ada", "Bo"], moves: 1 });
   });
 
+  it("keeps an open seat's since while the room republishes", async () => {
+    await clear();
+    const a = await open("/ws/room/new");
+    const { roomId } = await a.call("createRoom", { clientId: `a${Math.random()}`, displayName: "Alice", listPublicly: true });
+    const [first] = await untilOpen((x) => x.length === 1);
+    await new Promise((r) => setTimeout(r, 5));
+    a.send("updateDisplayName", { roomId, displayName: "Alicia" });
+    const [again] = await untilOpen((x) => x[0]?.name === "Alicia");
+    expect(again.since).toBe(first.since);
+  });
+
+  it("does not offer a lobby match's token-held seat as open", async () => {
+    await clear();
+    const la = await open("/ws/lobby");
+    const lb = await open("/ws/lobby");
+    await la.call("joinLobby", { displayName: "Ada", gameId: "connect4" });
+    await lb.call("joinLobby", { displayName: "Bo", gameId: "connect4" });
+    const ma = (await la.wait((f) => f.t === "matchFound")).d;
+    const ra = await open(`/ws/room/${ma.roomId}`);
+    await ra.call("joinRoom", { roomId: ma.roomId, clientId: "ca", token: ma.token });
+    // A room that really is open, reported after the matched one, proves the list has caught up.
+    const c = await open("/ws/room/new");
+    const { roomId: control } = await c.call("createRoom", { clientId: `c${Math.random()}`, displayName: "Cy", listPublicly: true });
+    const o = await untilOpen((x) => x.some((r) => r.roomId === control));
+    expect(o.map((r) => r.roomId)).toEqual([control]);
+  });
+
   it("rejects writes: only GET is routed", async () => {
     const r = await app.fetch(new Request("http://x/api/live", { method: "POST" }), env);
     expect(r.status).toBe(404);
