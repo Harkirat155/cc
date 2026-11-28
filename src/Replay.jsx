@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import "@shared/games/index.js";
 import { get as rulesFor } from "@shared/games/registry.js";
 import GameBoard from "./components/GameBoard";
-import { apiBase } from "./arenaShared";
+import { apiBase, badgeBase } from "./arenaShared";
 
 const note = "rounded-2xl border border-foreground/10 p-4 text-foreground/70";
 const btn = "rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40";
@@ -49,6 +49,16 @@ function Replay() {
     const g = gen;
     return () => { g.current++; };
   }, [load]);
+
+  // The Worker's /r/{id} page carries the link preview, then sends the browser on to this page.
+  const [copied, setCopied] = useState(false);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${badgeBase()}/r/${encodeURIComponent(id)}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard refused: the button stays "Copy link" */ }
+  };
 
   const loaded = typeof res === "object";
   const built = useMemo(() => {
@@ -103,6 +113,7 @@ function Replay() {
               <p role="status" aria-live="polite" className="text-sm font-medium">Move {at} of {total}</p>
               <button type="button" className={btn} disabled={at === total} onClick={() => setAt(at + 1)}>Next</button>
             </div>
+            <button type="button" className={btn} onClick={copyLink}>{copied ? "Copied" : "Copy link"}</button>
           </>
         )}
       </div>

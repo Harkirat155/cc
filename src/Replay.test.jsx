@@ -51,7 +51,7 @@ describe("replay page", () => {
     stub({ ok: true, json: async () => ({ ...body, moves: body.moves.slice(0, 3) }) });
     const { unmount } = show();
     await screen.findByText("Move 0 of 3");
-    const cells = () => screen.getAllByRole("button").filter((b) => !["Previous", "Next"].includes(b.textContent));
+    const cells = () => screen.getAllByRole("button").filter((b) => !["Previous", "Next", "Copy link"].includes(b.textContent));
     expect(cells().length).toBeGreaterThan(8);
     expect(cells().every((b) => b.disabled)).toBe(true);
     unmount();
@@ -118,5 +118,15 @@ describe("replay page", () => {
     stub({ ok: true, json: async () => ({ ...body, moves: [{ type: "place", cell: 4 }, { type: "place", cell: 4 }] }) });
     show();
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not be replayed/);
+  });
+
+  it("copies the unfurling /r/{id} link from the Worker, not the Pages URL", async () => {
+    stub({ ok: true, json: async () => body });
+    const writeText = jest.fn().mockResolvedValue();
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith("https://cc-api.harkirat-hira.workers.dev/r/r1");
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });
 });
