@@ -14,14 +14,14 @@ Finding: the arena works, but a first visit on a phone still sees test bots, a c
 be followed. Next, a reason to come back daily and a reason to share a game. Every item reads or extends data the
 Lobby Durable Object already holds.
 
-1. **Arena tidy. (Built in this PR; mark Built when merged.)** Seen by: a first-time visitor to `/arena` on a phone.
+1. **Arena tidy. (Built, PR #74.)** Seen by: a first-time visitor to `/arena` on a phone.
    Changes: operator test bots (`"unlisted": true` at registration, additive `unlisted_bots` table) leave the
    leaderboard and "Just finished"; W, D and L share one column so the table fits 390 px; the strip's bot names link
    to `/arena/{name}`; "The last rated result" reads right for one row. Data: `bots`, `ratings`, `bot_games`; one
    new table, inserts only.
-2. **A daily puzzle.** Seen by: any visitor, and anyone a friend sends the result line to. Changes: one position per
+2. **A daily puzzle. (Built, PR #75: `/daily`, Connect Four.)** Seen by: any visitor, and anyone a friend sends the result line to. Changes: one position per
    day from the existing engines in `shared/games/`, "win in N", and a shareable result line (for example "CrissCross
-   daily 2026-12-01: solved in 2"). Data: the engines and the date; no stored user data. (Another builder is on it.)
+   daily 2026-12-01: solved in 2"). Data: the engines and the date; no stored user data.
 3. **Replays of rated games. (Not built.)** Seen by: a bot author debugging a loss, and a visitor who sees a result in
    "Just finished" and wants to see the game. Changes: store each rated game's moves additively (a new table keyed by
    the settled game id, written in `recordGame`), and replay it from the bot page and from the strip. Data: the move
@@ -29,3 +29,5 @@ Lobby Durable Object already holds.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); game replays until item 3 ships (no move log is stored today); any paid service or custom domain.
+
+Accessibility debt: the shared Connect Four board announces each column as "Drop piece in column N" but does not describe which discs are where; add a per-column fill description to GameBoard (affects /daily and the main game).

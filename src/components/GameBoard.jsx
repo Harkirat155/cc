@@ -32,6 +32,7 @@ const GameBoard = ({
   selection = null,
   legalTargets = EMPTY_LEGAL_TARGETS,
   lastMove = null,
+  disabled = false,
 }) => {
   const colsClass = GRID_COLS[cols] || GRID_COLS[3];
   const isDark = Boolean(boardSpec?.dark);
@@ -78,7 +79,7 @@ const GameBoard = ({
                 onMouseLeave={() => setActiveColumn((current) => (current === col ? null : current))}
                 onFocus={() => setActiveColumn(col)}
                 onBlur={() => setActiveColumn((current) => (current === col ? null : current))}
-                disabled={columnIsFull}
+                disabled={disabled || columnIsFull}
                 className={cx(
                   "group flex flex-col gap-1 rounded-2xl p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 sm:gap-2 sm:p-1.5",
                   isHighlighted ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.04]"
