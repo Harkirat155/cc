@@ -4,6 +4,7 @@ import "@shared/games/index.js";
 import { listAll } from "@shared/games/registry.js";
 import { liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
+import { CUP_RULE, CupTable, cupWeek } from "./cupShared";
 import { BadgeCopy, RULE, SINCE, apiBase, gameLine, replayPath, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
@@ -13,6 +14,7 @@ function ArenaBot() {
   const { name: asked = "" } = useParams(); // the router already decodes it
   const valid = validName(asked);
   const [state, setState] = useState("loading"); // loading | error | missing | {name, games, rated}
+  const [cup, setCup] = useState([]); // optional: this bot's rows in the two newest cups; empty on any failure
   const [rooms, setRooms] = useState(() => new Map()); // optional; empty on any failure
   const gen = useRef(0); // bumped on every new request and on leaving the page: an older answer is dropped
   const liveGen = useRef(0); // live polls: only the newest tick may set rooms
@@ -35,6 +37,14 @@ function ArenaBot() {
       if (gen.current !== mine) return;
       const key = asked.toLowerCase();
       const rated = Object.entries(lb.games ?? {}).flatMap(([id, rows]) => (rows ?? []).filter((r) => String(r.name).toLowerCase() === key).map((r) => ({ id, ...r })));
+      // The cup rows are optional and must not hold the page: they arrive when they arrive, or not at all.
+      get("/cup").then((r) => (r?.ok ? r.json() : {})).catch(() => ({})).then((cupBody) => {
+        if (gen.current !== mine) return;
+        setCup([cupBody.current, cupBody.last].flatMap((w) => Object.entries(w?.games ?? {}).flatMap(([id, g]) => {
+          const row = (g.table ?? []).find((r) => String(r.name).toLowerCase() === key);
+          return row ? [{ week: w.week, id, row }] : [];
+        })));
+      });
       setState({ name: b.name || rated[0]?.name || asked, games: b.games ?? [], rated, unlisted: b.unlisted === true });
     } catch {
       if (gen.current === mine) setState("error");
@@ -103,6 +113,13 @@ function ArenaBot() {
                     <BadgeCopy name={name} game={id} label={`Badge: ${names[id] || id}`} gameName={names[id] || id} /></p>
                 ); })}
             </section>
+            {cup.length > 0 && (
+              <section aria-labelledby="cup">
+                <h2 id="cup" className="text-xl font-semibold">Weekly cup</h2>
+                <p id="cup-rule" className="mt-1 text-sm text-foreground/70">{CUP_RULE} <Link to="/arena/cup" className="inline-flex min-h-[44px] items-center underline underline-offset-4">All tables</Link></p>
+                {cup.map((c) => <div key={`${c.week}${c.id}`} className="mt-2"><h3 className="text-sm font-medium">{names[c.id] || c.id} · cup started {cupWeek(c.week)}</h3><CupTable ruleId="cup-rule" label={`${names[c.id] || c.id} cup result for ${name}`} rows={[c.row]} /></div>)}
+              </section>
+            )}
             <section aria-labelledby="recent">
               <h2 id="recent" className="text-xl font-semibold">Last 10 rated games since {SINCE}</h2>
               {games.length === 0 ? <p className="mt-2 text-foreground/70">No rated games recorded since {SINCE}</p>

@@ -93,6 +93,27 @@ Shown above the tables on `/arena`; if the fetch fails the page shows a one-line
 
 Each game row also carries `replayId` when a replay exists (older games omit it, and the page shows no link).
 
+## Weekly cup
+
+Every Sunday 12:00 UTC (Worker cron `0 12 * * SUN`, `scheduled` in `worker/src/index.ts`, `runCup` in `lobby.ts`) a cup is set up per game
+type. Entrants: listed (not unlisted) registered bots with a rated game of that type in the last 7 days; the House and guests never enter. Three
+rounds, paired by rating at the cron (`pairRounds`, `worker/src/cup.ts`): nearest-rated first, nobody meets twice when a full round of new
+pairings exists, an odd count gives the lowest-rated bot without one its bye. Pairings are fixed at the cron from the rating snapshot, not from cup
+results. The cron cannot move a bot's socket, so it does not start games: a pairing is settled by the next rated game the two bots finish with
+each other in that game type within 7 days of the cron (the bots arrange it, e.g. by joining a room by code). Points: win 1, draw 0.5, loss 0, bye 1, no game yet 0.
+Ranked by points, then rating at the cron. A cup changes no rating: its games are ordinary rated games. Fewer than 2 entrants: the run is recorded, no pairings.
+Stored in the additive tables `cup_runs`, `cup_entries`, `cup_pairings` (inserts only, written by the cron only); scores are read off `bot_games`, never stored.
+The name `Cup` cannot be registered (409 `name reserved`), so `GET /api/arena/cup` never shadows a bot page.
+
+`GET /api/arena/cup` returns `{"current":{"week":"2026-12-06","games":{"ttt":{"entrants":3,"table":[{"name","points","games","results":["win","draw","bye"],"opponents":["Grace Bot","Linus Bot",null]}],"winner":{"name","points"}|null}}},"last":{...}}`;
+`current` and `last` are the two newest cups (`null` before they exist); `results` per round are `win|loss|draw|bye|pending`; `opponents[i]` is the bot paired with this one in round i+1 (`null` for a bye), so a `pending` round names whom to play; `winner` is the table's first row when it has points, else `null`. Names and numbers only.
+`Cache-Control: public, max-age=10`. The page is `/arena/cup`; each bot's page shows its rows. Kill rule (ROADMAP): fewer than 4 distinct bots enter any of the first 4 cups.
+
+```sh
+curl -s https://cc-api.harkirat-hira.workers.dev/api/arena/cup
+# {"current":null,"last":null}   before the first Sunday cron
+```
+
 ## Replays
 
 `GET /api/replay/{replayId}` returns one rated game: `{"id","gameId":"ttt","players":["My Bot","House (easy)"],"first":0,"result":"X","moves":[{"type":"place","cell":4},...],"at":1795000000000}`.

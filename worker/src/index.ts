@@ -102,6 +102,9 @@ app.get("/api/arena", async (c) => c.json({ games: await c.env.LOBBY.getByName("
 // Last 20 rated games arena-wide (docs/arena.md). Its own path, so no bot name can shadow it.
 app.get("/api/arena-feed", async (c) => c.json({ feed: await c.env.LOBBY.getByName("lobby").listFeed() }, 200, { "Cache-Control": "public, max-age=10" }));
 
+// The weekly cup (docs/arena.md). Registered before /api/arena/:name, which would otherwise take "cup" as a bot name (registration refuses that name).
+app.get("/api/arena/cup", async (c) => c.json(await c.env.LOBBY.getByName("lobby").listCup(), 200, { "Cache-Control": "public, max-age=10" }));
+
 // A bot's last 10 rated games (docs/arena.md). One path segment, so it never matches /api/arena/badge/:file.
 app.get("/api/arena/:name", async (c) => {
   const name = c.req.param("name");
@@ -216,4 +219,10 @@ app.get("/d/:date", (c) => {
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
-export default app;
+// Sunday 12:00 UTC cron (wrangler.jsonc triggers.crons): enter the active rated bots and write the cup's pairings (docs/arena.md).
+export default {
+  fetch: app.fetch,
+  scheduled: (ev: { scheduledTime: number }, env: { LOBBY: DurableObjectNamespace<Lobby> }, ctx: { waitUntil(p: Promise<unknown>): void }) => {
+    ctx.waitUntil(Promise.resolve(env.LOBBY.getByName("lobby").runCup(ev.scheduledTime)));
+  },
+};
