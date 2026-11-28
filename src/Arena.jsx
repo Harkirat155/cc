@@ -5,6 +5,8 @@ import { listAll } from "@shared/games/registry.js";
 import { ago, liveUrl } from "./Live";
 import { roomFor, watchRooms } from "./arenaWatch";
 import OpenSeats from "./OpenSeats";
+import NoSignal from "./components/NoSignal";
+import useOnline from "./hooks/useOnline";
 import { BadgeCopy, RULE, SINCE, VERB, apiBase, badgeBase, replayPath, validName } from "./arenaShared";
 
 const REFRESH_MS = 30_000;
@@ -14,6 +16,7 @@ export { apiBase };
 function Arena() {
   const [games, setGames] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
+  const online = useOnline();
   const [feed, setFeed] = useState(null); // null = loading, false = failed, else the last rated games
   const [rooms, setRooms] = useState(() => new Map()); // lowercased name -> roomId; optional, empty on any failure
   const [open, setOpen] = useState([]); // listed rooms waiting for an opponent; optional
@@ -97,7 +100,7 @@ function Arena() {
           </section>
         )}
 
-        {failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the leaderboard. Retrying every {REFRESH_MS / 1000} seconds.</p>}
+        {(failed || !online) && <NoSignal>{`Could not load the leaderboard. Retrying every ${REFRESH_MS / 1000} seconds.`}</NoSignal>}
         {!failed && games === null && <p className="text-foreground/60">Loading…</p>}
         {!failed && games && ids.length === 0 && (
           <section className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">

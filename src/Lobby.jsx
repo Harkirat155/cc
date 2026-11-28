@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LobbyView from './components/LobbyView';
+import NoSignal from './components/NoSignal';
+import useOnline from './hooks/useOnline';
 import useSocketGame from './hooks/useSocketGame';
 import '@shared/games/index.js';
 import { get as getGameRules } from '@shared/games/registry.js';
@@ -27,6 +29,7 @@ const Lobby = () => {
     connectionState,
   } = useSocketGame();
 
+  const online = useOnline();
   const hasJoinedRef = useRef(false);
   const preferredGameId = useMemo(() => {
     const requested = searchParams.get('game') || gameState?.gameId || 'ttt';
@@ -87,7 +90,8 @@ const Lobby = () => {
           className={`h-[60vw] w-[60vw] rounded-full opacity-[0.04] blur-[100px] transition-colors duration-1000 ${glowClass}`}
         />
       </div>
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-8">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-4 py-8">
+        {!online && <NoSignal>The lobby needs a connection.</NoSignal>}
         <LobbyView
           lobbyQueue={lobbyQueue}
           isInLobby={isInLobby}
