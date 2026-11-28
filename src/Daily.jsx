@@ -180,6 +180,8 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
 
   // The solution view is derived: the puzzle's start position plus the first `shown` moves of the line. Nothing is saved.
   const viewBoard = shown === null ? board : line.slice(0, shown).reduce((b, m) => drop(b, m.col, m.mark), puzzle.board);
+  const end = shown === null ? null : connect4.checkTerminal({ board: viewBoard });
+  const solutionWin = end?.status === "win" ? end : null;
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
@@ -195,7 +197,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
         <GameBoard
           squares={viewBoard}
           onSquareClick={play}
-          winningSquares={[]}
+          winningSquares={solutionWin?.line ?? []}
           rows={6}
           cols={7}
           playerInfo={connect4.playerInfo}
@@ -203,7 +205,10 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
           disabled={done || shown !== null}
         />
         <div ref={status} tabIndex={-1} role="status" aria-live="polite" className="w-full rounded-lg p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40">
-          {already ? (
+          {shown !== null ? (
+            // The board's own sr-only status announces "<Side> dropped in column N"; this caption adds only what it does not say (progress, the winner).
+            <p className="font-semibold">{solutionWin ? `Solution · ${COLOR[solutionWin.winner]} wins` : `Solution · move ${shown} of ${line.length}`}</p>
+          ) : already ? (
             <>
               <p className="font-semibold">Already solved.</p>
               <p className="mt-1 text-sm">Day {streak} in a row</p>
