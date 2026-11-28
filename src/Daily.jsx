@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import ttt from "@shared/games/ttt.js";
 import five from "@shared/games/five.js";
-import { FIVE_WINDOW, GAME_NAMES, defenderReply, fivePuzzleForDate, gameForDate, keepsWin, puzzleForDate, solutionLine, todayUtc, tttPuzzleForDate } from "@shared/daily.js";
+import checkers from "@shared/games/checkers.js";
+import { FIVE_WINDOW, GAME_NAMES, checkersDefenderReply, checkersMoves, checkersPlay, checkersPuzzleForDate, checkersSolutionLine, defenderReply, fivePuzzleForDate, gameForDate, keepsWin, puzzleForDate, solutionLine, todayUtc, tttPuzzleForDate } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
 import { paletteForValue } from "./components/games/boardPresentationUtils";
 import { getGamePalette } from "./components/games/palette";
@@ -57,6 +58,8 @@ const streakTo = (date, days) => {
   for (let d = date; set.has(d); d = dayBefore(d)) n++;
   return n;
 };
+
+const ckCell = (cell) => `row ${Math.floor(cell / 8) + 1}, column ${(cell % 8) + 1}`;
 
 const drop = (board, col, mark) => {
   const next = board.slice();
@@ -194,11 +197,12 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const game = gameForDate(date);
   const isTtt = game === "ttt";
   const isFive = game === "five";
+  const isCk = game === "checkers";
   const oneMove = isTtt || isFive; // a one-move position with `answers`, not a Connect Four forced win
-  const rules = isFive ? five : isTtt ? ttt : connect4;
+  const rules = isCk ? checkers : isFive ? five : isTtt ? ttt : connect4;
   const marks = isFive ? ["B", "G"] : isTtt ? ["X", "O"] : MARKS;
-  const names = isFive ? ["Blue", "Green"] : isTtt ? ["X", "O"] : COLOR;
-  const puzzle = useMemo(() => (isFive ? fivePuzzleForDate(date) : isTtt ? tttPuzzleForDate(date) : puzzleForDate(date)), [date, isTtt, isFive]);
+  const names = isCk ? ["Red", "Amber"] : isFive ? ["Blue", "Green"] : isTtt ? ["X", "O"] : COLOR;
+  const puzzle = useMemo(() => (isCk ? checkersPuzzleForDate(date) : isFive ? fivePuzzleForDate(date) : isTtt ? tttPuzzleForDate(date) : puzzleForDate(date)), [date, isTtt, isFive, isCk]);
   const rcOf = (cell) => (isFive ? fiveRc(cell) : { row: Math.floor(cell / 3) + 1, col: (cell % 3) + 1 });
   const [saved, setSaved] = useState(() => (past ? loadPast(date) : load(date)));
   const [days, setDays] = useState(() => readStore().days);
@@ -207,8 +211,9 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const [left, setLeft] = useState(puzzle.n);
   const [slipped, setSlipped] = useState(false);
   const [note, setNote] = useState("");
+  const [sel, setSel] = useState(null); // Checkers: the piece picked up
   const [shown, setShown] = useState(null); // null = my board; else how many moves of the winning line are on the board
-  const line = useMemo(() => (oneMove ? [{ cell: puzzle.answers[0], mark: marks[puzzle.turn] }] : solutionLine(puzzle)), [puzzle, oneMove]); // eslint-disable-line react-hooks/exhaustive-deps
+  const line = useMemo(() => (oneMove ? [{ cell: puzzle.answers[0], mark: marks[puzzle.turn] }] : isCk ? checkersSolutionLine(puzzle) : solutionLine(puzzle)), [puzzle, oneMove, isCk]); // eslint-disable-line react-hooks/exhaustive-deps
   const status = useRef(null);
   const me = puzzle.turn;
 
@@ -225,7 +230,36 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const done = saved.solved || slipped || already;
   const streak = streakTo(date, days);
 
+  // Checkers: tap a piece, then a square it can reach. The same search as the generator says whether the win is still forced,
+  // and the defender answers with its best reply, exactly as in Connect Four.
+  const playCk = (cell) => {
+    if (done) return;
+    const piece = board[cell];
+    if (piece && piece.owner === me) { setSel(sel === cell ? null : cell); return; }
+    const move = sel === null ? null : checkersMoves(board, me).find((m) => m.from === sel && m.to === cell);
+    if (!move) { setSel(null); return; }
+    setSel(null);
+    const r = checkersPlay(board, me, move, left);
+    const said = `You moved ${ckCell(move.from)} to ${ckCell(move.to)}${move.captures ? ", capturing" : ""}`;
+    if (r.won) {
+      setBoard(r.board);
+      setNote(`${said} and won.`);
+      tally("cc", evt("daily_solve", game)); // once per day solved: `done` blocks any further move on this day
+      save({ ...saved, solved: true });
+      return;
+    }
+    const reply = checkersDefenderReply(r.board, me, left - 1);
+    const answered = checkersPlay(r.board, 1 - me, reply, 0);
+    setBoard(answered.board);
+    setNote(`${said}. They moved ${ckCell(reply.from)} to ${ckCell(reply.to)}.`);
+    if (!r.kept || left < 2 || answered.won) {
+      setSlipped(true);
+      save({ ...saved, tries: saved.tries + 1 });
+    } else setLeft(left - 1);
+  };
+
   const play = (col) => {
+    if (isCk) return playCk(col);
     if (done || board[col] !== "") return;
     if (oneMove) {
       const solves = puzzle.answers.includes(col);
@@ -263,6 +297,7 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   const retry = () => {
     setBoard(puzzle.board);
     setLeft(puzzle.n);
+    setSel(null);
     setSlipped(false);
     setShown(null);
     setNote("Board reset.");
@@ -270,14 +305,16 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
   };
 
   // The solution view is derived: the puzzle's start position plus the first `shown` moves of the line. Nothing is saved.
-  const place = (b, m) => (oneMove ? b.map((v, i) => (i === m.cell ? m.mark : v)) : drop(b, m.col, m.mark));
+  const place = (b, m) => (isCk ? checkersPlay(b, m.turn, m.move, 0).board : oneMove ? b.map((v, i) => (i === m.cell ? m.mark : v)) : drop(b, m.col, m.mark));
   const viewBoard = shown === null ? board : line.slice(0, shown).reduce(place, puzzle.board);
-  const end = shown === null ? null : rules.checkTerminal({ board: viewBoard });
-  const solutionWin = end?.status === "win" ? end : null;
+  const end = shown === null || isCk ? null : rules.checkTerminal({ board: viewBoard });
+  const ckLast = isCk && shown > 0 ? line[shown - 1] : null;
+  // The line ends on the attacker's capturing move, which leaves the opponent without a piece or a move.
+  const solutionWin = isCk ? (ckLast && shown === line.length && ckLast.turn === me ? { winner: me, line: [ckLast.move.to] } : null) : end?.status === "win" ? end : null;
   // Tic-Tac-Toe boards have no move announcer of their own (GameBoard speaks Connect Four drops only), so the caption says where the mark went.
   // Five in a Row says it with the shown window's own row and column numbers, and the mark by its colour name.
-  const last = oneMove && shown > 0 ? line[shown - 1] : null;
-  const step = last ? `${names[marks.indexOf(last.mark)]} at row ${rcOf(last.cell).row}, column ${rcOf(last.cell).col} · ` : "";
+  const last = oneMove && !isCk && shown > 0 ? line[shown - 1] : null;
+  const step = last ? `${names[marks.indexOf(last.mark)]} at row ${rcOf(last.cell).row}, column ${rcOf(last.cell).col} · ` : ckLast ? `${names[ckLast.turn]} ${ckCell(ckLast.move.from)} to ${ckCell(ckLast.move.to)} · ` : "";
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium disabled:opacity-50";
 
   return (
@@ -285,9 +322,10 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
         <Link to="/" className="self-start text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← CrissCross</Link>
         <header className="self-start">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{oneMove ? ` · ${GAME_NAMES[game]}` : ""}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Daily puzzle · {date}{game !== "connect4" ? ` · ${GAME_NAMES[game]}` : ""}{date === dayBefore(today) ? " · yesterday's" : ""}</h1>
           {unavailable && <p className="mt-2 font-medium">{"That puzzle isn't available, here is today's."}</p>}
           <p className="mt-2 text-foreground/70">One puzzle a day, the same for everyone. New puzzle at 00:00 UTC.</p>
+          {isCk && <p className="mt-2 text-sm text-foreground/70">Men move forward, kings both ways. Jump an enemy piece to capture it; jumping is your choice, and a jump is one hop. Win by taking every piece or leaving them no move.</p>}
           <p className="mt-2 font-medium">{isFive ? `${names[me]} to move: make the five that wins now.` : isTtt ? `${names[me]} to move: ${puzzle.kind === "win" ? "win now" : "block their win"}.` : `${names[me]} to move: win in ${puzzle.n} of your moves.`}</p>
         </header>
         {isFive ? (
@@ -297,8 +335,11 @@ function DailyPuzzle({ date, today, unavailable, onSwitch }) {
             squares={viewBoard}
             onSquareClick={play}
             winningSquares={solutionWin?.line ?? []}
-            rows={isTtt ? 3 : 6}
-            cols={isTtt ? 3 : 7}
+            rows={isCk ? 8 : isTtt ? 3 : 6}
+            cols={isCk ? 8 : isTtt ? 3 : 7}
+            moveStyle={isCk ? "select-target" : "place"}
+            selection={sel}
+            legalTargets={isCk && sel !== null ? checkersMoves(board, me).filter((m) => m.from === sel) : undefined}
             playerInfo={rules.playerInfo}
             boardSpec={rules.boardSpec}
             disabled={done || shown !== null}

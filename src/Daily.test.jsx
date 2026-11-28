@@ -2,7 +2,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
-import { puzzleForDate, keepsWin, defenderReply, solutionLine, tttPuzzleForDate, fivePuzzleForDate, FIVE_WINDOW } from "@shared/daily.js";
+import { puzzleForDate, keepsWin, defenderReply, solutionLine, tttPuzzleForDate, fivePuzzleForDate, FIVE_WINDOW, checkersPuzzleForDate, checkersMoves, checkersPlay, checkersSolutionLine } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
 
 const DATE = "2026-11-28";
@@ -627,6 +627,64 @@ describe("a Five in a Row day", () => {
   it("counts a shared-link arrival as daily_link_five", () => {
     render(<MemoryRouter initialEntries={[`/daily/${FIVE_DATE}?via=d`]}><Routes><Route path="/daily/:date" element={<Daily />} /></Routes></MemoryRouter>);
     expect(events("daily_link_five")).toHaveLength(1);
+    expect(events("daily_link")).toHaveLength(0);
+  });
+});
+
+describe("a Checkers day", () => {
+  const CK_DATE = "2026-12-07"; // gameForDate: day number % 4 === 2, from CHECKERS_FROM
+  const beacon = jest.fn(() => true);
+  const events = (e) => beacon.mock.calls.map(([u]) => u).filter((u) => new window.URL(u).searchParams.get("e") === e);
+  const p = checkersPuzzleForDate(CK_DATE);
+  const sq = (i) => screen.getByRole("button", { name: new RegExp(`^Square row ${Math.floor(i / 8) + 1}, column ${(i % 8) + 1} `) });
+  const go = (m) => { fireEvent.click(sq(m.from)); fireEvent.click(sq(m.to)); };
+  const me = ["Red", "Amber"][p.turn];
+  beforeEach(() => {
+    jest.setSystemTime(new Date(`${CK_DATE}T10:00:00Z`));
+    beacon.mockClear();
+    Object.assign(navigator, { sendBeacon: beacon });
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [] }) });
+  });
+
+  it("names the game and the task, on an 8x8 board of squares", () => {
+    show();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Checkers");
+    expect(screen.getByText(`${me} to move: win in ${p.n} of your moves.`)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Square row \d, column \d / })).toHaveLength(64);
+  });
+
+  it("playing the solution line through the board solves it, names the game and tallies daily_solve_checkers only", () => {
+    show();
+    for (const step of checkersSolutionLine(p).filter((x) => x.turn === p.turn)) go(step.move);
+    expect(screen.getByText("Solved.")).toBeTruthy();
+    expect(screen.getByText(`CrissCross Daily ${CK_DATE} · Checkers · solved in 1 try https://cc-api.harkirat-hira.workers.dev/d/${CK_DATE}`)).toBeTruthy();
+    expect(events("daily_solve_checkers")).toHaveLength(1);
+    expect(events("daily_solve")).toHaveLength(0);
+  });
+
+  it("a move that gives the win away is a counted try; Try again resets the board", () => {
+    const bad = checkersMoves(p.board, p.turn).find((m) => !checkersPlay(p.board, p.turn, m, p.n).kept);
+    show();
+    go(bad);
+    expect(screen.getByText("That lets them off the hook")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    for (const step of checkersSolutionLine(p).filter((x) => x.turn === p.turn)) go(step.move);
+    expect(screen.getByText(/solved in 2 tries/)).toBeTruthy();
+  });
+
+  it("the solution view steps through the line and says who wins", () => {
+    const bad = checkersMoves(p.board, p.turn).find((m) => !checkersPlay(p.board, p.turn, m, p.n).kept);
+    show();
+    go(bad);
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    const line = checkersSolutionLine(p);
+    for (let i = 0; i < line.length; i++) fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(screen.getByText(/^Solution ·/).textContent).toMatch(new RegExp(`${me} wins$`));
+  });
+
+  it("counts a shared-link arrival as daily_link_checkers", () => {
+    render(<MemoryRouter initialEntries={[`/daily/${CK_DATE}?via=d`]}><Routes><Route path="/daily/:date" element={<Daily />} /></Routes></MemoryRouter>);
+    expect(events("daily_link_checkers")).toHaveLength(1);
     expect(events("daily_link")).toHaveLength(0);
   });
 });
