@@ -4,7 +4,8 @@ import { cors } from "./cors";
 import { Room } from "./room";
 import { feedback } from "./feedback";
 import type { SheetsEnv } from "./sheets";
-import { genCode, validateRoomId } from "./validation";
+import { genCode, validateGameId, validateRoomId } from "./validation";
+import { get as gameRules } from "../../shared/games/registry.js";
 import { GAME_NAMES, gameForDate } from "../../shared/daily.js";
 
 export { Lobby, Room };
@@ -209,6 +210,40 @@ app.get("/d/:date", (c) => {
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="CrissCross daily puzzle">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${img}">
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p><a href="${to}">${title}</a></p></body></html>`, 200, HTML_HEADERS);
+});
+
+// Link-preview card for a room invite. The link carries only the room code and a game id, so the card says only that: no Durable Object is read
+// or woken (no seats, no names). The game id is checked against the registry and the code by validateRoomId; both are escaped.
+app.get("/j/:roomId", (c) => {
+  const code = validateRoomId(c.req.param("roomId"));
+  if (!code) {
+    return c.html(`<!doctype html><meta charset="utf-8"><title>Room link not found · CrissCross</title><p>This room link is not valid. <a href="${PAGES}/lobby">Find a game</a></p>`, 404, { ...HTML_HEADERS, "Cache-Control": "no-store" });
+  }
+  const g = validateGameId(c.req.query("g"));
+  const title = html(g ? `Join my ${gameRules(g).displayName} game · CrissCross` : "Join a game on CrissCross");
+  const desc = html(`Room ${code}. Open the link to take the other seat, or watch if it's full.`);
+  const url = html(new URL(`/j/${code}${g ? `?g=${g}` : ""}`, c.req.url).href);
+  // ?via=j lets the room page count arrivals through invite links (room_link); crawlers never follow the refresh.
+  const to = html(`${PAGES}/room/${code}?via=j`);
+  const img = `${PAGES}/og-default.png`;
+  return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${url}">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CrissCross">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${url}">
+<meta property="og:image" content="${img}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="CrissCross, two-player board games">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${desc}">
