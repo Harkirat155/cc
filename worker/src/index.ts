@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { Lobby } from "./lobby";
 import { cors } from "./cors";
 import { Room } from "./room";
+import { MAX_BODY, parseMoves } from "./rush";
 import { feedback } from "./feedback";
 import type { SheetsEnv } from "./sheets";
 import { genCode, validateGameId, validateRoomId } from "./validation";
@@ -89,6 +90,23 @@ app.get("/api/live", async (c) => {
   const [games, open] = [await lobby.listLive(), await lobby.listOpen()];
   return c.json({ games, open }, 200, { "Cache-Control": "public, max-age=5" });
 });
+
+// Puzzle Rush best, checked by replaying the moves (docs/ROADMAP.md item 5). No names, no IPs, no per-player record.
+app.post("/api/rush/start", async (c) => {
+  const r = await c.env.LOBBY.getByName("lobby").rushStart();
+  return r ? c.json(r, 200, { "Cache-Control": "no-store" }) : c.json({ error: "busy" }, 503);
+});
+app.post("/api/rush/finish", async (c) => {
+  const text = await c.req.text();
+  if (text.length > MAX_BODY) return c.json({ error: "body too large" }, 413);
+  let b: { id?: unknown; moves?: unknown } | null = null;
+  try { b = JSON.parse(text); } catch { /* malformed */ }
+  const moves = parseMoves(b?.moves);
+  if (typeof b?.id !== "string" || b.id.length > 64 || !moves) return c.json({ error: "id and moves required" }, 400);
+  const r = await c.env.LOBBY.getByName("lobby").rushFinish(b.id, moves);
+  return r.status === 200 ? c.json(r.body, 200, { "Cache-Control": "no-store" }) : c.json({ error: r.status === 404 ? "unknown run" : "too late" }, r.status);
+});
+app.get("/api/rush/best", async (c) => c.json(await c.env.LOBBY.getByName("lobby").rushBest(), 200, { "Cache-Control": "public, max-age=10" }));
 
 // Agent Arena (docs/arena.md): register a bot name once for a secret key, read the public rated leaderboard.
 app.post("/api/bots", async (c) => {

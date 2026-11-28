@@ -135,3 +135,57 @@ describe("rush page", () => {
     });
   });
 });
+
+describe("today's best, checked by the server", () => {
+  const reply = (body) => Promise.resolve({ ok: true, json: async () => body });
+  const serve = (best, finishBody = { score: 1, best: 4 }) => {
+    window.fetch = jest.fn((url) => reply(url.endsWith("/api/rush/best") ? { day: DAY, best } : url.endsWith("/api/rush/start") ? { id: "run1", day: DAY } : finishBody));
+  };
+  const flush = () => act(async () => {});
+  const posted = (path) => window.fetch.mock.calls.find(([u]) => u.endsWith(path));
+
+  it("shows the number with its rule on the start screen, and says so before any checked run", async () => {
+    serve(7);
+    show();
+    await flush();
+    expect(screen.getByText(/Today's best: 7/)).toBeTruthy();
+    expect(screen.getByText(/checked by the server: it replays every move on today's puzzles, within 3 minutes/i)).toBeTruthy();
+  });
+
+  it("says no run has been checked yet when the server has none", async () => {
+    serve(null);
+    show();
+    await flush();
+    expect(screen.getByText(/Today's best: no checked run yet/)).toBeTruthy();
+  });
+
+  it("posts the recorded moves at the end, shows the server's best and tallies rush_verified", async () => {
+    serve(2);
+    show();
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    await flush();
+    solveFirst();
+    act(() => { jest.advanceTimersByTime(181000); });
+    await flush();
+    expect(JSON.parse(posted("/api/rush/finish")[1].body)).toEqual({ id: "run1", moves: [rushSolve(rushPuzzle(DAY, 0))] });
+    expect(screen.getByText(/You solved 1 puzzle/)).toBeTruthy();
+    expect(screen.getByText(/Today's best: 4/)).toBeTruthy();
+    expect(beacons()).toContain("rush_verified");
+  });
+
+  it("leaves the line out and still runs when the network fails", async () => {
+    window.fetch = jest.fn(() => Promise.reject(new Error("offline")));
+    show();
+    await flush();
+    expect(screen.queryByText(/Today's best/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    await flush();
+    solveFirst();
+    act(() => { jest.advanceTimersByTime(181000); });
+    await flush();
+    expect(screen.getByText(/You solved 1 puzzle/)).toBeTruthy();
+    expect(screen.queryByText(/Today's best/)).toBeNull();
+    expect(beacons()).not.toContain("rush_verified");
+  });
+});
