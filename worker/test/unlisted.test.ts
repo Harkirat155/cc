@@ -39,6 +39,21 @@ describe("unlisted bots", () => {
     expect((await get("/api/arena/Plain%20Bot")).unlisted).toBeUndefined();
   });
 
+  it("omits a game type whose only rated bots are unlisted", async () => {
+    await register({ name: "Shown Bot" });
+    await register({ name: "Hidden Bot", unlisted: true });
+    await play("g1", "Shown Bot", null, 1);
+    await runInDurableObject((env as any).LOBBY.getByName("lobby"), async (o: Lobby) => o.recordGame("g2", "connect4", "Hidden Bot", null, 1));
+    expect(Object.keys((await get("/api/arena")).games)).toEqual(["ttt"]);
+  });
+
+  it("cannot unlist a bot someone else already registered, in any case spelling", async () => {
+    await register({ name: "Rival Bot" });
+    expect((await register({ name: "rival bot", unlisted: true })).status).toBe(409);
+    await play("g1", "Rival Bot", null, 1);
+    expect((await get("/api/arena")).games.ttt.map((r: any) => r.name)).toEqual(["Rival Bot"]);
+  });
+
   it("treats a non-true unlisted value as listed", async () => {
     await register({ name: "Str Bot", unlisted: "yes" });
     expect(await sql((s) => s.exec("SELECT COUNT(*) AS n FROM unlisted_bots").one().n)).toBe(0);

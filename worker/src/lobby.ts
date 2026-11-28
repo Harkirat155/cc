@@ -114,11 +114,12 @@ export class Lobby extends DurableObject {
     const sql = this.ctx.storage.sql;
     const out: Record<string, any[]> = {};
     for (const { game_id } of sql.exec<{ game_id: string }>("SELECT DISTINCT game_id FROM ratings ORDER BY game_id").toArray()) {
-      out[game_id] = sql
+      const rows = sql
         .exec<{ name: string; rating: number; games: number; wins: number; draws: number; losses: number }>(
           "SELECT COALESCE(b.name, r.name_lc) AS name, r.rating, r.games, r.wins, r.draws, r.losses FROM ratings r LEFT JOIN bots b ON b.name_lc = r.name_lc WHERE r.game_id = ? AND (b.name_lc IS NOT NULL OR r.name_lc LIKE 'house (%)') AND r.name_lc NOT IN (SELECT name_lc FROM unlisted_bots) ORDER BY r.rating DESC, r.games DESC, name LIMIT ?", game_id, ARENA_TOP)
         .toArray()
         .map((r) => ({ ...r, name: HOUSE_NAMES[r.name] ?? r.name, rating: Math.round(r.rating) }));
+      if (rows.length) out[game_id] = rows; // a type rated only by unlisted bots is left out, not shown as an empty table
     }
     return out;
   }
