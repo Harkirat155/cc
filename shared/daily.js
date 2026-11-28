@@ -1,3 +1,5 @@
+import five from './games/five.js';
+
 // Daily Connect Four puzzle: a small exact solver plus a date-seeded generator.
 // Pure functions over the connect4 board (42 cells, row-major, '' | 'R' | 'Y').
 // "Win in N" means the side to move forces a win using at most N of its own moves.
@@ -166,9 +168,15 @@ export function puzzleForDate(date) {
 }
 
 // Which game a date's puzzle is, from the UTC date alone so everyone agrees and a past day never changes:
-// every fourth UTC day (day number % 4 === 3) is Tic-Tac-Toe, the rest Connect Four. The Worker's /d card uses the same rule.
-export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe' };
-export const gameForDate = (date) => (Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000) % 4 === 3 ? 'ttt' : 'connect4');
+// every fourth UTC day (day number % 4 === 3) is Tic-Tac-Toe; from FIVE_FROM on, day number % 4 === 1 is Five in a Row;
+// the rest are Connect Four. FIVE_FROM is the day after the one live when Five in a Row shipped, so no served puzzle changes.
+// The Worker's /d card uses the same rule.
+export const GAME_NAMES = { connect4: 'Connect Four', ttt: 'Tic-Tac-Toe', five: 'Five in a Row' };
+const FIVE_FROM = '2026-11-29';
+export const gameForDate = (date) => {
+  const n = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86400000) % 4;
+  return n === 3 ? 'ttt' : n === 1 && date >= FIVE_FROM ? 'five' : 'connect4';
+};
 
 const TTT_LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const TTT_MARKS = ['X', 'O'];
@@ -202,4 +210,76 @@ export function tttPuzzleForDate(date) {
     if (kind === 'block' && !mine.length && theirs.length === 1) return { date, game: 'ttt', kind, n: 1, board, turn, answers: theirs };
   }
   throw new Error(`no tic-tac-toe puzzle found for ${date}`);
+}
+
+// Five in a Row: the board is the real 15x15 of shared/games/five.js, but every stone sits inside a 7x7 window of it
+// (rows and columns 5 to 11) so the page can show big, tappable cells on a phone. Cells are full-board indices.
+const FIVE_SIZE = 15;
+const FIVE_MARKS = ['B', 'G'];
+export const FIVE_WINDOW = { top: 4, left: 4, size: 7 };
+
+/** Empty cells where `mark` completes a line of five or more (the rule of five.js). */
+export function fiveWinningCells(board, mark) {
+  const out = [];
+  for (let i = 0; i < board.length; i++) {
+    if (board[i] !== '') continue;
+    const r0 = Math.floor(i / FIVE_SIZE);
+    const c0 = i % FIVE_SIZE;
+    const wins = DIRS.some(([dr, dc]) => {
+      let n = 1;
+      for (const s of [1, -1]) {
+        for (let k = 1; k < 5; k++) {
+          const r = r0 + dr * k * s;
+          const c = c0 + dc * k * s;
+          if (r < 0 || r >= FIVE_SIZE || c < 0 || c >= FIVE_SIZE || board[r * FIVE_SIZE + c] !== mark) break;
+          n++;
+        }
+      }
+      return n >= 5;
+    });
+    if (wins) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * Five in a Row puzzle for a date: a legal position (alternating plies) where the side to move has exactly one cell that
+ * makes five and the opponent has none, so the answer is unambiguous. `answers` holds that one cell; `n` is 1.
+ * Built by planting four of the mover's stones in a line with a gap, scattering the rest, and keeping only positions that pass.
+ */
+export function fivePuzzleForDate(date) {
+  const rng = mulberry32(seedFrom(`${date}:five`));
+  const { top, left, size } = FIVE_WINDOW;
+  const pick = (n) => Math.floor(rng() * n);
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const turn = pick(2);
+    const each = 4 + pick(5); // White's stones, 4..8; Black has the same, or one more when White is to move
+    const target = { B: each + turn, G: each };
+    const board = Array(FIVE_SIZE * FIVE_SIZE).fill('');
+    const [dr, dc] = DIRS[pick(DIRS.length)];
+    const span = (d) => (d === 0 ? size : size - 4); // start offsets that keep all five cells inside the window
+    const r0 = top + pick(span(dr));
+    const c0 = left + (dc === -1 ? 4 : 0) + pick(span(dc));
+    const gap = pick(5);
+    const gapCell = (r0 + dr * gap) * FIVE_SIZE + c0 + dc * gap;
+    const counts = { B: 0, G: 0 };
+    for (let k = 0; k < 5; k++) {
+      if (k === gap) continue;
+      board[(r0 + dr * k) * FIVE_SIZE + c0 + dc * k] = FIVE_MARKS[turn];
+      counts[FIVE_MARKS[turn]]++;
+    }
+    for (const m of FIVE_MARKS) {
+      while (counts[m] < target[m]) {
+        const cell = (top + pick(size)) * FIVE_SIZE + left + pick(size);
+        if (board[cell] !== '' || cell === gapCell) continue;
+        board[cell] = m;
+        counts[m]++;
+      }
+    }
+    if (fiveWinningCells(board, FIVE_MARKS[turn]).join() !== String(gapCell)) continue;
+    if (fiveWinningCells(board, FIVE_MARKS[1 - turn]).length) continue;
+    if (five.checkTerminal({ board }).status !== 'active') continue;
+    return { date, game: 'five', n: 1, board, turn, answers: [gapCell], window: FIVE_WINDOW };
+  }
+  throw new Error(`no five-in-a-row puzzle found for ${date}`);
 }

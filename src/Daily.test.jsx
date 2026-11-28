@@ -2,7 +2,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
-import { puzzleForDate, keepsWin, defenderReply, solutionLine, tttPuzzleForDate } from "@shared/daily.js";
+import { puzzleForDate, keepsWin, defenderReply, solutionLine, tttPuzzleForDate, fivePuzzleForDate, FIVE_WINDOW } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
 
 const DATE = "2026-11-28";
@@ -559,6 +559,74 @@ describe("a Tic-Tac-Toe day", () => {
   it("counts a shared-link arrival as daily_link_ttt", () => {
     render(<MemoryRouter initialEntries={[`/daily/${TTT_DATE}?via=d`]}><Routes><Route path="/daily/:date" element={<Daily />} /></Routes></MemoryRouter>);
     expect(events("daily_link_ttt")).toHaveLength(1);
+    expect(events("daily_link")).toHaveLength(0);
+  });
+});
+
+describe("a Five in a Row day", () => {
+  const FIVE_DATE = "2026-12-02"; // gameForDate: day number % 4 === 1, from the day after launch
+  const beacon = jest.fn(() => true);
+  const events = (e) => beacon.mock.calls.map(([u]) => u).filter((u) => new window.URL(u).searchParams.get("e") === e);
+  const p = fivePuzzleForDate(FIVE_DATE);
+  const rc = (i) => ({ row: Math.floor(i / 15) - FIVE_WINDOW.top + 1, col: (i % 15) - FIVE_WINDOW.left + 1 });
+  const cell = (i) => screen.getByRole("button", { name: new RegExp(`^Row ${rc(i).row}, column ${rc(i).col}, empty`) });
+  const wrong = () => p.board.findIndex((v, i) => v === "" && i !== p.answers[0] && i % 15 >= FIVE_WINDOW.left && i % 15 < FIVE_WINDOW.left + 7 && Math.floor(i / 15) >= FIVE_WINDOW.top && Math.floor(i / 15) < FIVE_WINDOW.top + 7);
+  const me = ["Blue", "Green"][p.turn];
+  beforeEach(() => {
+    jest.setSystemTime(new Date(`${FIVE_DATE}T10:00:00Z`));
+    beacon.mockClear();
+    Object.assign(navigator, { sendBeacon: beacon });
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [] }) });
+  });
+
+  it("names the game and the task, with a 7x7 window of row/column labelled buttons", () => {
+    show();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Five in a Row");
+    expect(screen.getByText(`${me} to move: make the five that wins now.`)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Row \d, column \d, / })).toHaveLength(49);
+    expect(screen.queryByRole("button", { name: /Drop piece/ })).toBeNull();
+  });
+
+  it("the winning cell solves it: result line names the game, tallies daily_solve_five only", () => {
+    show();
+    fireEvent.click(cell(p.answers[0]));
+    expect(screen.getByText("Solved.")).toBeTruthy();
+    expect(screen.getByText(`CrissCross Daily ${FIVE_DATE} · Five in a Row · solved in 1 try https://cc-api.harkirat-hira.workers.dev/d/${FIVE_DATE}`)).toBeTruthy();
+    expect(events("daily_solve_five")).toHaveLength(1);
+    expect(events("daily_solve")).toHaveLength(0);
+  });
+
+  it("a wrong cell is a counted try; Try again resets the board", () => {
+    show();
+    fireEvent.click(cell(wrong()));
+    expect(screen.getByText("That lets them off the hook")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(cell(p.answers[0]));
+    expect(screen.getByText(/solved in 2 tries/)).toBeTruthy();
+  });
+
+  it("the solution step says which mark went to which row and column, and the winner", () => {
+    show();
+    fireEvent.click(cell(wrong()));
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    const { row, col } = rc(p.answers[0]);
+    expect(screen.getByText(/^Solution ·/).textContent).toBe(`Solution · ${me} at row ${row}, column ${col} · ${me} wins`);
+  });
+
+  it("Play someone now joins an open Five in a Row seat, and counts daily_play_five", async () => {
+    window.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ games: [], open: [{ roomId: "CF111", gameId: "connect4", name: "Cy" }, { roomId: "FV333", gameId: "five", name: "Ada" }] }) });
+    show();
+    fireEvent.click(cell(p.answers[0]));
+    await act(async () => {});
+    expect(screen.getByRole("link", { name: "Play someone now" }).getAttribute("href")).toBe("/room/FV333");
+    fireEvent.click(screen.getByRole("link", { name: "Play someone now" }));
+    expect(events("daily_play_five")).toHaveLength(1);
+  });
+
+  it("counts a shared-link arrival as daily_link_five", () => {
+    render(<MemoryRouter initialEntries={[`/daily/${FIVE_DATE}?via=d`]}><Routes><Route path="/daily/:date" element={<Daily />} /></Routes></MemoryRouter>);
+    expect(events("daily_link_five")).toHaveLength(1);
     expect(events("daily_link")).toHaveLength(0);
   });
 });

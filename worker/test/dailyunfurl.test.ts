@@ -29,6 +29,13 @@ describe("GET /d/:date", () => {
     expect(h).not.toContain("Connect Four");
   });
 
+  it("names Five in a Row on a Five in a Row day (2026-12-02), by the same date rule as the page", async () => {
+    vi.useFakeTimers({ now: new Date("2026-12-03T12:00:00Z"), toFake: ["Date"] });
+    const h = await (await get("/d/2026-12-02")).text().finally(() => vi.useRealTimers());
+    expect(h).toContain('content="A friend solved the 2026-12-02 Five in a Row puzzle. Can you?"');
+    expect(h).not.toContain("Connect Four");
+  });
+
   it("is a 404 no-store HTML page for a malformed, impossible or out-of-range date", async () => {
     for (const d of ["nope", "2026-13-01", "2026-02-30", "2026-1-5", "2026-11-28x", "1999-01-01", "2026-11-26", "2999-01-01", new Date(Date.now() + 86400000).toISOString().slice(0, 10), "%3Cscript%3E"]) {
       const r = await get(`/d/${d}`);

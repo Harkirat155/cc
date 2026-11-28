@@ -41,6 +41,15 @@
   `/d/`) and `daily_play_ttt`. Kill rule: over 4 weeks of live Tic-Tac-Toe days, `daily_link_ttt` or
   `daily_solve_ttt` per Tic-Tac-Toe day below `daily_link` or `daily_solve` per Connect Four day. Checkers not built.
 
+- A Five in a Row day in the daily (item 3, built, not live yet): every fourth UTC day (day number % 4 === 1, first on
+  2026-12-02; 2026-11-28 stays Connect Four because it was already served) the daily is "make the five that wins now", one
+  move with exactly one winning cell and no immediate five for the opponent, from `gameForDate` / `fivePuzzleForDate` in
+  `shared/daily.js` (rules of `shared/games/five.js`). The page shows the 7x7 window of the 15x15 board that holds every
+  stone, so cells are 44 px targets at 390 px wide; cells and the solution step are named by row and column. Same solve,
+  tries, streak, share text and "Play someone now" (an open Five in a Row seat, else `/lobby`); tallies `daily_solve_five`,
+  `daily_link_five`, `daily_play_five`. Kill rule: over 4 weeks of live Five in a Row days, `daily_solve_five` per such day
+  below `daily_solve_ttt` per Tic-Tac-Toe day.
+
 - "Play someone now" after the daily is done (not in the solution view): joins an open Connect Four seat from `GET /api/live`, else `/lobby` (item 2, built). Data: tally `cc` events `daily_play` (clicks) and `daily_solve` (first solves); kill rule: `daily_play` under 5% of `daily_solve` within 4 weeks of launch.
 
 - Five in a Row, a fourth game (live since 2026-11-28 with Pages 83c32ef; id `five`, built in a2ae58b and 8b6ec3b,
@@ -58,19 +67,13 @@
 ## Next
 
 Finding (2026-11-28, after the Tic-Tac-Toe day): the daily now has a streak, a solution, a shared link and two games, but
-Arena bots only ever meet when their authors happen to be online, and the daily has no Five in a Row day. Next, in need order:
+Arena bots only ever meet when their authors happen to be online. Next, in need order:
 
 2. **A weekly Arena cup (explore).** Seen by: bot authors and spectators on `/arena`. Changes: every Sunday 12:00 UTC a
    Worker cron pairs the connected rated bots of each game in a Swiss round of 3 games each; `/arena/cup` shows this
    week's table and last week's winner, and each bot page shows its cup results. Data: one additive D1 table of cup
    rows, written by the cron only; ratings unchanged. Kill rule: fewer than 4 distinct bots enter any of the first 4
    cups.
-3. **A Five in a Row day in the daily (exploit).** Seen by: daily players who have solved Connect Four and
-   Tic-Tac-Toe days and want the new game. Changes: every fourth UTC day (day number % 4 === 1) the daily is a Five in
-   a Row position, make the five that wins now (one move, from `shared/games/five.js`), through `gameForDate` in
-   `shared/daily.js`; same solve, tries, streak, share text and "Play someone now" (an open Five in a Row seat, else
-   `/lobby`). Data: none new; tallies `daily_solve_five`, `daily_link_five`, `daily_play_five`. Kill rule: over 4 weeks
-   of live Five in a Row days, `daily_solve_five` per such day below `daily_solve_ttt` per Tic-Tac-Toe day.
 
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
