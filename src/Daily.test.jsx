@@ -2,7 +2,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import Daily, { shareText } from "./Daily";
-import { puzzleForDate, keepsWin, defenderReply } from "@shared/daily.js";
+import { puzzleForDate, keepsWin, defenderReply, solutionLine } from "@shared/daily.js";
 import connect4 from "@shared/games/connect4.js";
 
 const DATE = "2026-11-28";
@@ -180,6 +180,44 @@ describe("show the solution", () => {
     expect(screen.getByText("That lets them off the hook")).toBeTruthy();
     expect(window.localStorage.getItem("cc.daily")).toBe(record);
     expect(p).toBeTruthy();
+  });
+
+  const stepToEnd = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    while (!screen.getByRole("button", { name: "Next move" }).disabled) fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+  };
+  // Cells ringed as winning, read from the rendered discs (row-major index), per column button top to bottom.
+  const ringed = () => COLS.flatMap((c) => {
+    const btn = screen.getByRole("button", { name: new RegExp(`^Column ${c + 1}:`) });
+    return [...btn.children].map((el, r) => (el.className.includes("ring-4") ? r * 7 + c : -1)).filter((i) => i >= 0);
+  }).sort((a, b) => a - b);
+
+  it("on the last move rings exactly the winning four, and not before", () => {
+    slipped();
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(ringed()).toEqual([]);
+    while (!screen.getByRole("button", { name: "Next move" }).disabled) fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    const win = connect4.checkTerminal({ board: boardOnScreen() });
+    expect(win.status).toBe("win");
+    expect(ringed()).toEqual([...win.line].sort((a, b) => a - b));
+    expect(ringed()).toHaveLength(4);
+  });
+
+  it("captions the solution as move k of N, then who wins, and Back restores the outcome text", () => {
+    const p = slipped();
+    fireEvent.click(screen.getByRole("button", { name: "Show the solution" }));
+    const total = solutionLine(p).length;
+    const caption = () => screen.getAllByRole("status").map((e) => e.textContent).join("|");
+    expect(screen.queryByText("That lets them off the hook")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(caption()).toContain(`Solution · move 1 of ${total}`);
+    while (!screen.getByRole("button", { name: "Next move" }).disabled) fireEvent.click(screen.getByRole("button", { name: "Next move" }));
+    expect(caption()).toContain(`Solution · ${["Red", "Yellow"][p.turn]} wins`);
+    expect(caption()).not.toContain("of " + total);
+    fireEvent.click(screen.getByRole("button", { name: "Back to my board" }));
+    expect(screen.getByText("That lets them off the hook")).toBeTruthy();
+    expect(caption()).not.toContain("Solution");
   });
 
   it("is offered after a solve and keeps the share line", () => {
