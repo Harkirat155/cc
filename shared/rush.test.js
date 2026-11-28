@@ -30,4 +30,16 @@ describe('puzzle rush sequence', () => {
     const wrong = p.board.findIndex((v, i) => v === '' && !p.answers.includes(i));
     expect(rushStep(p, { board: p.board, left: 1 }, wrong).result).toBe('slipped');
   });
+
+  it('a tap on a taken cell or a full column is ignored, not a miss', () => {
+    const t = rushPuzzle(DAY, 0);
+    const taken = t.board.findIndex((v) => v !== '');
+    const state = { board: t.board, left: 1 };
+    expect(rushStep(t, state, taken)).toEqual({ ...state, result: 'continue' });
+    const c = rushPuzzle(DAY, 1);
+    const full = c.board.slice();
+    for (let r = 0; r < 6; r += 1) full[r * 7] = r % 2 ? 'R' : 'Y';
+    const cState = { board: full, left: c.n };
+    expect(rushStep(c, cState, 0)).toEqual({ ...cState, result: 'continue' });
+  });
 });

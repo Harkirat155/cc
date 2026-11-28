@@ -33,6 +33,8 @@ const dropC4 = (board, col, mark) => {
 export function rushStep(p, state, move) {
   const { board, left } = state;
   const marks = MARKS[p.game];
+  // A taken cell, or a full column (its top cell is taken), is a mis-tap: ignore it, as the daily does.
+  if (p.game !== 'checkers' && board[move] !== '') return { board, left, result: 'continue' };
   if (p.game === 'checkers') {
     const r = checkersPlay(board, p.turn, move, left);
     if (r.won) return { board: r.board, left, result: 'solved' };
