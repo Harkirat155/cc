@@ -11,6 +11,10 @@ export const ROUTES = {
     image: 'og-daily.png',
     alt: 'CrissCross daily puzzle card with a Connect Four board',
   },
+  rush: {
+    title: `Puzzle Rush | ${SITE}`,
+    description: 'Solve as many puzzles as you can in 3 minutes, across Tic-Tac-Toe, Connect Four, Five in a Row and Checkers. Same run for everyone today.',
+  },
   arena: {
     title: `Bot arena | ${SITE}`,
     description: 'Rated bots on a public Elo leaderboard. Watch live games, step through replays, or connect your own bot.',

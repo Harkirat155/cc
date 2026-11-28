@@ -29,8 +29,15 @@ describe('prerenderRoutes', () => {
     expect(meta(html, 'og:title')).toMatch(/Daily/);
   });
 
+  test('rush is a real page, so a shared challenge link answers 200 with a Rush preview', () => {
+    const html = fs.readFileSync(path.join(dist, 'rush', 'index.html'), 'utf8');
+    expect(html).toMatch(/<title>[^<]*Rush[^<]*<\/title>/);
+    expect(meta(html, 'og:url')).toBe(`${ORIGIN}/rush/`);
+    expect(meta(html, 'og:description')).toMatch(/3 minutes/);
+  });
+
   test('every static route is emitted with its own og:url and none claims the home page', () => {
-    expect(Object.keys(ROUTES).sort()).toEqual(['agents', 'arena', 'daily', 'live', 'lobby']);
+    expect(Object.keys(ROUTES).sort()).toEqual(['agents', 'arena', 'daily', 'live', 'lobby', 'rush']);
     for (const route of Object.keys(ROUTES)) {
       const html = fs.readFileSync(path.join(dist, route, 'index.html'), 'utf8');
       expect(meta(html, 'og:url')).toBe(`${ORIGIN}/${route}/`);
