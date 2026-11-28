@@ -36,6 +36,13 @@ describe("bot page", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("still shows the games when only the leaderboard fails", async () => {
+    stub({ lb: { ok: false, status: 500 } });
+    show();
+    expect(await screen.findByText("Won vs House (easy) · Tic-Tac-Toe · 1216")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says no bot has this name, with the since line, on a 404", async () => {
     stub({ bot: { ok: false, status: 404 } });
     show("Nobody");
@@ -107,7 +114,7 @@ describe("bot page", () => {
   it("says plainly when the bot is not rated in any game type", async () => {
     stub({ bot: ok({ name: "Ada Bot", games: [] }), lb: ok({ games: {} }) });
     show();
-    expect(await screen.findByText(/not in the top 20 of any game type/)).toBeTruthy();
+    expect(await screen.findByText(/not in the top 20 of any game type, so no rating is listed here\./)).toBeTruthy();
   });
 
   it("never lets a late answer for the previous bot overwrite the current one", async () => {

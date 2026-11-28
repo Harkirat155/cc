@@ -15,6 +15,7 @@ function ArenaBot() {
   const [state, setState] = useState("loading"); // loading | error | missing | {name, games, rated}
   const [rooms, setRooms] = useState(() => new Map()); // optional; empty on any failure
   const gen = useRef(0); // bumped on every new request and on leaving the page: an older answer is dropped
+  const liveGen = useRef(0); // live polls: only the newest tick may set rooms
   const heading = useRef(null);
   const status = useRef(null);
   const all = listAll();
@@ -25,11 +26,12 @@ function ArenaBot() {
     setState("loading");
     try {
       const get = async (path) => window.fetch(`${apiBase()}/api/arena${path}`);
-      const [bot, board] = await Promise.all([get(`/${encodeURIComponent(asked)}`), get("")]);
+      const [bot, board] = await Promise.all([get(`/${encodeURIComponent(asked)}`), get("").catch(() => null)]);
       if (gen.current !== mine) return;
       if (bot.status === 404) { setState("missing"); return; }
-      if (!bot.ok || !board.ok) throw new Error(`${bot.status}/${board.status}`);
-      const [b, lb] = [await bot.json(), await board.json()];
+      if (!bot.ok) throw new Error(String(bot.status));
+      const b = await bot.json();
+      const lb = board?.ok ? await board.json().catch(() => ({})) : {};
       if (gen.current !== mine) return;
       const key = asked.toLowerCase();
       const rated = Object.entries(lb.games ?? {}).flatMap(([id, rows]) => (rows ?? []).filter((r) => String(r.name).toLowerCase() === key).map((r) => ({ id, ...r })));
@@ -40,14 +42,14 @@ function ArenaBot() {
   }, [asked]);
 
   const loadLive = useCallback(async () => {
-    const mine = gen.current;
+    const mine = ++liveGen.current;
     try {
       const res = await window.fetch(liveUrl());
       if (!res.ok) throw new Error(String(res.status));
       const next = watchRooms((await res.json()).games);
-      if (gen.current === mine) setRooms(next);
+      if (liveGen.current === mine) setRooms(next);
     } catch {
-      if (gen.current === mine) setRooms(new Map());
+      if (liveGen.current === mine) setRooms(new Map());
     }
   }, []);
 
@@ -58,8 +60,8 @@ function ArenaBot() {
     loadLive();
     heading.current?.focus();
     const t = window.setInterval(loadLive, REFRESH_MS);
-    const g = gen; // leaving the page or the bot drops any answer still in flight
-    return () => { g.current++; window.clearInterval(t); };
+    const g = gen, lg = liveGen; // leaving the page or the bot drops any answer still in flight
+    return () => { g.current++; lg.current++; window.clearInterval(t); };
   }, [valid, load, loadLive]);
 
   const loaded = typeof state === "object";
@@ -74,12 +76,12 @@ function ArenaBot() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <Link to="/arena" className="text-sm font-medium text-foreground/60 underline-offset-4 hover:text-foreground hover:underline">← Arena</Link>
         <header>
-          <h1 ref={heading} tabIndex={-1} className="break-words text-3xl font-semibold tracking-tight outline-none sm:text-4xl">{name}</h1>
+          <h1 ref={heading} tabIndex={-1} className="focus-visible:outline-none break-words text-3xl font-semibold tracking-tight outline-none sm:text-4xl">{name}</h1>
           <p className="mt-3 text-foreground/70">{RULE}</p>
         </header>
         {!valid && <p className={note}>{asked} has no page: the House and unregistered names are never listed. Rated bots are on the <Link to="/arena" className="underline underline-offset-4">Arena</Link>.</p>}
         {valid && (
-          <div ref={status} tabIndex={-1} aria-live="polite" className="outline-none">
+          <div ref={status} tabIndex={-1} aria-live="polite" className="outline-none focus-visible:outline-none">
             {state === "loading" && <p className="text-foreground/60">Loading…</p>}
             {state === "error" && (
               <p role="alert" className={note}>{"Could not load this bot's games."} <button type="button" className="underline underline-offset-4" onClick={retry}>Try again</button></p>
@@ -94,7 +96,7 @@ function ArenaBot() {
           <>
             <section aria-labelledby="ratings">
               <h2 id="ratings" className="text-xl font-semibold">Ratings</h2>
-              {badgeIds.length === 0 ? <p className="mt-2 text-foreground/70">{name} is not in the top 20 of any game type, so no rating is listed. Rating appears once a rated game is finished.</p>
+              {badgeIds.length === 0 ? <p className="mt-2 text-foreground/70">{name} is not in the top 20 of any game type, so no rating is listed here.</p>
                 : badgeIds.map((id) => { const r = state.rated.find((x) => x.id === id); return (
                   <p key={id} className="mt-2 text-sm"><span className="font-medium">{names[id] || id}</span>{r && <> · <span>{`${r.rating} · ${r.games} ${r.games === 1 ? "game" : "games"} · ${r.wins}W ${r.draws}D ${r.losses}L`}</span></>}
                     <BadgeCopy name={name} game={id} label={`Badge: ${names[id] || id}`} gameName={names[id] || id} /></p>
