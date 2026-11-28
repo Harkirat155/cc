@@ -83,8 +83,8 @@ interface Att {
   rl?: { n: number; at: number; until: number };
 }
 // The only reactions the room relays; no free text, so nothing to moderate. One per EMOTE_GAP_MS per seat.
-const EMOTES = ["👍", "😮", "😅", "🤝"];
-const EMOTE_GAP_MS = 2000;
+const EMOTES = ["👍", "👏", "😮", "😅", "🤔", "🔥"];
+const EMOTE_GAP_MS = 1000;
 // RATE_LIMIT_* of server/config.js:33-35, same names, defaults and clamps.
 const envInt = (v: unknown, def: number, min: number, max: number) => {
   const n = parseInt(String(v), 10);

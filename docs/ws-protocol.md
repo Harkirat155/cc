@@ -108,7 +108,7 @@ Frame: `{"t":"declineDraw","d":{"roomId":string}}`. No ack. Only the seat that d
 Source: worker/src/room.ts
 
 ### `emote`
-Frame: `{"t":"emote","d":{"roomId":string,"emote":"👍"|"😮"|"😅"|"🤝"}}`. No ack. Seated players only; any other value is dropped, and so is a reaction less than 2 s after the same seat's last one. Relayed to every joined socket (sender and spectators too) as `emote`. Worker only.
+Frame: `{"t":"emote","d":{"roomId":string,"emote":"👍"|"👏"|"😮"|"😅"|"🤔"|"🔥"}}`. No ack. Seated players only; any other value is dropped, and so is a reaction less than 1 s after the same seat's last one. Relayed to every joined socket (sender and spectators too) as `emote`. Worker only.
 Source: worker/src/room.ts
 
 ### `joinLobby`

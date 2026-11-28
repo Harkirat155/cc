@@ -28,19 +28,19 @@ test("an incoming draw offer shows Accept and Decline", () => {
   expect(onAction.mock.calls).toEqual([["acceptDraw"], ["declineDraw"]]);
 });
 
-test("four labelled reactions send the chosen value and tally once per send; resign hides when the game ended", () => {
+test("six labelled reactions send the chosen value and tally once per send; resign hides when the game ended", () => {
   const onAction = setup({ status: "win" });
   expect(screen.queryByText("Resign")).toBeNull();
   expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
-    "Send thumbs up", "Send surprised", "Send relieved", "Send handshake",
+    "Send thumbs up", "Send clap", "Send surprised", "Send relieved", "Send thinking", "Send fire",
   ]);
-  fireEvent.click(screen.getByLabelText("Send handshake"));
-  expect(onAction).toHaveBeenCalledWith("emote", { emote: "🤝" });
+  fireEvent.click(screen.getByLabelText("Send fire"));
+  expect(onAction).toHaveBeenCalledWith("emote", { emote: "🔥" });
   expect(tally).toHaveBeenCalledWith("cc", "react");
   expect(tally).toHaveBeenCalledTimes(1);
 });
 
-test("the buttons are disabled for 2 s after a send", () => {
+test("the buttons are disabled for 1 s after a send", () => {
   jest.useFakeTimers();
   const onAction = setup({ status: "win" });
   fireEvent.click(screen.getByLabelText("Send thumbs up"));
@@ -48,10 +48,10 @@ test("the buttons are disabled for 2 s after a send", () => {
   expect(btns.every((b) => b.disabled)).toBe(true);
   fireEvent.click(btns[1]);
   expect(onAction).toHaveBeenCalledTimes(1);
-  act(() => { jest.advanceTimersByTime(1900); });
-  expect(screen.getByLabelText("Send surprised")).toBeDisabled();
+  act(() => { jest.advanceTimersByTime(900); });
+  expect(screen.getByLabelText("Send clap")).toBeDisabled();
   act(() => { jest.advanceTimersByTime(150); });
-  expect(screen.getByLabelText("Send surprised")).toBeEnabled();
+  expect(screen.getByLabelText("Send clap")).toBeEnabled();
   jest.useRealTimers();
 });
 

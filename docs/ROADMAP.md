@@ -50,12 +50,10 @@
   here; none existed before, only `finished_<gameId>`; lobby matches and house games are not counted by it). Kill rule: `room_create_five` under 5 % of all `room_create_*`
   within 4 weeks of launch.
 
-- Quick reactions in a game (item 2, built 2026-11-28, not live yet): four fixed reactions (👍 😮 😅 🤝) under the board for
-  seated players; a tap shows it beside the sender's seat for 3 s on both screens and to spectators, one per 2 s per seat
-  (enforced in the Worker's Room, buttons disabled for the 2 s), never stored, never free text. It replaces the earlier
-  six-emote buttons (the `emote` event, opponent-only, 1 s) rather than adding a second event. Hidden on the Fly
-  Socket.IO backend, which lacks it. Tally: `react` per send. Kill rule: `react` under 1 per 10 room games within
-  4 weeks of launch.
+- Quick emotes (live since b49da0d: six fixed emotes 👍 👏 😮 😅 🤔 🔥, one per second per seat); 2026-11-28 adds spectator view,
+  seat placement (3 s beside the sender's seat on every screen), screen-reader labels and announcements, 44 px buttons,
+  buttons hidden on the Fly backend, and a `react` tally per send (built in PR #93, not live yet). Spectators get no buttons
+  and the server drops their sends.
 
 ## Next
 
