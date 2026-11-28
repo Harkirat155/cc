@@ -103,7 +103,7 @@ the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTT
    "Beat 7 in today's Puzzle Rush" and which sends the browser on to `/rush/?beat=N&via=b`; invalid N answers 404 like `/j/`. Data:
    tally `cc` `rush_beat_arrival`, once per arrival through `via=b`. Judge with item 3's rule: arrivals per `rush_beat_link`.
 
-5. **Today's best Rush, checked by the server (explore).** Seen by: everyone on the Rush start and end screens. Changes: the
+5. **Today's best Rush, checked by the server (built; explore).** Seen by: everyone on the Rush start and end screens. Changes: the
    Worker issues a run token at start and replays the finished run's moves against `shared/rush.js` (the same puzzles for
    everyone), so the day's best score is one no client can claim without solving; the page shows "Today's best: N" with
    its rule in words. No names, no accounts, no per-player record. Data: tally `rush_verified`. Kill: fewer than 10 verified

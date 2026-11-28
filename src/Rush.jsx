@@ -7,6 +7,7 @@ import { GAME_NAMES, checkersMoves, todayUtc } from "@shared/daily.js";
 import { RUSH_SECONDS, rushPuzzle, rushStep } from "@shared/rush.js";
 import GameBoard from "./components/GameBoard";
 import { FiveWindow, ShareResult } from "./Daily";
+import { liveUrl } from "./Live";
 import { tally } from "./lib/tally";
 
 const KEY = "cc.rush";
@@ -41,6 +42,23 @@ function Challenge({ score }) {
   );
 }
 
+// Today's best, checked by the server (it replays every move). Any failure returns undefined and the line is left out.
+const rushApi = async (path, body) => {
+  try {
+    const res = await window.fetch(liveUrl().replace(/\/api\/live$/, path), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+    return res.ok ? await res.json() : undefined;
+  } catch { return undefined; }
+};
+
+function TodayBest({ best }) {
+  if (best === undefined) return null;
+  return (
+    <p className="text-sm text-foreground/70">
+      Today's best: {best === null ? "no checked run yet" : best}. Checked by the server: it replays every move on today's puzzles, within 3 minutes.
+    </p>
+  );
+}
+
 const readBest = (day) => {
   try {
     const s = JSON.parse(window.localStorage.getItem(KEY));
@@ -57,11 +75,12 @@ const prompt = (p) => {
 };
 
 // One puzzle; remounted (keyed by slot) for each next one so its board state always starts fresh.
-function Puzzle({ p, onDone }) {
+function Puzzle({ p, onDone, onMove }) {
   const [state, setState] = useState({ board: p.board, left: p.n });
   const [sel, setSel] = useState(null);
   const { board } = state;
   const play = (move) => {
+    onMove(p.game === "checkers" ? { from: move.from, to: move.to } : move);
     const r = rushStep(p, state, move);
     if (r.result === "continue") setState(r); else onDone(r.result === "solved");
   };
@@ -91,7 +110,7 @@ function Puzzle({ p, onDone }) {
   );
 }
 
-function Run({ day, onEnd }) {
+function Run({ day, onEnd, onMove }) {
   const [k, setK] = useState(0);
   const [solved, setSolved] = useState(0);
   const [left, setLeft] = useState(RUSH_SECONDS);
@@ -124,7 +143,7 @@ function Run({ day, onEnd }) {
         <span role="timer" aria-label="Time left">{mm}:{ss}</span>
       </div>
       <p className="w-full font-medium">{GAME_NAMES[p.game]}. {prompt(p)}</p>
-      <Puzzle key={k} p={p} onDone={done} />
+      <Puzzle key={k} p={p} onDone={done} onMove={(m) => onMove(k, m)} />
       <p role="status" aria-live="polite" className="text-sm text-foreground/70">{flash}</p>
     </>
   );
@@ -136,6 +155,13 @@ function Rush() {
   const [phase, setPhase] = useState("intro"); // intro | run | done
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => readBest(day));
+  const [checked, setChecked] = useState(); // the server's best for today: undefined (unknown), null (none yet) or a number
+  const run = useRef({ id: null, moves: [] });
+  useEffect(() => {
+    let live = true;
+    rushApi("/api/rush/best").then((r) => { if (live && r && "best" in r) setChecked(r.best); });
+    return () => { live = false; };
+  }, []);
   const finish = (n) => {
     const top = Math.max(n, readBest(day));
     try { window.localStorage.setItem(KEY, JSON.stringify({ date: day, best: top })); } catch { /* ignore */ }
@@ -143,8 +169,16 @@ function Rush() {
     setScore(n);
     setBest(top);
     setPhase("done");
+    const { id, moves } = run.current;
+    if (id) rushApi("/api/rush/finish", { id, moves }).then((r) => { if (r && Number.isInteger(r.best)) { setChecked(r.best); tally("cc", "rush_verified"); } });
   };
-  const start = () => { tally("cc", "rush_start"); setPhase("run"); };
+  const start = () => {
+    tally("cc", "rush_start");
+    const mine = (run.current = { id: null, moves: [] });
+    rushApi("/api/rush/start", {}).then((r) => { if (r && typeof r.id === "string") mine.id = r.id; });
+    setPhase("run");
+  };
+  const onMove = (k, m) => { const { moves } = run.current; while (moves.length <= k) moves.push([]); moves[k].push(m); };
   const pill = "min-h-11 rounded-full border border-foreground/20 px-4 py-2 text-sm font-medium";
   return (
     <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -156,15 +190,17 @@ function Rush() {
             <p className="mt-2 text-foreground/70">Solve as many puzzles as you can in 3 minutes, across Tic-Tac-Toe, Connect Four, Five in a Row and Checkers. A move that lets the win slip skips that puzzle. Same run for everyone today.</p>
             {target > 0 && <p className="mt-2 text-lg font-semibold">Beat {target}</p>}
             {best > 0 && <p className="mt-2 text-sm text-foreground/70">Your best today: {best}</p>}
+            <div className="mt-2"><TodayBest best={checked} /></div>
             <button type="button" onClick={start} className={`${pill} mt-4`}>Start</button>
           </header>
         )}
-        {phase === "run" && <Run day={day} onEnd={finish} />}
+        {phase === "run" && <Run day={day} onEnd={finish} onMove={onMove} />}
         {phase === "done" && (
           <section className="flex flex-col items-center gap-3 text-center" role="status">
             <h1 className="text-3xl font-semibold tracking-tight">You solved {score} {score === 1 ? "puzzle" : "puzzles"}</h1>
             {target > 0 && <p className="font-medium">{beatVerdict(score, target)}</p>}
             <p className="text-foreground/70">Best today: {best}</p>
+            <TodayBest best={checked} />
             <ShareResult text={rushShareText(score)} url={RUSH_LINK} />
             {score > 0 && <Challenge score={score} />}
             <button type="button" onClick={start} className={pill}>Run again</button>

@@ -3,6 +3,9 @@ import { genCode, validateGameId } from "./validation";
 import { FIRST_CUP, cupDrawTime, pairRounds } from "./cup";
 import { buildEntry, MAX_ENTRIES, type FeedbackEntry, type FeedbackInput } from "./feedbackStore";
 
+import { replayScore, type Move } from "./rush";
+import { RUSH_SECONDS } from "../../shared/rush.js";
+
 type Msg = Record<string, unknown>;
 interface Att { sid: string }
 const LIVE_MAX = 50;
@@ -18,6 +21,8 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 // outside BOT_NAME, so the exact names cannot be registered; RESERVED also catches "House easy", "house-easy", "HOUSE_HARD".
 const HOUSE_NAMES: Record<string, string> = { "house (easy)": "House (easy)", "house (medium)": "House (medium)", "house (hard)": "House (hard)" };
 const RESERVED = /^house(easy|medlum|hard)$/; // compared after 0->o, 1/i->l and stripping everything else
+const RUSH_KEEP_MS = 15 * 60_000; // an unfinished run id is dropped after this
+const RUSH_MAX_OPEN = 5000; // bounds rush_runs against start spam
 const CUP_WEEK_MS = 7 * 86_400_000;
 const HOUSE_DAILY = 20; // rated house games per bot per UTC day; later ones are played but unrated
 type Replay = { first: 0 | 1; moves: unknown[] };
@@ -52,7 +57,41 @@ export class Lobby extends DurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS cup_runs (week TEXT NOT NULL, game_id TEXT NOT NULL, entrants INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (week, game_id))");
     sql.exec("CREATE TABLE IF NOT EXISTS cup_entries (week TEXT NOT NULL, game_id TEXT NOT NULL, name_lc TEXT NOT NULL, rating REAL NOT NULL, PRIMARY KEY (week, game_id, name_lc))");
     sql.exec("CREATE TABLE IF NOT EXISTS cup_pairings (week TEXT NOT NULL, game_id TEXT NOT NULL, round INTEGER NOT NULL, a_lc TEXT NOT NULL, b_lc TEXT, PRIMARY KEY (week, game_id, round, a_lc))");
+    // Puzzle Rush best (docs/ROADMAP.md item 5). rush_runs holds issued run ids until finish or expiry; rush_best one row per UTC day. No player data.
+    sql.exec("CREATE TABLE IF NOT EXISTS rush_runs (id TEXT PRIMARY KEY, day TEXT NOT NULL, t0 INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS rush_best (day TEXT PRIMARY KEY, best INTEGER NOT NULL)");
     sql.exec("INSERT OR IGNORE INTO unlisted_bots (name_lc) VALUES ('smokerecent42775'), ('smokehouse14206'), ('cc-launch-check')");
+  }
+
+  rushStart(): { id: string; day: string } | null {
+    const sql = this.ctx.storage.sql;
+    const now = Date.now();
+    sql.exec("DELETE FROM rush_runs WHERE t0 < ?", now - RUSH_KEEP_MS);
+    if (sql.exec<{ n: number }>("SELECT COUNT(*) AS n FROM rush_runs").one().n >= RUSH_MAX_OPEN) return null;
+    const id = crypto.randomUUID();
+    const day = new Date(now).toISOString().slice(0, 10);
+    sql.exec("INSERT INTO rush_runs (id, day, t0) VALUES (?, ?, ?)", id, day, now);
+    return { id, day };
+  }
+
+  // The id is spent whatever happens next (a bad body is checked by the caller before this is reached).
+  rushFinish(id: string, moves: Move[][]): { status: 200; body: { score: number; best: number } } | { status: 404 | 410 } {
+    const sql = this.ctx.storage.sql;
+    const now = Date.now();
+    sql.exec("DELETE FROM rush_runs WHERE t0 < ?", now - RUSH_KEEP_MS);
+    const run = sql.exec<{ day: string; t0: number }>("SELECT day, t0 FROM rush_runs WHERE id = ?", id).toArray()[0];
+    if (!run) return { status: 404 };
+    sql.exec("DELETE FROM rush_runs WHERE id = ?", id);
+    if (now - run.t0 > (RUSH_SECONDS + 10) * 1000) return { status: 410 };
+    const score = replayScore(run.day, moves);
+    const prev = sql.exec<{ best: number }>("SELECT best FROM rush_best WHERE day = ?", run.day).toArray()[0]?.best ?? 0;
+    if (score > prev) sql.exec("INSERT OR REPLACE INTO rush_best (day, best) VALUES (?, ?)", run.day, score);
+    return { status: 200, body: { score, best: Math.max(prev, score) } };
+  }
+
+  rushBest(): { day: string; best: number | null } {
+    const day = new Date().toISOString().slice(0, 10);
+    return { day, best: this.ctx.storage.sql.exec<{ best: number }>("SELECT best FROM rush_best WHERE day = ?", day).toArray()[0]?.best ?? null };
   }
 
   async registerBot(name: unknown, ip: string, unlisted = false): Promise<{ status: number; body: { name?: string; key?: string; error?: string } }> {
