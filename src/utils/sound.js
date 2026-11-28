@@ -22,6 +22,15 @@ export function subscribeSound(fn) {
   return () => listeners.delete(fn);
 }
 
+/**
+ * The slot whose wins and losses are "mine": the X/O seat online (labels such as Red/Yellow differ per
+ * game, so never match on them), the human's slot against the computer, else null (spectator, local).
+ */
+export function viewerSlotFor({ player, isMultiplayer, botSlot }) {
+  if (isMultiplayer) return player === "X" ? 0 : player === "O" ? 1 : null;
+  return botSlot === 0 || botSlot === 1 ? 1 - botSlot : null;
+}
+
 const sameBoard = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i]);
 
 /**

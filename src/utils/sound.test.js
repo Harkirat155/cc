@@ -1,4 +1,4 @@
-import { soundFor } from "./sound";
+import { soundFor, viewerSlotFor } from "./sound";
 
 const s = (over) => ({ gameId: "ttt", status: "active", board: Array(9).fill(null), turnSlot: 0, winnerSlot: null, ...over });
 const afterMove = (prev, over) => s({ board: ["X", ...prev.board.slice(1)], turnSlot: 1, ...over });
@@ -33,5 +33,19 @@ describe("soundFor", () => {
     expect(soundFor(over, a, 0)).toBeNull();
     expect(soundFor(a, s({ gameId: "connect4", board: Array(42).fill(null) }), 0)).toBeNull();
     expect(soundFor(over, { ...over, board: ["O", ...over.board.slice(1)] }, 0)).toBeNull();
+  });
+});
+
+describe("viewerSlotFor", () => {
+  it("maps the X/O seat to a slot for every game, whatever its colour labels", () => {
+    expect(viewerSlotFor({ player: "X", isMultiplayer: true, botSlot: null })).toBe(0);
+    expect(viewerSlotFor({ player: "O", isMultiplayer: true, botSlot: null })).toBe(1);
+  });
+  it("is null for a spectator and for a local two-player game", () => {
+    expect(viewerSlotFor({ player: null, isMultiplayer: true, botSlot: null })).toBeNull();
+    expect(viewerSlotFor({ player: "X", isMultiplayer: false, botSlot: null })).toBeNull();
+  });
+  it("is the human's slot against the computer", () => {
+    expect(viewerSlotFor({ player: null, isMultiplayer: false, botSlot: 1 })).toBe(0);
   });
 });
