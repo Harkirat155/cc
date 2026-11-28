@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import connect4 from "@shared/games/connect4.js";
 import { defenderReply, keepsWin, puzzleForDate, todayUtc } from "@shared/daily.js";
 import GameBoard from "./components/GameBoard";
+import { badgeBase } from "./arenaShared";
+import { tally } from "./lib/tally";
 
 const KEY = "cc.daily";
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -47,22 +49,30 @@ const drop = (board, col, mark) => {
   return next;
 };
 
-export const resultLine = (date, tries, streak = 1) =>
-  `CrissCross daily ${date} · solved in ${tries} ${tries === 1 ? "try" : "tries"}${streak >= 2 ? ` · day ${streak} in a row` : ""} · harkirat155.github.io/cc/daily`;
+// The share text holds only numbers from this device's record. The link carries the date alone (the Worker's /d/:date card), so no result number is ever parsed from a URL.
+export const shareText = (date, tries, streak = 1) =>
+  `CrissCross Daily ${date} · solved in ${tries} ${tries === 1 ? "try" : "tries"}${streak >= 2 ? ` · ${streak} days in a row` : ""}`;
+export const shareLink = (date) => `${badgeBase()}/d/${date}`;
+export const resultLine = (date, tries, streak = 1) => `${shareText(date, tries, streak)} ${shareLink(date)}`;
 
-function CopyResult({ text }) {
+function ShareResult({ date, tries, streak }) {
   const [state, setState] = useState(""); // "" | "ok" | "failed"
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(text); setState("ok"); }
+  const text = shareText(date, tries, streak);
+  const url = shareLink(date);
+  const share = async () => {
+    try {
+      if (navigator.share) { await navigator.share({ text, url }); return; }
+    } catch (e) { if (e?.name === "AbortError") return; /* any other failure: fall back to copying */ }
+    try { await navigator.clipboard.writeText(`${text}\n${url}`); setState("ok"); }
     catch { setState("failed"); }
   };
   return (
     <>
-      <button type="button" onClick={copy} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
-        {state === "ok" ? "Copied" : "Copy"}
+      <button type="button" onClick={share} className="rounded-full border border-foreground/20 px-3 py-1.5 text-sm font-medium">
+        {state === "ok" ? "Copied" : "Share result"}
       </button>
       {state === "failed" && (
-        <input readOnly aria-label="Result line" value={text} onFocus={(e) => e.target.select()} className="mt-2 block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm" />
+        <input readOnly aria-label="Result line" value={`${text} ${url}`} onFocus={(e) => e.target.select()} className="mt-2 block w-full rounded border border-foreground/20 bg-transparent px-2 py-1 text-sm" />
       )}
     </>
   );
@@ -72,6 +82,9 @@ function CopyResult({ text }) {
 function Daily() {
   const [today, setToday] = useState(() => todayUtc());
   const [past, setPast] = useState(false);
+  // Arrivals through a shared /d/ link (the Worker adds ?via=d): the share bet's kill-rule signal, counted once per page load.
+  const { search } = useLocation();
+  useEffect(() => { if (new window.URLSearchParams(search).get("via") === "d") tally("cc", "daily_link"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const next = Date.parse(`${today}T00:00:00Z`) + 86400000;
     const t = window.setTimeout(() => { setToday(todayUtc()); setPast(false); }, Math.max(next - Date.now(), 0) + 50);
@@ -162,7 +175,7 @@ function DailyPuzzle({ date, past, onSwitch }) {
               <p className="font-semibold">Solved.</p>
               <p className="mt-1 text-sm">Day {streak} in a row</p>
               <p className="mt-2 break-words text-sm">{resultLine(date, saved.tries, streak)}</p>
-              <div className="mt-2"><CopyResult text={resultLine(date, saved.tries, streak)} /></div>
+              <div className="mt-2"><ShareResult date={date} tries={saved.tries} streak={streak} /></div>
             </>
           ) : slipped ? (
             <>
