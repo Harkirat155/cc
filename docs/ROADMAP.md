@@ -113,6 +113,27 @@ the surface people reach. Until #107/#108 every `/rush?beat=N` link answered HTT
    downloads a calendar file (`.ics`, a daily event at the UTC reset, made on the device), so people come back without an
    account or push permission. Data: tally `daily_remind`. Judge by `daily_play` from returning days.
 
+7. **Play with no signal (built; exploit).** Seen by: anyone who installed the app or opened it before, then lost signal (the
+   manifest says standalone but nothing was cached, so the installed app showed nothing). Changes: a hand-written service worker
+   (`src/sw/worker.js`, decisions in `src/sw/core.js`, bundled to `dist/sw.js` by `scripts/swBuild.js` from the vite build) keeps
+   the built app shell, every route chunk and the prerendered pages on the phone, so `/`, local play, play-the-computer and the
+   daily (deterministic by date, `shared/daily.js`) open with no network. Navigations go network first and fall back to the
+   cached page; hashed files go cache first; `/api`, sockets, tally, cross-origin and non-GET requests are never touched.
+   Registered in `src/index.jsx` in production builds only. Where a feature needs the network (lobby, `/live`, `/arena`, a
+   `/room/` link, Rush's server-checked best, the home "Play a friend" door) one plain line says "No signal: play the computer
+   or a friend on this phone" with a "Play the computer" button (`src/components/NoSignal.jsx`); no online data is faked or
+   hidden. Data: nothing new is sent and no tally; on the phone, one cache `cc-shell-<build hash>` of about 1.5 MB (files of
+   the build, no user data). Update path: the build hash is computed from the bytes of every shipped file, so each deploy changes `sw.js`; the browser
+   rechecks it on each visit and the new worker precaches into a new cache (all or nothing). It does not skip waiting or claim
+   pages: it stays waiting until every tab on the old version is closed, then activates and deletes older `cc-shell-*`
+   caches, so an open old tab keeps its own chunks. If a lazy chunk of an old bundle is gone anyway (`src/lib/lazyReload.js`),
+   the tab reloads (at most once per 10 minutes) to get the new bundle. Offline, "Play the computer" from a room link starts the computer game and the
+   home "Play a friend" door is disabled. Kill switch: `CC_SW_KILL=1 npm run build` emits `src/sw/kill.js` as `sw.js`;
+   deploy it and every phone that picks it up deletes all `cc-shell-*` caches, takes over its open pages, unregisters the worker and reloads those pages
+   (recovery from a stale-deploy report; later normal builds register the offline worker again only if `registerSw` is
+   left in `src/index.jsx`, so remove that call in the same change to retire the feature). Kill rule: remove the worker (ship a `sw.js` that unregisters itself) on any stale-deploy bug report, or if the Pages deploy
+   check sees an old bundle served after an update.
+
 Not here: anything on the house opponent (PR #65); rated human play (humans are a fixed guest pool by design in
 `docs/arena.md`); any paid service or custom domain.
 

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "@shared/games/index.js";
 import OpenSeats from "./OpenSeats";
+import NoSignal from "./components/NoSignal";
+import useOnline from "./hooks/useOnline";
 import { listAll } from "@shared/games/registry.js";
 
 const REFRESH_MS = 10_000;
@@ -21,6 +23,7 @@ function Live() {
   const [games, setGames] = useState(null); // null = loading
   const [open, setOpen] = useState([]);
   const [failed, setFailed] = useState(false);
+  const online = useOnline();
   const names = Object.fromEntries(listAll().map((g) => [g.id, g.displayName]));
 
   const load = useCallback(async () => {
@@ -55,7 +58,9 @@ function Live() {
           </p>
         </header>
 
-        {failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the list. Retrying every {REFRESH_MS / 1000} seconds.</p>}
+        {!online
+          ? <NoSignal />
+          : failed && <p role="alert" className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">Could not load the list. Retrying every {REFRESH_MS / 1000} seconds.</p>}
         {!failed && games === null && <p className="text-foreground/60">Loading…</p>}
         {!failed && games?.length === 0 && (
           <p className="rounded-2xl border border-foreground/10 p-4 text-foreground/70">

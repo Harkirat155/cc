@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { prerenderRoutes } from './scripts/prerenderRoutes.js';
+import { buildWorker } from './scripts/swBuild.js';
 
 const prerender = () => {
   let outDir;
@@ -9,7 +10,8 @@ const prerender = () => {
     name: 'prerender-routes',
     apply: 'build',
     configResolved: (c) => { outDir = c.build.outDir; },
-    closeBundle: () => prerenderRoutes(outDir),
+    // The worker's file list is read after prerendering so the per-route pages are in it.
+    closeBundle: async () => { prerenderRoutes(outDir); await buildWorker(outDir, '/cc/', { kill: process.env.CC_SW_KILL === '1' }); },
   };
 };
 

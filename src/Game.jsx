@@ -19,6 +19,8 @@ import FeedbackDialog from "./components/FeedbackDialog";
 import OpponentControl from "./components/OpponentControl";
 import HomeDoors from "./components/HomeDoors";
 import RoomActions from "./components/RoomActions";
+import NoSignal from "./components/NoSignal";
+import useOnline from "./hooks/useOnline";
 import useGameSounds from "./hooks/useGameSounds";
 import { viewerSlotFor } from "./utils/sound";
 import useOpponent from "./hooks/useOpponent";
@@ -28,6 +30,7 @@ import { tally } from "./lib/tally";
 
 const Game = () => {
   const navigate = useNavigate();
+  const online = useOnline();
   const { roomId: paramRoomId } = useParams();
   const [searchParams] = useSearchParams();
   // Allow deep-linking a game variant: /?game=connect4 will create rooms with
@@ -376,6 +379,7 @@ const Game = () => {
               }}
             />
           )}
+          {paramRoomId && !online && <NoSignal onPlay={() => { setOpponent({ mode: "computer" }); resetGame(); navigate("/"); }}>This room needs a connection.</NoSignal>}
           {!isMultiplayer && history.length <= 1 && (
             <HomeDoors
               onComputer={() => { setOpponent({ mode: "computer" }); resetGame(); }}

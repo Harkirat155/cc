@@ -10,6 +10,7 @@ import { FiveWindow, ShareResult } from "./Daily";
 import { liveUrl } from "./Live";
 import { badgeBase } from "./arenaShared";
 import { tally } from "./lib/tally";
+import useOnline from "./hooks/useOnline";
 
 const KEY = "cc.rush";
 const NAMES = { ttt: ["X", "O"], connect4: ["Red", "Yellow"], five: ["Blue", "Green"], checkers: ["Red", "Amber"] };
@@ -53,7 +54,8 @@ const rushApi = async (path, body) => {
 };
 
 function TodayBest({ best }) {
-  if (best === undefined) return null;
+  const online = useOnline();
+  if (best === undefined) return online ? null : <p role="status" className="text-sm text-foreground/70">No signal: today&apos;s best is checked by the server, so it is not shown. The puzzles still play.</p>;
   return (
     <p className="text-sm text-foreground/70">
       Today's best: {best === null ? "no checked run yet" : best}. Checked by the server: it replays every move on today's puzzles, within 3 minutes.
