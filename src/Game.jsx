@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import GameBoard from "./components/GameBoard";
 import HistoryPanel from "./components/HistoryPanel";
 import MatchActionBar from "./components/MatchActionBar";
@@ -374,6 +374,11 @@ const Game = () => {
                 if ("humanSlot" in patch || "mode" in patch) resetGame();
               }}
             />
+          )}
+          {!isMultiplayer && (
+            <p className="-mt-4 text-sm text-foreground/60">
+              Daily puzzle: win in 2 or 3. <Link to="/daily" className="underline underline-offset-4">Play today&apos;s</Link>
+            </p>
           )}
           <ScorePanel
             gameState={gameState}
