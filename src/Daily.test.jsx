@@ -120,3 +120,43 @@ describe("daily page", () => {
     expect((await screen.findByLabelText("Result line")).value).toMatch(/^CrissCross daily 2026-11-28/);
   });
 });
+
+describe("daily streak", () => {
+  const seed = (rec) => window.localStorage.setItem("cc.daily", JSON.stringify(rec));
+  const read = () => JSON.parse(window.localStorage.getItem("cc.daily"));
+
+  it("counts consecutive solved days, from a record kept before streaks existed", () => {
+    seed({ date: "2026-11-27", tries: 1, solved: true });
+    show();
+    solve(puzzleForDate(DATE));
+    expect(screen.getByText("Day 2 in a row")).toBeTruthy();
+    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 1 try · day 2 in a row · harkirat155.github.io/cc/daily")).toBeTruthy();
+  });
+
+  it("resets after a gap and leaves the day-1 result line unchanged", () => {
+    seed({ date: "2026-11-25", tries: 1, solved: true, days: ["2026-11-24", "2026-11-25"] });
+    show();
+    solve(puzzleForDate(DATE));
+    expect(screen.getByText("Day 1 in a row")).toBeTruthy();
+    expect(screen.getByText("CrissCross daily 2026-11-28 · solved in 1 try · harkirat155.github.io/cc/daily")).toBeTruthy();
+  });
+
+  it("Try yesterday's loads yesterday's puzzle, keeps today's record, and a late solve extends the streak", () => {
+    seed({ date: "2026-11-26", tries: 1, solved: true });
+    show();
+    solve(puzzleForDate(DATE));
+    expect(screen.getByText("Day 1 in a row")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try yesterday's" }));
+    expect(screen.getByText(/Daily puzzle · 2026-11-27/)).toBeTruthy();
+    solve(puzzleForDate("2026-11-27"));
+    expect(read()).toMatchObject({ date: DATE, tries: 1, solved: true });
+    fireEvent.click(screen.getByRole("button", { name: "Back to today's" }));
+    expect(screen.getByText("Day 3 in a row")).toBeTruthy();
+  });
+
+  it("offers Try yesterday's after a slip too", () => {
+    show();
+    drop(slip(puzzleForDate(DATE)));
+    expect(screen.getByRole("button", { name: "Try yesterday's" })).toBeTruthy();
+  });
+});
